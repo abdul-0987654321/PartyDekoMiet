@@ -39,3 +39,52 @@ button.primary:hover { filter: brightness(1.1); }
 @media (prefers-color-scheme: light) {
   :root { --bg:#f6f7fb; --card:#fff; --line:#e3e6ef; --text:#1b1d29; --muted:#6b7183; }
 }
+
+/* ── Navigation ── */
+nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 20px; }
+nav a {
+  padding: 7px 13px; border-radius: 8px; text-decoration: none; color: var(--muted); font-size: 14px;
+}
+nav a:hover { background: var(--card); color: var(--text); }
+nav a.on { background: var(--card); color: var(--text); font-weight: 600; }
+nav .spacer { flex: 1; }
+nav button.link { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 7px 10px; }
+nav button.link:hover { color: var(--text); }
+.langswitch { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.langswitch button {
+  background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px;
+  font-weight: 600; padding: 6px 10px;
+}
+.langswitch button.on { background: var(--accent); color: #fff; }
+
+/* ── Settings form ── */
+h2 { font-size: 15px; margin: 24px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.field { padding: 13px 0; border-bottom: 1px solid var(--line); }
+.field:last-child { border-bottom: 0; }
+.field label { display: block; font-weight: 600; margin-bottom: 3px; font-size: 14px; }
+.field .help { color: var(--muted); font-size: 12.5px; margin: 0 0 7px; }
+.field input[type=text], .field input[type=number], .field select {
+  width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font-size: 14px; font-family: inherit;
+}
+.field input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+.field .src { float: right; font-size: 11px; color: var(--muted); font-weight: 400; }
+.actions { position: sticky; bottom: 0; padding: 14px 0; background: var(--bg); }
+button.ghost {
+  padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer;
+  background: none; color: var(--text); font-size: 14px;
+}
+button.ghost:hover { background: var(--card); }
+.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ── Tables ── */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td a { color: var(--accent); }
+.scroll { overflow-x: auto; }
+
+/* ── QR ── */
+.qr { text-align: center; padding: 10px; }
+.qr img { width: 280px; max-width: 100%; border-radius: 10px; background: #fff; padding: 10px; }
+code.mail { background: var(--bg); padding: 2px 6px; border-radius: 5px; font-size: 12.5px; word-break: break-all; }

@@ -10,17 +10,25 @@ const config = {
   env: 'test',
   openai: { model: 'gpt-4o-mini', apiKey: '' },
   calendar: { id: '', serviceAccountJsonB64: '' },
+  storage: { webhookUrl: '', secret: '' },
   whatsapp: { ownerNumber: '41791234567' },
   business: { rentalDays: 3, depositChf: 50 },
   web: { port: 0, dashboardPassword: 'test-password-123' },
 };
 const state = { startedAt: new Date().toISOString(), ready: true, storageError: null, storageWarning: null, knowledge: { source: 'files', faqEntries: 15 } };
 
+// A minimal settings stand-in: the real one needs storage, which these tests do not use.
+const fakeSettings = {
+  all: () => ({ dashboardLanguage: 'de', botEnabled: true, botLanguage: 'auto', calendarId: '', ownerWhatsapp: '41791234567' }),
+  describe: () => [],
+  get: () => null,
+};
+
 let server;
 let base;
 
 before(async () => {
-  const app = createServer({ config, state });
+  const app = createServer({ config, state, settings: fakeSettings });
   await new Promise((resolve) => {
     server = app.listen(0, resolve);
   });

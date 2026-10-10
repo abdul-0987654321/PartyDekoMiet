@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buchungen – PartyDekoMiet Bot</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <header id="nav"></header>
+  <h1 id="title"></h1>
+  <div class="card scroll" id="wrap"><p class="muted" id="loading"></p></div>
+</main>
+<script src="/app.js"></script>
+<script>
+renderNav('/bookings');
+$('title').textContent = t('nav_bookings');
+$('loading').textContent = t('loading');
+
+async function refresh() {
+  const d = await api('/api/bookings');
+  const rows = d.bookings || [];
+  if (!rows.length) { $('wrap').innerHTML = `<p class="muted">${t('no_bookings')}</p>`; return; }
+
+  $('wrap').innerHTML = `<table>
+    <thead><tr>
+      <th>${t('b_id')}</th><th>${t('b_status')}</th><th>${t('b_customer')}</th><th>${t('b_product')}</th>
+      <th>${t('b_pickup')}</th><th>${t('b_return')}</th><th>${t('b_created')}</th>
+    </tr></thead>
+    <tbody>${rows.map((b) => `<tr>
+      <td>${esc(b.id)}</td>
+      <td>${pill(b.status, b.status === 'CONFIRMED' ? 'ok' : b.status === 'CANCELLED' ? 'err' : 'warn')}</td>
+      <td>${esc(b.customerName)}<br><span class="muted">${esc(b.phone)}</span></td>
+      <td>${b.productUrl ? `<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)}</a>` : esc(b.productTitle)}</td>
+      <td>${esc(b.pickupDate)}</td>
+      <td>${esc(b.returnDate)}</td>
+      <td>${fmtDate(b.createdAt)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+refresh(); setInterval(refresh, 15000);
+</script>
+</body>
+</html>

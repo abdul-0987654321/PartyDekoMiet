@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp – PartyDekoMiet Bot</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <header id="nav"></header>
+  <h1 id="title"></h1>
+  <p class="muted" id="hint"></p>
+  <div id="alerts"></div>
+
+  <div class="card">
+    <div class="row"><span>Status</span><span id="st">…</span></div>
+    <div class="row"><span id="l_num">Nummer</span><span id="num">–</span></div>
+    <div class="row"><span id="l_since">Seit</span><span id="since">–</span></div>
+  </div>
+
+  <div class="card qr" id="qrcard"></div>
+
+  <div class="card inline">
+    <button class="ghost" id="connect"></button>
+    <button class="ghost" id="relink"></button>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+renderNav('/whatsapp');
+$('title').textContent = t('qr_title');
+$('hint').textContent = t('qr_scan');
+$('connect').textContent = t('connect');
+$('relink').textContent = t('relink');
+
+$('connect').onclick = async () => { await api('/api/whatsapp/connect', { method: 'POST' }); refresh(); };
+$('relink').onclick = async () => {
+  if (!confirm(t('relink_confirm'))) return;
+  await api('/api/whatsapp/relink', { method: 'POST' });
+  refresh();
+};
+
+async function refresh() {
+  let d;
+  try { d = await api('/api/whatsapp'); }
+  catch { $('alerts').innerHTML = `<p class="banner err">${t('unreachable')}</p>`; return; }
+
+  $('st').innerHTML = d.status === 'connected' ? pill(t('connected'), 'ok')
+    : d.status === 'qr' ? pill('QR', 'warn') : pill(d.status || '–', 'warn');
+  $('num').textContent = d.me?.id ? String(d.me.id).split(':')[0] : '–';
+  $('since').textContent = fmtDate(d.connectedAt);
+
+  $('alerts').innerHTML = d.lastDisconnect?.message
+    ? `<p class="banner warn">${esc(d.lastDisconnect.message)}</p>` : '';
+
+  $('qrcard').innerHTML = d.qrDataUrl
+    ? `<img src="${d.qrDataUrl}" alt="QR">`
+    : `<p class="muted">${d.connected ? t('qr_connected') : t('qr_wait')}</p>`;
+}
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>

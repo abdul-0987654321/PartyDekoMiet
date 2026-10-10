@@ -73,6 +73,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   app.get('/settings', page('settings.html'));
   app.get('/whatsapp', page('whatsapp.html'));
   app.get('/bookings', page('bookings.html'));
+  app.get('/chats', page('chats.html'));
 
   app.get('/api/status', (req, res) => {
     const s = settings ? settings.all() : {};
@@ -154,6 +155,84 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     if (!runtime.router) return res.status(503).json({ ok: false, error: 'router not ready' });
     runtime.router.resume(String(req.body?.jid || ''));
     res.json({ ok: true, paused: runtime.router.listPaused() });
+  }));
+
+  app.post('/api/whatsapp/pair', safe(async (req, res) => {
+    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(await whatsapp.startPairing(String(req.body?.number || '')));
+  }));
+
+  app.post('/api/whatsapp/pair/cancel', safe(async (req, res) => {
+    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(whatsapp.cancelPairing());
+  }));
+
+  // ---- Chats ----
+  // The owner reads conversations here and can step in. Sending from the
+  // dashboard also pauses the bot in that chat, so the two never talk at once.
+  app.get('/api/chats', (req, res) => {
+    const byJid = new Map();
+    for (const m of db.all('chat')) {
+      const prev = byJid.get(m.jid);
+      if (!prev || String(m.at) > String(prev.at)) byJid.set(m.jid, m);
+      const entry = byJid.get(m.jid);
+      entry.count = (entry.count || 0) + 1;
+    }
+    const paused = new Set((runtime.router ? runtime.router.listPaused() : []).map((p) => p.jid));
+    const chats = [...byJid.entries()]
+      .map(([jid, last]) => {
+        const customer = db.get('customers', jid);
+        return {
+          jid,
+          phone: jid.split('@')[0],
+          name: customer?.name || customer?.pushName || null,
+          lastAt: last.at,
+          lastText: String(last.text || '').slice(0, 120),
+          lastDirection: last.direction,
+          messages: last.count || 0,
+          paused: paused.has(jid),
+        };
+      })
+      .sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt)));
+    res.json({ ok: true, chats });
+  });
+
+  app.get('/api/chats/:jid', (req, res) => {
+    const jid = String(req.params.jid);
+    const messages = db
+      .all('chat')
+      .filter((m) => m.jid === jid)
+      .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+      .slice(-300);
+    const customer = db.get('customers', jid) || null;
+    const paused = (runtime.router ? runtime.router.listPaused() : []).find((p) => p.jid === jid) || null;
+    res.json({ ok: true, jid, phone: jid.split('@')[0], customer, paused, messages });
+  });
+
+  app.post('/api/chats/:jid/send', safe(async (req, res) => {
+    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    const jid = String(req.params.jid);
+    const text = String(req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ ok: false, error: 'text required' });
+    if (!whatsapp.isConnected()) {
+      // Not a server fault: the phone is simply not linked right now.
+      return res.status(503).json({ ok: false, error: 'WhatsApp ist nicht verbunden.' });
+    }
+
+    await whatsapp.sendText(jid, text);
+    db.put('chat', {
+      id: `${Date.now()}-dash`,
+      at: new Date().toISOString(),
+      jid,
+      direction: 'out',
+      text,
+    });
+    // The owner is handling this chat now, so the bot steps aside.
+    if (runtime.router) {
+      runtime.router.pause(jid, settings ? settings.get('takeoverPauseHours') : 12, 'sent from dashboard');
+    }
+    await db.flush();
+    res.json({ ok: true });
   }));
 
   // ---- Bookings ----

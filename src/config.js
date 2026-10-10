@@ -41,7 +41,11 @@ const config = {
 
   calendar: {
     id: process.env.GOOGLE_CALENDAR_ID || '',
-    serviceAccountJsonB64: process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64 || '',
+    // Either form works: the raw JSON from the downloaded key file, or base64 of it.
+    serviceAccountJsonB64:
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64 ||
+      '',
     oauth: {
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || '',

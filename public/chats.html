@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Chats – PartyDekoMiet</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="note"></p>
+  <div class="chatwrap" id="wrap">
+    <div class="chatlist" id="list"><p class="empty" id="loading"></p></div>
+    <div class="thread" id="thread">
+      <div class="head">
+        <button class="ghost back" id="back">←</button>
+        <div style="flex:1;min-width:0">
+          <div id="who" style="font-weight:600"></div>
+          <div class="muted" id="sub" style="font-size:12px"></div>
+        </div>
+        <button class="ghost" id="resume" hidden></button>
+      </div>
+      <div class="body" id="body"><p class="empty" id="pick"></p></div>
+      <div class="compose">
+        <textarea id="msg" rows="1"></textarea>
+        <button class="primary" id="send"></button>
+      </div>
+    </div>
+  </div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/chats');
+$('h1').textContent = t('nav_chats');
+$('note').textContent = t('chat_sent_note');
+$('loading').textContent = t('loading');
+$('pick').textContent = t('chat_pick');
+$('send').textContent = t('chat_send');
+$('back').textContent = t('chat_back');
+$('msg').placeholder = t('chat_ph');
+
+let current = null;
+let chats = [];
+
+async function loadList() {
+  const d = await api('/api/chats');
+  chats = d.chats || [];
+  if (!chats.length) { $('list').innerHTML = `<p class="empty">${t('chat_none')}</p>`; return; }
+  $('list').innerHTML = chats.map((c) => `
+    <div class="chatitem ${c.jid === current ? 'on' : ''}" onclick="openChat('${esc(c.jid)}')">
+      <div class="top">
+        <span class="who">${esc(c.name || c.phone)}</span>
+        <span class="when">${esc(shortTime(c.lastAt))}</span>
+      </div>
+      <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(c.lastText)}</div>
+      ${c.paused ? `<div style="margin-top:5px">${pill(t('chat_paused'), 'warn')}</div>` : ''}
+    </div>`).join('');
+}
+
+function shortTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const loc = LANG === 'en' ? 'en-GB' : 'de-CH';
+  return sameDay ? d.toLocaleTimeString(loc, { hour:'2-digit', minute:'2-digit' })
+                 : d.toLocaleDateString(loc, { day:'2-digit', month:'2-digit' });
+}
+
+async function openChat(jid) {
+  current = jid;
+  $('wrap').classList.add('open');
+  const d = await api('/api/chats/' + encodeURIComponent(jid));
+  const c = chats.find((x) => x.jid === jid);
+  $('who').textContent = d.customer?.name || c?.name || d.phone;
+  $('sub').textContent = d.phone;
+  $('resume').hidden = !d.paused;
+  $('resume').textContent = t('resume_bot');
+  $('resume').onclick = async () => {
+    await api('/api/whatsapp/resume', { method:'POST', body:{ jid } });
+    openChat(jid); loadList();
+  };
+  $('body').innerHTML = (d.messages || []).map((m) => `
+    <div class="msg ${m.direction === 'in' ? 'in' : 'out'}">${esc(m.text)}
+      <span class="ts">${esc(shortTime(m.at))}</span>
+    </div>`).join('') || `<p class="empty">${t('chat_none')}</p>`;
+  $('body').scrollTop = $('body').scrollHeight;
+  loadList();
+}
+
+$('back').onclick = () => { $('wrap').classList.remove('open'); current = null; };
+
+async function send() {
+  const text = $('msg').value.trim();
+  if (!text || !current) return;
+  $('send').disabled = true;
+  try {
+    const res = await api(`/api/chats/${encodeURIComponent(current)}/send`, { method:'POST', body:{ text } });
+    if (res.ok) { $('msg').value = ''; await openChat(current); }
+    else alert(res.error || 'error');
+  } finally { $('send').disabled = false; }
+}
+$('send').onclick = send;
+$('msg').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+loadList();
+setInterval(() => { loadList(); if (current) openChat(current); }, 15000);
+</script>
+</body></html>

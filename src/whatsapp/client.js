@@ -36,6 +36,11 @@ const runtime = {
   reconnectAttempts: 0,
   stopping: false,
   starting: false,
+  // Pairing-code login: the owner types the bot's own phone number and gets an
+  // 8-character code to enter on the phone, instead of scanning a QR image.
+  pairingRequest: null, // phone number waiting for a code
+  pairingCode: null,
+  pairingError: null,
 };
 
 let messageHandler = async () => {};
@@ -59,7 +64,10 @@ function getStatus() {
   return {
     status: runtime.status,
     connected: isConnected(),
-    qrDataUrl: runtime.status === 'qr' ? runtime.qrDataUrl : null,
+    qrDataUrl: runtime.status === 'qr' || runtime.status === 'pairing' ? runtime.qrDataUrl : null,
+    pairingCode: runtime.pairingCode,
+    pairingNumber: runtime.pairingRequest,
+    pairingError: runtime.pairingError,
     me: runtime.me,
     connectedAt: runtime.connectedAt,
     lastDisconnect: runtime.lastDisconnect,
@@ -206,17 +214,40 @@ async function start() {
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (runtime.sock !== sock) return; // event from an old socket
       if (qr) {
-        runtime.status = 'qr';
+        // The QR is always rendered, so the owner can choose either way to log in.
         try {
           runtime.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
-          log.info('New QR code available on the dashboard (WhatsApp-Status).');
         } catch (err) {
           log.error(`QR render failed: ${err.message}`);
+        }
+
+        // A pairing code was asked for: the socket is now open and unregistered,
+        // which is the only moment WhatsApp accepts the request.
+        if (runtime.pairingRequest && !runtime.pairingCode) {
+          const number = runtime.pairingRequest;
+          try {
+            const code = await sock.requestPairingCode(number);
+            runtime.pairingCode = String(code).toUpperCase();
+            runtime.pairingError = null;
+            runtime.status = 'pairing';
+            log.info(`Pairing code for ${number}: ${runtime.pairingCode}`);
+          } catch (err) {
+            runtime.pairingError = err.message;
+            runtime.pairingRequest = null;
+            runtime.status = 'qr';
+            log.error(`Pairing code request failed for ${number}: ${err.message}`);
+          }
+        } else if (runtime.status !== 'pairing') {
+          runtime.status = 'qr';
+          log.info('New QR code available on the dashboard.');
         }
       }
       if (connection === 'open') {
         runtime.status = 'connected';
         runtime.qrDataUrl = null;
+        runtime.pairingRequest = null;
+        runtime.pairingCode = null;
+        runtime.pairingError = null;
         runtime.reconnectAttempts = 0;
         runtime.connectedAt = new Date().toISOString();
         runtime.me = { id: sock.user?.id || null, name: sock.user?.name || sock.user?.verifiedName || null };
@@ -285,12 +316,56 @@ async function start() {
   }
 }
 
+/**
+ * Logs in with a pairing code instead of a QR image.
+ *
+ * WhatsApp only hands out a code while the socket is open and not yet
+ * registered, so the connection is restarted and the code is requested from the
+ * connection handler at exactly that moment. The owner then enters it on the
+ * phone under Linked devices > Link with phone number instead.
+ *
+ * @param {string} phoneNumber the BOT's own number, international, digits only
+ */
+async function startPairing(phoneNumber) {
+  const number = String(phoneNumber || '').replace(/[^0-9]/g, '');
+  if (number.length < 8 || number.length > 15) {
+    return { ok: false, message: 'Bitte die Nummer international und nur mit Ziffern angeben, z.B. 41791234567.' };
+  }
+  if (isConnected()) {
+    return { ok: false, message: 'WhatsApp ist bereits verbunden. Zuerst "Neu verknuepfen" waehlen.' };
+  }
+
+  runtime.pairingRequest = number;
+  runtime.pairingCode = null;
+  runtime.pairingError = null;
+
+  // A fresh socket is needed: a code can only be requested on an unregistered one.
+  runtime.stopping = true;
+  detachSocket();
+  runtime.stopping = false;
+  runtime.reconnectAttempts = 0;
+
+  const res = await start();
+  return { ok: res.ok !== false, message: 'Code wird angefordert, bitte einen Moment...', number };
+}
+
+/** Goes back to QR login and drops a pending pairing request. */
+function cancelPairing() {
+  runtime.pairingRequest = null;
+  runtime.pairingCode = null;
+  runtime.pairingError = null;
+  if (runtime.status === 'pairing') runtime.status = 'qr';
+  return { ok: true };
+}
+
 async function stop() {
   runtime.stopping = true;
   detachSocket();
   runtime.status = 'stopped';
   runtime.qrDataUrl = null;
   runtime.connectedAt = null;
+  runtime.pairingRequest = null;
+  runtime.pairingCode = null;
 }
 
 /** Logs out (unlinks the device) and starts again with a fresh QR code. */
@@ -309,4 +384,5 @@ async function logoutAndRelink() {
 module.exports = {
   start, stop, logoutAndRelink, getStatus, isConnected, onMessage,
   sendText, sendImage, forwardImage, downloadImage, isPrivateChat, isOwnMessage,
+  startPairing, cancelPairing,
 };

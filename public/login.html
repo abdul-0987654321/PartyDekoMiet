@@ -1,18 +1,19 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Anmeldung – PartyDekoMiet Bot</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Anmeldung – PartyDekoMiet</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<main>
+<main class="content" style="margin:0 auto">
   <form class="card login" method="post" action="/login">
-    <h1>PartyDekoMiet Bot</h1>
-    <p class="muted">Bitte mit dem Dashboard-Passwort anmelden.</p>
-    <p id="err" class="banner err" hidden>Falsches Passwort.</p>
-    <p><input type="password" name="password" placeholder="Passwort" autofocus required></p>
-    <button class="primary" type="submit">Anmelden</button>
+    <h1>PartyDekoMiet</h1>
+    <p class="muted">WhatsApp Assistant – Dashboard</p>
+    <p id="err" class="banner err" hidden>Falsches Passwort. / Wrong password.</p>
+    <p><input type="password" name="password" placeholder="Passwort / Password" autofocus required autocomplete="current-password"></p>
+    <button class="primary" type="submit" style="width:100%">Anmelden / Log in</button>
   </form>
 </main>
 <script>if (location.search.includes('fehler')) document.getElementById('err').hidden = false;</script>

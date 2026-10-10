@@ -74,24 +74,34 @@ from `[PENDING]` to `[CONFIRMED]`.
 
 ## 6. Put it into the bot
 
-The key goes in as one line of base64. On Mac or Linux:
+**No base64 needed.** Open the downloaded `.json` file in a text editor, select
+everything (it starts with `{` and ends with `}`), copy it, and paste it as one
+environment variable in Render → **Environment**:
+
+```
+GOOGLE_SERVICE_ACCOUNT_JSON = {"type":"service_account","project_id":"...", ... }
+GOOGLE_CALENDAR_ID          = c_8f3a...@group.calendar.google.com
+```
+
+Paste the whole thing on one line. Render accepts long values; the newlines
+inside the private key are already written as `\n` in the file and are handled.
+
+<details>
+<summary>If you prefer base64, that still works</summary>
 
 ```bash
+# Mac / Linux
 base64 -i ~/Downloads/partydekomiet-bot-xxxx.json | tr -d '\n'
 ```
 
-On Windows PowerShell:
-
 ```powershell
+# Windows PowerShell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\Downloads\partydekomiet-bot-xxxx.json"))
 ```
 
-In Render → **Environment**:
-
-```
-GOOGLE_SERVICE_ACCOUNT_JSON_B64=<the long base64 line>
-GOOGLE_CALENDAR_ID=c_8f3a...@group.calendar.google.com
-```
+Then use `GOOGLE_SERVICE_ACCOUNT_JSON_B64` instead. The bot detects which form
+it was given, and line breaks in the base64 are tolerated.
+</details>
 
 `GOOGLE_CALENDAR_ID` can also be set later in the dashboard under
 **Settings → Calendar**. The key has to stay an environment variable: it is a

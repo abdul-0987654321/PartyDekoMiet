@@ -28,6 +28,16 @@ const T = {
     no_bookings: 'Noch keine Buchungsanfragen.',
     b_id: 'Nr.', b_status: 'Status', b_customer: 'Kunde', b_product: 'Set', b_pickup: 'Abholung', b_return: 'Rückgabe', b_created: 'Erstellt',
     cal_hint: 'Kalender teilen mit:',
+    nav_chats: 'Chats', tab_qr: 'QR-Code', tab_pair: 'Mit Nummer',
+    pair_title: 'Mit Telefonnummer verbinden',
+    pair_hint: 'Nummer des Bot-Telefons eingeben (international, ohne +). Dann am Telefon: WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät verknüpfen → «Stattdessen mit Telefonnummer verknüpfen».',
+    pair_btn: 'Code anfordern', pair_wait: 'Code wird angefordert…',
+    pair_enter: 'Diesen Code am Telefon eingeben:', pair_cancel: 'Abbrechen',
+    chat_none: 'Noch keine Chats.', chat_pick: 'Links einen Chat auswählen.',
+    chat_send: 'Senden', chat_ph: 'Nachricht schreiben…',
+    chat_paused: 'Bot pausiert', chat_back: 'Zurück',
+    chat_sent_note: 'Wenn du hier schreibst, pausiert der Bot in diesem Chat.',
+    resume_bot: 'Bot wieder aktivieren',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -50,6 +60,16 @@ const T = {
     no_bookings: 'No booking requests yet.',
     b_id: 'No.', b_status: 'Status', b_customer: 'Customer', b_product: 'Set', b_pickup: 'Pickup', b_return: 'Return', b_created: 'Created',
     cal_hint: 'Share the calendar with:',
+    nav_chats: 'Chats', tab_qr: 'QR code', tab_pair: 'With number',
+    pair_title: 'Connect with a phone number',
+    pair_hint: 'Enter the bot phone\u2019s number (international, no +). Then on the phone: WhatsApp → Settings → Linked devices → Link a device → "Link with phone number instead".',
+    pair_btn: 'Request code', pair_wait: 'Requesting the code…',
+    pair_enter: 'Enter this code on the phone:', pair_cancel: 'Cancel',
+    chat_none: 'No chats yet.', chat_pick: 'Pick a chat on the left.',
+    chat_send: 'Send', chat_ph: 'Write a message…',
+    chat_paused: 'Bot paused', chat_back: 'Back',
+    chat_sent_note: 'Writing here pauses the bot in this chat.',
+    resume_bot: 'Re-activate the bot',
   },
 };
 
@@ -66,24 +86,47 @@ function setLang(lang) {
   location.reload();
 }
 
-/** Renders the nav bar and the language switch into <header id="nav">. */
+/**
+ * Renders the shell: a sidebar on desktop, a bottom tab bar on phones.
+ * The page's own markup goes inside <div id="content">.
+ */
 function renderNav(active) {
   const links = [
-    ['/', 'nav_status'], ['/whatsapp', 'nav_whatsapp'], ['/bookings', 'nav_bookings'], ['/settings', 'nav_settings'],
+    ['/', 'nav_status', '◉'],
+    ['/chats', 'nav_chats', '💬'],
+    ['/bookings', 'nav_bookings', '🗓'],
+    ['/whatsapp', 'nav_whatsapp', '🔗'],
+    ['/settings', 'nav_settings', '⚙'],
   ];
-  $('nav').innerHTML = `
-    <nav>
-      ${links.map(([href, key]) =>
-        `<a href="${href}" class="${href === active ? 'on' : ''}">${t(key)}</a>`).join('')}
-      <span class="spacer"></span>
-      <span class="langswitch">
-        <button class="${LANG === 'de' ? 'on' : ''}" onclick="setLang('de')">DE</button>
-        <button class="${LANG === 'en' ? 'on' : ''}" onclick="setLang('en')">EN</button>
-      </span>
-      <form method="post" action="/logout" style="display:inline">
+  const langBtns = `<span class="langswitch">
+      <button class="${LANG === 'de' ? 'on' : ''}" onclick="setLang('de')">DE</button>
+      <button class="${LANG === 'en' ? 'on' : ''}" onclick="setLang('en')">EN</button>
+    </span>`;
+
+  const side = document.createElement('aside');
+  side.className = 'side';
+  side.innerHTML = `
+    <div class="brand">PartyDekoMiet<small>WhatsApp Assistant</small></div>
+    ${links.map(([href, key, ic]) =>
+      `<a href="${href}" class="${href === active ? 'on' : ''}"><span class="ic">${ic}</span>${t(key)}</a>`).join('')}
+    <div class="grow"></div>
+    <div class="foot">
+      ${langBtns}
+      <form method="post" action="/logout" style="margin:0">
         <button class="link" type="submit">${t('logout')}</button>
       </form>
-    </nav>`;
+    </div>`;
+
+  const shell = document.querySelector('.shell');
+  shell.insertBefore(side, shell.firstChild);
+
+  // Phones hide the sidebar foot, so the language switch moves to a top bar.
+  const bar = document.createElement('div');
+  bar.className = 'mobile-bar';
+  bar.innerHTML = `<span class="t">${t(links.find(([h]) => h === active)?.[1] || 'nav_status')}</span>${langBtns}
+    <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">${t('logout')}</button></form>`;
+  const content = document.getElementById('content');
+  content.insertBefore(bar, content.firstChild);
 }
 
 async function api(path, options) {

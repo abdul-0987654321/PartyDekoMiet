@@ -1,66 +1,48 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Einstellungen – PartyDekoMiet Bot</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Einstellungen – PartyDekoMiet</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<main>
-  <header id="nav"></header>
-  <h1 id="title">Einstellungen</h1>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
   <p class="muted" id="intro"></p>
   <div id="alerts"></div>
-  <form id="form"><p class="muted" id="loading"></p></form>
-</main>
+  <form id="form" onsubmit="return false"><p class="muted" id="loading"></p></form>
+</main></div>
 <script src="/app.js"></script>
 <script>
 renderNav('/settings');
-$('title').textContent = t('nav_settings');
+$('h1').textContent = t('nav_settings');
 $('intro').textContent = t('settings_intro');
 $('loading').textContent = t('loading');
 
-const GROUPS = ['bot', 'contacts', 'business', 'shop', 'calendar', 'dashboard'];
+const GROUPS = ['bot','contacts','business','shop','calendar','dashboard'];
 let schema = [];
 
 function fieldHtml(s) {
   const label = s.label[LANG] || s.label.de;
   const help = s.help ? (s.help[LANG] || s.help.de) : '';
-  const srcLabel = { env: t('src_env'), dashboard: t('src_dashboard'), default: t('src_default') }[s.source];
+  const src = { env: t('src_env'), dashboard: t('src_dashboard'), default: t('src_default') }[s.source];
   let input;
-
-  if (s.type === 'boolean') {
-    input = `<input type="checkbox" id="f_${s.key}" ${s.value ? 'checked' : ''}>`;
-  } else if (s.type === 'enum') {
-    input = `<select id="f_${s.key}">` +
-      s.options.map((o) => `<option value="${esc(o)}" ${o === s.value ? 'selected' : ''}>${esc(o)}</option>`).join('') +
-      `</select>`;
-  } else if (s.type === 'number') {
-    input = `<input type="number" id="f_${s.key}" value="${esc(s.value)}"` +
-      (s.min !== undefined ? ` min="${s.min}"` : '') + (s.max !== undefined ? ` max="${s.max}"` : '') + '>';
-  } else {
-    input = `<input type="text" id="f_${s.key}" value="${esc(s.value)}" placeholder="${esc(s.placeholder || '')}">`;
-  }
-
-  return `<div class="field">
-    <label for="f_${s.key}">${esc(label)}<span class="src">${esc(srcLabel)}</span></label>
-    ${help ? `<p class="help">${esc(help)}</p>` : ''}
-    ${input}
-  </div>`;
+  if (s.type === 'boolean') input = `<input type="checkbox" id="f_${s.key}" ${s.value?'checked':''}>`;
+  else if (s.type === 'enum') input = `<select id="f_${s.key}">${s.options.map(o=>`<option value="${esc(o)}" ${o===s.value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (s.type === 'number') input = `<input type="number" inputmode="numeric" id="f_${s.key}" value="${esc(s.value)}"${s.min!==undefined?` min="${s.min}"`:''}${s.max!==undefined?` max="${s.max}"`:''}>`;
+  else input = `<input type="text" id="f_${s.key}" value="${esc(s.value)}" placeholder="${esc(s.placeholder||'')}">`;
+  return `<div class="field"><label for="f_${s.key}">${esc(label)}<span class="src">${esc(src)}</span></label>
+    ${help?`<p class="help">${esc(help)}</p>`:''}${input}</div>`;
 }
 
 function render() {
-  const groups = GROUPS.filter((g) => schema.some((s) => s.group === g));
-  $('form').innerHTML = groups.map((g) => `
-    <h2>${t('g_' + g)}</h2>
-    <div class="card">${schema.filter((s) => s.group === g).map(fieldHtml).join('')}</div>
-  `).join('') + `
-    <div class="actions inline">
-      <button class="primary" type="button" id="save" style="width:auto">${t('save')}</button>
+  const groups = GROUPS.filter(g => schema.some(s => s.group === g));
+  $('form').innerHTML = groups.map(g =>
+    `<h2>${t('g_'+g)}</h2><div class="card">${schema.filter(s=>s.group===g).map(fieldHtml).join('')}</div>`
+  ).join('') + `<div class="actions inline">
+      <button class="primary" type="button" id="save">${t('save')}</button>
       <button class="ghost" type="button" id="reload">${t('refresh')}</button>
-      <span id="msg" class="muted"></span>
-    </div>`;
-
+      <span id="msg" class="muted"></span></div>`;
   $('save').onclick = save;
   $('reload').onclick = load;
 }
@@ -68,36 +50,28 @@ function render() {
 function collect() {
   const patch = {};
   for (const s of schema) {
-    const el = $('f_' + s.key);
-    if (!el) continue;
-    patch[s.key] = s.type === 'boolean' ? el.checked : s.type === 'number' ? Number(el.value) : el.value;
+    const el = $('f_'+s.key); if (!el) continue;
+    patch[s.key] = s.type==='boolean' ? el.checked : s.type==='number' ? Number(el.value) : el.value;
   }
   return patch;
 }
 
 async function save() {
-  $('msg').textContent = t('saving');
-  $('alerts').innerHTML = '';
-  const res = await api('/api/settings', { method: 'POST', body: collect() });
+  $('msg').textContent = t('saving'); $('alerts').innerHTML = '';
+  const res = await api('/api/settings', { method:'POST', body: collect() });
   if (!res.ok) {
     $('msg').textContent = '';
-    $('alerts').innerHTML = `<p class="banner err">${(res.errors || [res.error]).map(esc).join('<br>')}</p>`;
+    $('alerts').innerHTML = `<p class="banner err">${(res.errors||[res.error]).map(esc).join('<br>')}</p>`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
-  schema = res.settings;
-  render();
+  schema = res.settings; render();
   $('msg').textContent = t('saved') + (res.changed.length ? ` (${res.changed.join(', ')})` : '');
-  // The dashboard language is itself a setting: follow it unless this browser overrode it.
-  const dash = schema.find((s) => s.key === 'dashboardLanguage');
+  const dash = schema.find(s => s.key === 'dashboardLanguage');
   if (dash && !localStorage.getItem('dashLang')) setLang(dash.value);
 }
 
-async function load() {
-  const res = await api('/api/settings');
-  schema = res.settings || [];
-  render();
-}
+async function load() { schema = (await api('/api/settings')).settings || []; render(); }
 load();
 </script>
-</body>
-</html>
+</body></html>

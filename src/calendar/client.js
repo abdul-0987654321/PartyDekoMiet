@@ -21,16 +21,47 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const API = 'https://www.googleapis.com/calendar/v3';
 const TIMEOUT_MS = 20000;
 
-function readServiceAccount(b64) {
-  if (!b64) return null;
-  let json;
-  try {
-    json = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-  } catch {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON_B64 is not valid base64-encoded JSON');
+/**
+ * Accepts the service account key in whichever form is easiest to paste:
+ * the raw JSON straight out of the downloaded file, or base64 of it.
+ *
+ * Pasting the raw JSON is one step fewer and avoids the usual mistake of a
+ * base64 string broken across lines. Both are supported so neither way fails.
+ */
+function readServiceAccount(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+
+  let json = null;
+  if (value.startsWith('{')) {
+    try {
+      json = JSON.parse(value);
+    } catch (err) {
+      throw new Error(`The service account JSON could not be parsed: ${err.message}`);
+    }
+  } else {
+    let decoded;
+    try {
+      decoded = Buffer.from(value.replace(/\s+/g, ''), 'base64').toString('utf8');
+    } catch {
+      throw new Error('The service account key is neither JSON nor valid base64.');
+    }
+    try {
+      json = JSON.parse(decoded);
+    } catch {
+      throw new Error(
+        'The service account key decoded from base64 but is not JSON. ' +
+          'Tip: you can paste the contents of the downloaded .json file directly instead.'
+      );
+    }
   }
+
   if (!json.client_email || !json.private_key) {
-    throw new Error('The service account JSON has no client_email / private_key');
+    throw new Error('The service account JSON has no client_email / private_key - is this the right file?');
+  }
+  // Env vars often arrive with the newlines in the key escaped as \n.
+  if (typeof json.private_key === 'string') {
+    json.private_key = json.private_key.replace(/\\n/g, '\n');
   }
   return json;
 }

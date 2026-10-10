@@ -57,7 +57,11 @@ npm test                 # 111 tests
 2. **OpenAI key** — `OPENAI_API_KEY` from platform.openai.com.
 3. **[Google Calendar](docs/GOOGLE_CALENDAR_SETUP.md)** — availability. *(15 min)*
 4. **Deploy** — see below.
-5. **Scan the QR** — dashboard → WhatsApp.
+5. **Link WhatsApp** — dashboard → WhatsApp. Two ways, both offered:
+   **QR code**, or **pairing code**: type the bot phone's number and enter the
+   8-character code on the phone (Linked devices → Link a device → "Link with
+   phone number instead"). The pairing code is the easier one when the phone and
+   the screen are not in the same place.
 6. Hand the client **[docs/CLIENT_GUIDE.md](docs/CLIENT_GUIDE.md)**.
 
 ## Configuration
@@ -97,7 +101,8 @@ client's live number, use the paid starter plan.
 | Page | |
 |---|---|
 | `/` | status: WhatsApp, storage, catalog, calendar, paused chats |
-| `/whatsapp` | QR code and re-link |
+| `/chats` | read conversations and reply by hand; replying pauses the bot there |
+| `/whatsapp` | link the phone by QR **or** pairing code, and re-link |
 | `/bookings` | all requests |
 | `/settings` | everything configurable |
 

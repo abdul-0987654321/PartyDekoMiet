@@ -111,7 +111,8 @@ Top right you can switch between **DE** and **EN**.
 | Page | What it is for |
 |---|---|
 | **Status** | is everything running: WhatsApp, storage, catalog, calendar |
-| **WhatsApp** | the QR code, if the phone ever needs re-linking |
+| **Chats** | read conversations and answer by hand |
+| **WhatsApp** | link the phone again: QR code or a code typed on the phone |
 | **Bookings** | all requests with status, dates and customer |
 | **Settings** | prices, deposit, pickup times, rental length, bot language |
 
@@ -133,8 +134,12 @@ Changes take effect immediately. Nothing has to be restarted.
 ## If something is wrong
 
 **The assistant stopped answering.** Open the dashboard → Status. If WhatsApp is
-not "connected", go to the WhatsApp page and scan the QR code again
-(WhatsApp on your phone → Settings → Linked devices → Link a device).
+not "connected", go to the WhatsApp page and link the phone again. Two ways:
+
+- **QR code** — WhatsApp on the phone → Settings → Linked devices → Link a device → scan
+- **With a number** — easier if the phone is not next to the screen. Type the bot
+  phone's number, then on the phone choose *"Link with phone number instead"* and
+  type the 8-character code shown on the dashboard.
 
 **It answered something wrong.** Reply in the chat yourself — it steps aside at
 once. Then tell your developer what it said, so the rule can be fixed.

@@ -1,15 +1,13 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WhatsApp – PartyDekoMiet Bot</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>WhatsApp – PartyDekoMiet</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<main>
-  <header id="nav"></header>
-  <h1 id="title"></h1>
-  <p class="muted" id="hint"></p>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
   <div id="alerts"></div>
 
   <div class="card">
@@ -18,25 +16,64 @@
     <div class="row"><span id="l_since">Seit</span><span id="since">–</span></div>
   </div>
 
-  <div class="card qr" id="qrcard"></div>
+  <div class="tabs">
+    <button id="tab_qr" class="on"></button>
+    <button id="tab_pair"></button>
+  </div>
+
+  <div class="card" id="pane_qr">
+    <p class="muted" id="qr_hint"></p>
+    <div class="qr" id="qrbox"></div>
+  </div>
+
+  <div class="card" id="pane_pair" hidden>
+    <p class="muted" id="pair_hint"></p>
+    <div id="pair_form" class="inline">
+      <input type="text" id="pnum" inputmode="numeric" placeholder="41791234567" style="flex:1;min-width:180px">
+      <button class="primary" id="pair_go"></button>
+    </div>
+    <div id="pair_out"></div>
+  </div>
 
   <div class="card inline">
     <button class="ghost" id="connect"></button>
     <button class="ghost" id="relink"></button>
   </div>
-</main>
+</main></div>
 <script src="/app.js"></script>
 <script>
 renderNav('/whatsapp');
-$('title').textContent = t('qr_title');
-$('hint').textContent = t('qr_scan');
+$('h1').textContent = t('qr_title');
+$('tab_qr').textContent = t('tab_qr');
+$('tab_pair').textContent = t('tab_pair');
+$('qr_hint').textContent = t('qr_scan');
+$('pair_hint').textContent = t('pair_hint');
+$('pair_go').textContent = t('pair_btn');
 $('connect').textContent = t('connect');
 $('relink').textContent = t('relink');
 
-$('connect').onclick = async () => { await api('/api/whatsapp/connect', { method: 'POST' }); refresh(); };
+let tab = 'qr';
+function showTab(which) {
+  tab = which;
+  $('tab_qr').className = which === 'qr' ? 'on' : '';
+  $('tab_pair').className = which === 'pair' ? 'on' : '';
+  $('pane_qr').hidden = which !== 'qr';
+  $('pane_pair').hidden = which !== 'pair';
+}
+$('tab_qr').onclick = () => showTab('qr');
+$('tab_pair').onclick = () => showTab('pair');
+
+$('connect').onclick = async () => { await api('/api/whatsapp/connect', { method:'POST' }); refresh(); };
 $('relink').onclick = async () => {
   if (!confirm(t('relink_confirm'))) return;
-  await api('/api/whatsapp/relink', { method: 'POST' });
+  await api('/api/whatsapp/relink', { method:'POST' }); refresh();
+};
+$('pair_go').onclick = async () => {
+  const number = $('pnum').value.replace(/[^0-9]/g, '');
+  if (!number) return;
+  $('pair_out').innerHTML = `<p class="muted">${t('pair_wait')}</p>`;
+  const res = await api('/api/whatsapp/pair', { method:'POST', body:{ number } });
+  if (!res.ok) $('pair_out').innerHTML = `<p class="banner err">${esc(res.message || res.error)}</p>`;
   refresh();
 };
 
@@ -45,19 +82,36 @@ async function refresh() {
   try { d = await api('/api/whatsapp'); }
   catch { $('alerts').innerHTML = `<p class="banner err">${t('unreachable')}</p>`; return; }
 
-  $('st').innerHTML = d.status === 'connected' ? pill(t('connected'), 'ok')
-    : d.status === 'qr' ? pill('QR', 'warn') : pill(d.status || '–', 'warn');
+  $('st').innerHTML = d.status === 'connected' ? pill(t('connected'),'ok')
+    : d.status === 'pairing' ? pill('Pairing','warn')
+    : d.status === 'qr' ? pill('QR','warn') : pill(d.status || '–','warn');
   $('num').textContent = d.me?.id ? String(d.me.id).split(':')[0] : '–';
   $('since').textContent = fmtDate(d.connectedAt);
-
-  $('alerts').innerHTML = d.lastDisconnect?.message
+  $('alerts').innerHTML = d.lastDisconnect?.message && !d.connected
     ? `<p class="banner warn">${esc(d.lastDisconnect.message)}</p>` : '';
 
-  $('qrcard').innerHTML = d.qrDataUrl
+  $('qrbox').innerHTML = d.qrDataUrl
     ? `<img src="${d.qrDataUrl}" alt="QR">`
     : `<p class="muted">${d.connected ? t('qr_connected') : t('qr_wait')}</p>`;
+
+  if (d.pairingCode) {
+    if (tab !== 'pair') showTab('pair');
+    $('pair_form').hidden = true;
+    $('pair_out').innerHTML =
+      `<p class="muted">${t('pair_enter')}</p><div class="paircode">${esc(d.pairingCode)}</div>` +
+      `<button class="ghost" onclick="cancelPair()">${t('pair_cancel')}</button>`;
+  } else if (d.pairingError) {
+    $('pair_form').hidden = false;
+    $('pair_out').innerHTML = `<p class="banner err">${esc(d.pairingError)}</p>`;
+  } else if (d.connected) {
+    $('pair_form').hidden = false;
+    $('pair_out').innerHTML = `<p class="banner ok">${t('qr_connected')}</p>`;
+  }
 }
-refresh(); setInterval(refresh, 4000);
+async function cancelPair() {
+  await api('/api/whatsapp/pair/cancel', { method:'POST' });
+  $('pair_form').hidden = false; $('pair_out').innerHTML = ''; refresh();
+}
+refresh(); setInterval(refresh, 3000);
 </script>
-</body>
-</html>
+</body></html>

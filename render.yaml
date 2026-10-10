@@ -1,0 +1,65 @@
+# Render Blueprint. You can also create the Web Service by hand with the same values.
+#
+# Note on the free plan: free instances spin down after inactivity and have no
+# persistent disk. That is fine here, because the WhatsApp session and all data
+# live in the Google Sheet, not on disk. Point UptimeRobot at /health every 5
+# minutes to keep the instance awake. Be aware that Render's free instance hours
+# are shared across the whole account, so several always-on free services will
+# not fit; use the starter plan for a client's live number.
+services:
+  - type: web
+    name: partydekomiet-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Europe/Zurich
+      - key: LOG_LEVEL
+        value: info
+      - key: KNOWLEDGE_SOURCE
+        value: files
+
+      # Business rules from the AGB
+      - key: RENTAL_DAYS
+        value: "3"
+      - key: DEPOSIT_CHF
+        value: "50"
+      - key: LATE_FEE_CHF
+        value: "50"
+      - key: BUFFER_DAYS
+        value: "0"
+      - key: PICKUP_ADDRESS
+        value: "Langstrasse 175, 8004 Zürich (SBB-Bürogebäude, Erdgeschoss)"
+      - key: SHOP_URL
+        value: https://partydekomiet.ch
+      - key: CATALOG_REFRESH_HOURS
+        value: "6"
+
+      # Secrets: set these in the Render dashboard, never in this file.
+      - key: SHEET_WEBHOOK_URL
+        sync: false
+      - key: SHEET_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: OWNER_WHATSAPP
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: GOOGLE_CALENDAR_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON_B64
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

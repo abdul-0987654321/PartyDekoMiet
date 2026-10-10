@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status – PartyDekoMiet Bot</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>PartyDekoMiet Bot</h1>
+  <p class="muted">Status wird alle 10 Sekunden aktualisiert.</p>
+
+  <div id="alerts"></div>
+
+  <div class="card">
+    <div class="row"><span>Bot</span><span id="ready">…</span></div>
+    <div class="row"><span>WhatsApp</span><span id="wa">…</span></div>
+    <div class="row"><span>Speicher (Google Sheet)</span><span id="storage">…</span></div>
+    <div class="row"><span>Offene Schreibvorgänge</span><span id="pending">…</span></div>
+    <div class="row"><span>Zuletzt gespeichert</span><span id="flushed">…</span></div>
+    <div class="row"><span>Gestartet</span><span id="started">…</span></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><span>KI-Modell</span><span id="model">…</span></div>
+    <div class="row"><span>OpenAI-Schlüssel</span><span id="key">…</span></div>
+    <div class="row"><span>Kalender</span><span id="cal">…</span></div>
+    <div class="row"><span>Wissensbasis</span><span id="knowledge">…</span></div>
+    <div class="row"><span>Mietdauer / Kaution</span><span id="biz">…</span></div>
+    <div class="row"><span>Inhaber-Nummer</span><span id="owner">…</span></div>
+  </div>
+
+  <form method="post" action="/logout"><button class="primary" type="submit">Abmelden</button></form>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const pill = (text, kind) => `<span class="pill ${kind}">${text}</span>`;
+
+async function refresh() {
+  let d;
+  try {
+    const res = await fetch('/api/status');
+    if (res.status === 401) return location.replace('/login');
+    d = await res.json();
+  } catch {
+    $('alerts').innerHTML = '<p class="banner err">Server nicht erreichbar.</p>';
+    return;
+  }
+
+  const alerts = [];
+  if (d.storageError) alerts.push(`<p class="banner err">${d.storageError}</p>`);
+  if (d.storageWarning) alerts.push(`<p class="banner warn">${d.storageWarning}</p>`);
+  $('alerts').innerHTML = alerts.join('');
+
+  $('ready').innerHTML = d.ready ? pill('bereit', 'ok') : pill('startet…', 'warn');
+  $('wa').innerHTML =
+    d.whatsapp.status === 'connected' ? pill('verbunden', 'ok')
+    : d.whatsapp.status === 'not-wired' ? pill('noch nicht angebunden', 'warn')
+    : pill(d.whatsapp.status, 'warn');
+  $('storage').innerHTML = d.storage.backend
+    ? (d.storage.lastFlushError ? pill(d.storage.backend + ' – Fehler', 'err') : pill(d.storage.backend, 'ok'))
+    : pill('nicht verbunden', 'err');
+  $('pending').textContent = d.storage.pending ?? '–';
+  $('flushed').textContent = d.storage.lastFlushAt
+    ? new Date(d.storage.lastFlushAt).toLocaleString('de-CH') : 'noch nichts';
+  $('started').textContent = new Date(d.startedAt).toLocaleString('de-CH');
+
+  $('model').textContent = d.config.model;
+  $('key').innerHTML = d.config.hasOpenAiKey ? pill('gesetzt', 'ok') : pill('fehlt', 'err');
+  $('cal').innerHTML = d.config.hasCalendar ? pill('verbunden', 'ok') : pill('noch nicht eingerichtet', 'warn');
+  $('knowledge').textContent = d.knowledge
+    ? `${d.knowledge.source}, ${d.knowledge.faqEntries} FAQ-Einträge` : '–';
+  $('biz').textContent = `${d.config.rentalDays} Tage · CHF ${d.config.depositChf}.–`;
+  $('owner').textContent = d.config.ownerNumber || 'nicht gesetzt';
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+:root {
+  --bg: #11121a; --card: #1b1d29; --line: #2c2f40;
+  --text: #eceef5; --muted: #9ba1b5; --accent: #c86bb0;
+  --ok: #4ec9a0; --warn: #e3b341; --err: #f07178;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 680px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.muted { color: var(--muted); font-size: 13px; margin-top: 0; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px; margin-bottom: 16px;
+}
+.row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row span:first-child { color: var(--muted); }
+.row span:last-child { font-variant-numeric: tabular-nums; text-align: right; word-break: break-word; }
+.pill { padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: rgba(78,201,160,.15); color: var(--ok); }
+.pill.warn { background: rgba(227,179,65,.15); color: var(--warn); }
+.pill.err { background: rgba(240,113,120,.15); color: var(--err); }
+.banner { padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.banner.err { background: rgba(240,113,120,.12); color: var(--err); }
+.banner.warn { background: rgba(227,179,65,.12); color: var(--warn); }
+input[type=password] {
+  width: 100%; padding: 11px 13px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font-size: 15px;
+}
+button.primary {
+  width: 100%; padding: 11px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+}
+button.primary:hover { filter: brightness(1.1); }
+.login { max-width: 340px; margin: 12vh auto 0; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#f6f7fb; --card:#fff; --line:#e3e6ef; --text:#1b1d29; --muted:#6b7183; }
+}

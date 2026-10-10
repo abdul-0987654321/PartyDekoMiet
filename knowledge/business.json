@@ -1,0 +1,47 @@
+{
+  "name": "PartyDekoMiet",
+  "website": "https://partydekomiet.ch",
+  "catalogUrl": "https://partydekomiet.ch/collections/all",
+  "city": "Zürich",
+  "country": "Schweiz",
+  "currency": "CHF",
+
+  "whatWeDo": "Vermietung von Partydekorationen und thematischen Dekorationssets, vor allem Kindergeburtstage (Einhorn, Prinzessin, Mädchengeburtstag und mehr), für private und geschäftliche Anlässe.",
+
+  "pickup": {
+    "selfPickupOnly": true,
+    "address": "Langstrasse 175, 8004 Zürich",
+    "addressDetail": "im SBB-Bürogebäude, im Erdgeschoss / unten beim Gebäude",
+    "timeIsAgreedInAdvance": true,
+    "hours": null,
+    "customerBringsVehicle": true,
+    "vehicleNote": "geeignetes, möglichst leeres Fahrzeug; störende Kindersitze oder Gegenstände vorher entfernen"
+  },
+
+  "rental": {
+    "days": 3,
+    "daysLabel": "drei aufeinanderfolgende Tage",
+    "returnDayOffset": 2,
+    "bufferDays": 0
+  },
+
+  "money": {
+    "depositChf": 50,
+    "lateFeeChfPerStartedDay": 50,
+    "depositRefundCondition": "vollständige, saubere und unbeschädigte Rückgabe",
+    "costsAboveDepositArePayable": true,
+    "paymentChannel": "Shopify-Shop",
+    "paymentNote": "Mietpreis und Kaution werden im Shop bezahlt. Der Bot nimmt niemals Zahlungsdaten an."
+  },
+
+  "notOffered": [
+    "Lieferservice",
+    "Aufbau am Veranstaltungsort",
+    "Abbau am Veranstaltungsort"
+  ],
+
+  "contact": {
+    "handoffPhone": null,
+    "ownerName": "Simone Frei"
+  }
+}

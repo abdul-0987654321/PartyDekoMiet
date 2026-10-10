@@ -1,0 +1,226 @@
+{
+  "_source": "Partydekomiet_AGB_Mietregeln_Chatbot_DE.pdf, Teil 2 - the German answers are the client's own wording and must stay verbatim.",
+  "entries": [
+    {
+      "id": "pickup_where",
+      "q": "Wo kann ich die Dekoration abholen?",
+      "a_de": "Die Abholung erfolgt an der Langstrasse 175, 8004 Zürich, unten im SBB-Bürogebäude. Wir vereinbaren den genauen Abholzeitpunkt mit dir.",
+      "a_en": "You pick the decoration up at Langstrasse 175, 8004 Zürich, on the ground floor of the SBB office building. We agree the exact pickup time with you.",
+      "keywords": [
+        "abholen",
+        "abholung",
+        "wo",
+        "adresse",
+        "standort",
+        "langstrasse",
+        "pickup",
+        "where",
+        "location"
+      ]
+    },
+    {
+      "id": "no_delivery",
+      "q": "Liefern Sie die Dekoration nach Hause oder zur Location?",
+      "a_de": "Nein, wir bieten keinen Lieferservice an. Die Dekoration wird ausschliesslich zur Selbstabholung bereitgestellt.",
+      "a_en": "No, we don't offer delivery. The decoration is available for self-pickup only.",
+      "keywords": [
+        "liefern",
+        "lieferung",
+        "lieferservice",
+        "bringen",
+        "zustellen",
+        "nach hause",
+        "location",
+        "deliver",
+        "delivery",
+        "ship"
+      ]
+    },
+    {
+      "id": "rental_duration",
+      "q": "Wie lange kann ich das Set mieten?",
+      "a_de": "Die reguläre Mietdauer beträgt drei aufeinanderfolgende Tage. Den genauen Rückgabezeitpunkt vereinbaren wir bei der Buchung.",
+      "a_en": "The standard rental period is three consecutive days. We agree the exact return time when you book.",
+      "keywords": [
+        "wie lange",
+        "mietdauer",
+        "tage",
+        "dauer",
+        "how long",
+        "rental period",
+        "days"
+      ]
+    },
+    {
+      "id": "deposit_amount",
+      "q": "Wie hoch ist die Kaution?",
+      "a_de": "Die Kaution beträgt CHF 50.– und wird nach vollständiger, sauberer und unbeschädigter Rückgabe zurückerstattet.",
+      "a_en": "The deposit is CHF 50.– and is refunded after a complete, clean and undamaged return.",
+      "keywords": [
+        "kaution",
+        "depot",
+        "deposit",
+        "sicherheit",
+        "wie hoch"
+      ]
+    },
+    {
+      "id": "deposit_refund",
+      "q": "Wann bekomme ich die Kaution zurück?",
+      "a_de": "Nach der Rückgabe kontrollieren wir, ob alle Teile vorhanden und unbeschädigt sind. Wenn alles in Ordnung ist, erstatten wir dir die CHF 50.– zurück.",
+      "a_en": "After the return we check that all parts are there and undamaged. If everything is fine, we refund the CHF 50.– to you.",
+      "keywords": [
+        "kaution zurück",
+        "rückerstattung",
+        "wann",
+        "refund",
+        "get back"
+      ]
+    },
+    {
+      "id": "damage",
+      "q": "Was passiert, wenn etwas kaputtgeht oder fehlt?",
+      "a_de": "Bitte melde uns den Schaden direkt. Reparatur- oder Ersatzkosten können mit der Kaution verrechnet werden. Wenn die Kosten höher sind als CHF 50.–, ist der Differenzbetrag zusätzlich zu bezahlen.",
+      "a_en": "Please report the damage to us directly. Repair or replacement costs can be charged against the deposit. If the costs are higher than CHF 50.–, the difference has to be paid on top.",
+      "keywords": [
+        "kaputt",
+        "schaden",
+        "beschädigt",
+        "fehlt",
+        "verloren",
+        "broken",
+        "damage",
+        "lost",
+        "missing"
+      ]
+    },
+    {
+      "id": "late_return",
+      "q": "Was kostet eine verspätete Rückgabe?",
+      "a_de": "Bei verspäteter Rückgabe berechnen wir CHF 50.– pro angefangenem Verspätungstag. Bitte melde dich sofort, wenn du den Rückgabetermin nicht einhalten kannst.",
+      "a_en": "For a late return we charge CHF 50.– per started day of delay. Please contact us immediately if you can't make the return date.",
+      "keywords": [
+        "verspätet",
+        "zu spät",
+        "verspätung",
+        "späte rückgabe",
+        "late",
+        "delay"
+      ]
+    },
+    {
+      "id": "transport",
+      "q": "Muss ich die Dekoration selbst transportieren?",
+      "a_de": "Ja. Bitte komm mit einem geeigneten, möglichst leeren Fahrzeug. Für Transport und sichere Aufbewahrung bist du während der Mietzeit verantwortlich.",
+      "a_en": "Yes. Please come with a suitable, ideally empty vehicle. You are responsible for transport and safe storage during the rental period.",
+      "keywords": [
+        "transport",
+        "fahrzeug",
+        "auto",
+        "transportieren",
+        "selbst holen",
+        "car",
+        "vehicle"
+      ]
+    },
+    {
+      "id": "setup_included",
+      "q": "Ist das Set bereits aufgebaut oder muss ich alles selbst dekorieren?",
+      "a_de": "Wir bereiten das gebuchte Set gemäss der bestätigten Zusammenstellung vor. Aufbau am Veranstaltungsort ist nicht inklusive; die Dekoration wird von dir abgeholt und selbst aufgebaut.",
+      "a_en": "We prepare the booked set according to the confirmed selection. Setup at the venue is not included; you pick the decoration up and set it up yourself.",
+      "keywords": [
+        "aufgebaut",
+        "aufbau",
+        "selbst dekorieren",
+        "montage",
+        "set up",
+        "assembled"
+      ]
+    },
+    {
+      "id": "theme_request",
+      "q": "Kann ich ein bestimmtes Motto oder eine Wunschfarbe bestellen?",
+      "a_de": "Ja. Sag uns bitte, für welchen Anlass die Dekoration ist, wie alt die gefeierte Person wird und welches Motto oder welche Farben du dir wünschst. Ein Referenzbild hilft uns bei der Abstimmung.",
+      "a_en": "Yes. Please tell us what the occasion is, how old the celebrated person will be, and which theme or colours you'd like. A reference picture helps us match it.",
+      "keywords": [
+        "motto",
+        "thema",
+        "farbe",
+        "wunschfarbe",
+        "theme",
+        "colour",
+        "color"
+      ]
+    },
+    {
+      "id": "reference_photo",
+      "q": "Kann ich ein Foto als Vorlage schicken?",
+      "a_de": "Ja, du kannst uns gern ein Referenzbild schicken. Wir prüfen, welche Elemente verfügbar sind, und bestätigen dir die mögliche Zusammenstellung vor der Buchung.",
+      "a_en": "Yes, feel free to send us a reference picture. We check which elements are available and confirm the possible selection before you book.",
+      "keywords": [
+        "foto",
+        "bild",
+        "vorlage",
+        "referenzbild",
+        "photo",
+        "picture",
+        "reference"
+      ]
+    },
+    {
+      "id": "booking_binding",
+      "q": "Wann ist meine Buchung verbindlich?",
+      "a_de": "Deine Buchung ist verbindlich, sobald wir die Verfügbarkeit bestätigt haben und die im Buchungsprozess verlangten Zahlungen eingegangen sind.",
+      "a_en": "Your booking is binding as soon as we have confirmed availability and the payments required in the booking process have arrived.",
+      "keywords": [
+        "verbindlich",
+        "buchung",
+        "reservierung",
+        "binding",
+        "booking confirmed"
+      ]
+    },
+    {
+      "id": "return_condition",
+      "q": "Was muss ich bei der Rückgabe beachten?",
+      "a_de": "Bitte gib alle Teile vollständig, sauber und zum vereinbarten Zeitpunkt zurück. Kontrolliere vor der Rückgabe, ob Zubehör und Dekorationselemente wieder eingepackt sind.",
+      "a_en": "Please return all parts complete, clean and at the agreed time. Before returning, check that accessories and decoration elements are packed up again.",
+      "keywords": [
+        "rückgabe",
+        "zurückgeben",
+        "beachten",
+        "return",
+        "give back"
+      ]
+    },
+    {
+      "id": "no_setup_service",
+      "q": "Bieten Sie Aufbau oder Abbau vor Ort an?",
+      "a_de": "Nein, Aufbau und Abbau am Veranstaltungsort sind nicht Teil unseres Angebots. Du holst das Set ab und baust es selbst auf.",
+      "a_en": "No, setup and teardown at the venue are not part of our offer. You pick the set up and set it up yourself.",
+      "keywords": [
+        "aufbau",
+        "abbau",
+        "vor ort",
+        "veranstaltungsort",
+        "setup",
+        "teardown",
+        "venue"
+      ]
+    },
+    {
+      "id": "extension",
+      "q": "Kann ich die Mietdauer verlängern?",
+      "a_de": "Eine Verlängerung ist nur möglich, wenn keine nachfolgende Buchung betroffen ist und wir sie ausdrücklich bestätigen. Bitte frage so früh wie möglich nach.",
+      "a_en": "An extension is only possible if no following booking is affected and we explicitly confirm it. Please ask as early as possible.",
+      "keywords": [
+        "verlängern",
+        "verlängerung",
+        "länger",
+        "extend",
+        "extension",
+        "longer"
+      ]
+    }
+  ]
+}

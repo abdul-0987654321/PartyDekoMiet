@@ -52,6 +52,23 @@ function createNotifier({ client }) {
       : { ok: true, sent, failed };
   }
 
+  /**
+   * How the price reads depends on how the shop handles the deposit. Hardcoding
+   * "+ CHF 50.- Kaution" made the owner's copy contradict what the customer was
+   * told, because the default is that the deposit is already in the shop price.
+   */
+  function priceLine(priceChf) {
+    const deposit = settings.get('depositChf');
+    switch (settings.get('depositMode')) {
+      case 'separate':
+        return `CHF ${priceChf} + CHF ${deposit}.- Kaution (eigenes Produkt im Shop)`;
+      case 'manual':
+        return `CHF ${priceChf} im Shop + CHF ${deposit}.- Kaution bei der Abholung`;
+      default:
+        return `CHF ${priceChf} (inkl. CHF ${deposit}.- Kaution)`;
+    }
+  }
+
   /** The message the owner gets for a new booking request. */
   async function bookingRequest(booking, extra = {}) {
     const lines = [
@@ -62,7 +79,7 @@ function createNotifier({ client }) {
       `Set:       ${booking.productTitle}`,
       `Abholung:  ${booking.pickupDate}`,
       `Rueckgabe: ${booking.returnDate}`,
-      booking.priceChf ? `Preis:     CHF ${booking.priceChf} + CHF ${settings.get('depositChf')}.- Kaution` : null,
+      booking.priceChf ? `Preis:     ${priceLine(booking.priceChf)}` : null,
       booking.occasion ? `Anlass:    ${booking.occasion}` : null,
       booking.childAge ? `Alter:     ${booking.childAge}` : null,
       booking.themeNotes ? `Motto:     ${booking.themeNotes}` : null,

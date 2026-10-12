@@ -34,12 +34,42 @@ function paymentHint(lang = 'de') {
   return (lang === 'en' ? en : de)[mode] || '';
 }
 
+/** Placeholders a model reaches for instead of asking for the real name. */
+const PLACEHOLDER_NAMES = new Set([
+  'customer', 'kunde', 'kundin', 'client', 'guest', 'gast', 'user', 'name',
+  'unknown', 'unbekannt', 'n/a', 'na', '-', '--', 'test', 'anonymous',
+]);
+
+/**
+ * The model once filed "October 20th" as the child's age, so the booking said
+ * the birthday child was turning 20. Values that cannot be right are rejected
+ * here rather than written into the owner's calendar.
+ *
+ * @returns {string|null} an error for the model, or null when the data is usable
+ */
+function validateBookingArgs(args) {
+  const name = String(args.customer_name || '').trim();
+  if (name.length < 2 || PLACEHOLDER_NAMES.has(name.toLowerCase())) {
+    return 'Der Name des Kunden fehlt noch. Frag freundlich nach dem Namen, bevor du die Anfrage anlegst.';
+  }
+  if (args.child_age !== undefined && args.child_age !== null && args.child_age !== '') {
+    const age = Number(args.child_age);
+    if (!Number.isFinite(age) || age < 1 || age > 99) {
+      return `child_age "${args.child_age}" ist kein plausibles Alter. Das Alter ist NICHT das Datum. Lass es weg oder frag nach.`;
+    }
+  }
+  return null;
+}
+
 function createBookings({ catalog, calendar, notify }) {
   /**
    * @returns {object} tool result; the wording is read by the model, so it must
    *                   never sound like a confirmation.
    */
   async function create(args) {
+    const problem = validateBookingArgs(args);
+    if (problem) return { ok: false, error: problem };
+
     const product = catalog ? await catalog.byId(args.product_id) : null;
     if (!product) {
       return { ok: false, error: `Produkt ${args.product_id} nicht gefunden. Bitte zuerst search_products benutzen.` };
@@ -127,6 +157,53 @@ function createBookings({ catalog, calendar, notify }) {
     };
   }
 
+  /**
+   * Changes a booking's status from the dashboard and keeps the calendar in
+   * step, because the calendar is what decides availability. CANCELLED frees
+   * the dates by deleting the event; anything else just retitles it.
+   *
+   * @param {string} id
+   * @param {'PENDING'|'CONFIRMED'|'CANCELLED'} status
+   */
+  async function setStatus(id, status) {
+    const allowed = ['PENDING', 'CONFIRMED', 'CANCELLED'];
+    if (!allowed.includes(status)) {
+      return { ok: false, error: `status must be one of ${allowed.join(', ')}` };
+    }
+    const booking = db.get('bookings', id);
+    if (!booking) return { ok: false, error: `booking ${id} not found` };
+    if (booking.status === status) return { ok: true, booking, unchanged: true };
+
+    const previous = booking.status;
+    let calendarWarning = null;
+
+    if (calendar && booking.calendarEventId) {
+      try {
+        if (status === 'CANCELLED') {
+          await calendar.deleteEvent(booking.calendarEventId);
+          booking.calendarEventId = '';
+        } else {
+          await calendar.patchEvent(booking.calendarEventId, {
+            summary: `[${status}] ${booking.productTitle} \u2013 ${booking.customerName}`,
+            extendedProperties: { private: { bookingStatus: status } },
+          });
+        }
+      } catch (err) {
+        // The booking still changes; the owner is told the calendar did not.
+        calendarWarning = err.message;
+        log.error(`Booking ${id}: calendar not updated (${err.message})`);
+      }
+    }
+
+    booking.status = status;
+    booking.updatedAt = new Date().toISOString();
+    db.put('bookings', booking);
+    await db.flush();
+    log.info(`Booking ${id}: ${previous} -> ${status}`);
+
+    return { ok: true, booking, previous, calendarWarning };
+  }
+
   function list({ status = null, limit = 100 } = {}) {
     return db
       .all('bookings')
@@ -135,7 +212,7 @@ function createBookings({ catalog, calendar, notify }) {
       .slice(0, limit);
   }
 
-  return { create, list, paymentHint };
+  return { create, list, setStatus, paymentHint };
 }
 
-module.exports = { createBookings, paymentHint, newId };
+module.exports = { createBookings, paymentHint, newId, validateBookingArgs };

@@ -21,15 +21,40 @@ async function refresh() {
   if (!rows.length) { $('wrap').innerHTML = `<p class="muted">${t('no_bookings')}</p>`; return; }
   $('wrap').innerHTML = `<table><thead><tr>
       <th>${t('b_id')}</th><th>${t('b_status')}</th><th>${t('b_customer')}</th><th>${t('b_product')}</th>
-      <th>${t('b_pickup')}</th><th>${t('b_return')}</th><th>${t('b_created')}</th>
+      <th>${t('b_pickup')}</th><th>${t('b_return')}</th><th>${t('b_action')}</th>
     </tr></thead><tbody>${rows.map((b)=>`<tr>
-      <td>${esc(b.id)}</td>
+      <td>${esc(b.id)}<br><span class="muted">${fmtDate(b.createdAt)}</span></td>
       <td>${pill(b.status, b.status==='CONFIRMED'?'ok':b.status==='CANCELLED'?'err':'warn')}</td>
       <td>${esc(b.customerName)}<br><span class="muted">${esc(b.phone)}</span></td>
       <td>${b.productUrl?`<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)}</a>`:esc(b.productTitle)}</td>
-      <td>${esc(b.pickupDate)}</td><td>${esc(b.returnDate)}</td><td>${fmtDate(b.createdAt)}</td>
+      <td>${esc(b.pickupDate)}</td><td>${esc(b.returnDate)}</td>
+      <td>${actions(b)}</td>
     </tr>`).join('')}</tbody></table>`;
 }
+
+/** Only the moves that make sense from the current status are offered. */
+function actions(b) {
+  const btn = (label, status, cls) =>
+    `<button class="${cls}" style="padding:6px 11px;font-size:12.5px;margin:2px 0"
+       onclick="setStatus('${esc(b.id)}','${status}')">${esc(label)}</button>`;
+  if (b.status === 'PENDING') {
+    return `<div class="inline">${btn(t('b_confirm'),'CONFIRMED','primary')}${btn(t('b_cancel'),'CANCELLED','ghost')}</div>`;
+  }
+  if (b.status === 'CONFIRMED') {
+    return `<div class="inline">${btn(t('b_cancel'),'CANCELLED','ghost')}</div>`;
+  }
+  return `<div class="inline">${btn(t('b_pending'),'PENDING','ghost')}</div>`;
+}
+
+async function setStatus(id, status) {
+  const question = status === 'CANCELLED' ? t('b_cancel_q') : status === 'CONFIRMED' ? t('b_confirm_q') : null;
+  if (question && !confirm(question)) return;
+  const res = await api(`/api/bookings/${encodeURIComponent(id)}/status`, { method:'POST', body:{ status } });
+  if (!res.ok) { alert(res.error || 'error'); return; }
+  if (res.calendarWarning) alert(`${t('b_cal_warn')}\n${res.calendarWarning}`);
+  refresh();
+}
+
 refresh(); setInterval(refresh, 15000);
 </script>
 </body></html>

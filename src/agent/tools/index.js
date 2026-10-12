@@ -92,9 +92,12 @@ const DEFS = [
       properties: {
         product_id: { type: 'string' },
         start_date: { type: 'string', description: 'Pickup date, ISO YYYY-MM-DD' },
-        customer_name: { type: 'string' },
+        customer_name: { type: 'string', description: "The customer's real name, as they gave it. Ask for it if you do not have it. Never invent one and never use 'Customer'." },
         occasion: { type: 'string', description: 'e.g. 5. Geburtstag' },
-        child_age: { type: 'integer' },
+        child_age: {
+          type: 'integer',
+          description: 'How old the celebrated person turns, in YEARS. This is NOT the party date. Leave it out if the customer has not said it.',
+        },
         theme_notes: { type: 'string', description: 'Theme, colours, wishes' },
         has_reference_photo: { type: 'boolean' },
       },

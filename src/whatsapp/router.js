@@ -278,10 +278,15 @@ function createRouter({ client, agent, services, notify, knowledge }) {
 
     if (out.handoff) {
       pause(jid, settings.get('takeoverPauseHours'), 'handoff to human');
-      await notify.owner(
-        `Uebergabe noetig im Chat mit ${jid.split('@')[0]}\nLetzte Nachricht: ${text}`,
-        { kind: 'handoff', jid }
-      );
+      // The handoff_to_human tool already alerted the owner with its own reason.
+      // Sending a second, vaguer alert for the same event just doubles the noise.
+      const toolAlreadyTold = (out.toolCalls || []).some((c) => c.name === 'handoff_to_human');
+      if (!toolAlreadyTold) {
+        await notify.owner(
+          `Uebergabe noetig im Chat mit ${jid.split('@')[0]}\nLetzte Nachricht: ${text}`,
+          { kind: 'handoff', jid }
+        );
+      }
     }
     if (out.blocked) {
       await notify.owner(

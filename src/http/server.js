@@ -305,6 +305,13 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     res.json({ ok: true, bookings: rows });
   });
 
+  app.post('/api/bookings/:id/status', safe(async (req, res) => {
+    if (!runtime.bookings) return res.status(503).json({ ok: false, error: 'bookings not ready' });
+    const result = await runtime.bookings.setStatus(String(req.params.id), String(req.body?.status || ''));
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  }));
+
   // ---- Catalog ----
   app.post('/api/catalog/refresh', safe(async (req, res) => {
     if (!catalog) return res.status(503).json({ ok: false, error: 'catalog not ready' });

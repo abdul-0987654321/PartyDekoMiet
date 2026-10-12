@@ -58,6 +58,10 @@ const T = {
     fix_wa: 'WhatsApp-Telefon verknüpfen',
     fix_ai: 'OpenAI-Schlüssel wird abgelehnt – neuen Schlüssel in Render setzen',
     ai_ok: 'antwortet', ai_bad: 'Fehler',
+    b_action: 'Status ändern', b_confirm: 'Bestätigen', b_cancel: 'Stornieren', b_pending: 'Zurück auf offen',
+    b_confirm_q: 'Zahlung ist eingegangen? Die Buchung wird auf CONFIRMED gesetzt.',
+    b_cancel_q: 'Buchung stornieren? Der Kalendereintrag wird gelöscht und die Tage werden wieder frei.',
+    b_cal_warn: 'Buchung geändert, aber der Kalender konnte nicht aktualisiert werden:',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -110,6 +114,10 @@ const T = {
     fix_wa: 'Link the WhatsApp phone',
     fix_ai: 'OpenAI key is being rejected – set a new key in Render',
     ai_ok: 'answering', ai_bad: 'failing',
+    b_action: 'Change status', b_confirm: 'Confirm', b_cancel: 'Cancel', b_pending: 'Back to pending',
+    b_confirm_q: 'Payment received? The booking will be set to CONFIRMED.',
+    b_cancel_q: 'Cancel this booking? The calendar entry is deleted and the days become free again.',
+    b_cal_warn: 'Booking changed, but the calendar could not be updated:',
   },
 };
 

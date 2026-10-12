@@ -140,7 +140,14 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50 } = {}
 
   /** Fixes what can be fixed safely, without changing meaning. */
   function autofix(text) {
-    return String(text).replace(new RegExp(SHARP_S, 'g'), 'ss');
+    let out = String(text).replace(new RegExp(SHARP_S, 'g'), 'ss');
+    // WhatsApp has no markdown links: [Einhorn Set](https://...) is shown with
+    // the brackets and the URL twice. Keep the label, keep the link, drop the
+    // syntax.
+    out = out.replace(/\[([^\]\n]{1,80})\]\((https?:\/\/[^\s)]+)\)/g, '$1: $2');
+    // Markdown bold is **x** on the web but *x* on WhatsApp.
+    out = out.replace(/\*\*([^*\n]{1,120})\*\*/g, '*$1*');
+    return out;
   }
 
   /** @returns {{code:string,hint:string,sentence:string}[]} */

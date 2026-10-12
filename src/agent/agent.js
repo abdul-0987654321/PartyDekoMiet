@@ -132,7 +132,12 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
       return { ...guarded, toolCalls, handoff, lang };
     }
 
-    log.warn(`Agent hit the step limit (${maxSteps}) without a final answer`);
+    // Usually a tool that keeps rejecting the model's arguments, so it retries
+    // forever. The owner needs to know, because the conversation stops here.
+    log.warn(
+      `Agent hit the step limit (${maxSteps}) without a final answer. ` +
+        `Tools called: ${toolCalls.map((c) => `${c.name}${c.result?.ok === false ? '(failed)' : ''}`).join(', ') || 'none'}`
+    );
     return {
       text:
         lang === 'en'
@@ -140,6 +145,7 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
           : 'Ich gebe das an jemanden aus dem Team weiter, du hoerst gleich von uns.',
       toolCalls,
       handoff: true,
+      stepLimit: true,
       violations: [],
       blocked: false,
       lang,

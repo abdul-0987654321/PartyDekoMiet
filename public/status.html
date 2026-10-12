@@ -35,6 +35,7 @@
     <div class="row"><span id="l_calendar"></span><span id="calendar">…</span></div>
     <div class="row"><span id="l_key"></span><span id="key">…</span></div>
     <div class="row"><span id="l_ai">AI</span><span id="ai">…</span></div>
+    <div class="row" id="skiprow" hidden><span id="l_skip"></span><span id="skip">–</span></div>
     <div class="row"><span id="l_owner"></span><span id="owner">…</span></div>
     <div class="row"><span id="l_paused"></span><span id="paused">…</span></div>
   </div>
@@ -146,6 +147,18 @@ async function refresh() {
     $('ai').innerHTML = pill(t('ai_ok'), 'ok');
   }
   $('owner').textContent = d.config.ownerNumber || t('missing');
+
+  // Why the bot stayed quiet, so an unanswered customer is never a mystery.
+  const sk = d.skipped && d.skipped.last;
+  $('l_skip').textContent = t('last_skip');
+  if (sk && Date.now() - new Date(sk.at).getTime() < 6 * 3600000) {
+    $('skiprow').hidden = false;
+    $('skip').innerHTML =
+      pill(t('sk_' + sk.reason) || sk.reason, sk.reason === 'paused' ? 'warn' : 'err') +
+      `<br><span class="muted" style="font-size:12px">${esc(sk.jid.split('@')[0])} · ${esc(fmtDate(sk.at))}</span>`;
+  } else {
+    $('skiprow').hidden = true;
+  }
   $('paused').textContent = d.pausedChats.length ? d.pausedChats.map(p=>p.jid.split('@')[0]).join(', ') : t('none');
 
   // ---- details ----

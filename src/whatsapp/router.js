@@ -193,20 +193,25 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     }
 
     // 3. Everything else is a customer.
+    //
+    // Each of these ends the turn without answering. They used to do so with
+    // nothing but a log line, which from the outside is indistinguishable from
+    // the bot being broken. Every one of them now records the message, is
+    // visible on the dashboard, and tells the owner a customer is waiting.
     if (!settings.get('botEnabled')) {
-      log.info(`Bot is off, ignoring message from ${jid}`);
+      await skip(jid, text, 'bot_off', 'Der Bot ist ausgeschaltet.');
       return;
     }
     if (isPaused(jid)) {
-      log.info(`Chat ${jid} is paused, not replying`);
+      await skip(jid, text, 'paused', 'Der Chat ist pausiert - jemand hat ihn uebernommen.');
       return;
     }
     if (!underRateLimit(jid)) {
-      log.warn(`Rate limit reached for ${jid}, not replying`);
+      await skip(jid, text, 'rate_limit', 'Stundenlimit fuer diesen Chat erreicht.');
       return;
     }
     if (!agent) {
-      log.error('No agent configured (OPENAI_API_KEY missing) - cannot reply');
+      await skip(jid, text, 'no_agent', 'Kein OPENAI_API_KEY gesetzt - der Bot kann nicht antworten.');
       return;
     }
 
@@ -281,7 +286,19 @@ function createRouter({ client, agent, services, notify, knowledge }) {
       // The handoff_to_human tool already alerted the owner with its own reason.
       // Sending a second, vaguer alert for the same event just doubles the noise.
       const toolAlreadyTold = (out.toolCalls || []).some((c) => c.name === 'handoff_to_human');
-      if (!toolAlreadyTold) {
+      if (out.stepLimit) {
+        // Not a normal handover: the model could not finish. Say what it was doing.
+        const failed = (out.toolCalls || [])
+          .filter((c) => c.result?.ok === false)
+          .map((c) => `${c.name}: ${c.result.error}`)
+          .join('\n');
+        await notify.owner(
+          `BOT KAM NICHT WEITER\n\nEr hat die Unterhaltung abgebrochen und an einen Menschen uebergeben.\n` +
+            `Chat: ${jid.split('@')[0]}\nLetzte Nachricht: ${text}\n` +
+            (failed ? `\nFehlgeschlagene Werkzeuge:\n${failed}` : ''),
+          { kind: 'step_limit', jid }
+        );
+      } else if (!toolAlreadyTold) {
         await notify.owner(
           `Uebergabe noetig im Chat mit ${jid.split('@')[0]}\nLetzte Nachricht: ${text}`,
           { kind: 'handoff', jid }
@@ -295,6 +312,37 @@ function createRouter({ client, agent, services, notify, knowledge }) {
         { kind: 'guard_blocked', jid }
       );
     }
+  }
+
+  // ---- A message the bot deliberately did not answer -------------------------
+
+  const skipped = { last: null, counts: {}, notifiedAt: {} };
+  const SKIP_NOTIFY_EVERY_MS = 10 * 60 * 1000;
+
+  /**
+   * A customer wrote and the bot stayed quiet on purpose. The message is still
+   * recorded, so whoever picks the chat up sees it, and the owner is nudged,
+   * because in every one of these cases a real person is waiting for a human.
+   */
+  async function skip(jid, text, reason, explanation) {
+    skipped.last = { jid, reason, at: new Date().toISOString(), text: String(text || '').slice(0, 120) };
+    skipped.counts[reason] = (skipped.counts[reason] || 0) + 1;
+    log.info(`Not answering ${jid}: ${reason} - ${explanation}`);
+
+    if (text) remember(jid, 'in', text); // never lose what the customer said
+
+    // "paused" is the normal case after a handover and the owner already knows,
+    // so it is nudged rarely; the others mean something is actually wrong.
+    const key = `${reason}:${jid}`;
+    const now = Date.now();
+    if (now - (skipped.notifiedAt[key] || 0) < SKIP_NOTIFY_EVERY_MS) return;
+    skipped.notifiedAt[key] = now;
+
+    await notify.owner(
+      `KUNDE WARTET\n\n${explanation}\n\nChat: ${jid.split('@')[0]}\n` +
+        `Nachricht: ${String(text || '[Bild]').slice(0, 300)}`,
+      { kind: 'skipped', reason, jid }
+    );
   }
 
   // ---- When the AI itself fails ---------------------------------------------
@@ -372,6 +420,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
   return {
     handle,
     aiHealth: () => ({ ...aiHealth }),
+    skipped: () => ({ ...skipped, notifiedAt: undefined }),
     init() {
       state = loadState();
       log.info(`Router ready (${Object.keys(state).length} known chats)`);

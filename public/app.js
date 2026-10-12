@@ -62,6 +62,9 @@ const T = {
     b_confirm_q: 'Zahlung ist eingegangen? Die Buchung wird auf CONFIRMED gesetzt.',
     b_cancel_q: 'Buchung stornieren? Der Kalendereintrag wird gelöscht und die Tage werden wieder frei.',
     b_cal_warn: 'Buchung geändert, aber der Kalender konnte nicht aktualisiert werden:',
+    last_skip: 'Zuletzt nicht beantwortet',
+    sk_paused: 'Chat pausiert', sk_bot_off: 'Bot ausgeschaltet',
+    sk_rate_limit: 'Stundenlimit', sk_no_agent: 'kein OpenAI-Schlüssel',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -118,6 +121,9 @@ const T = {
     b_confirm_q: 'Payment received? The booking will be set to CONFIRMED.',
     b_cancel_q: 'Cancel this booking? The calendar entry is deleted and the days become free again.',
     b_cal_warn: 'Booking changed, but the calendar could not be updated:',
+    last_skip: 'Last message not answered',
+    sk_paused: 'chat paused', sk_bot_off: 'bot switched off',
+    sk_rate_limit: 'hourly limit', sk_no_agent: 'no OpenAI key',
   },
 };
 

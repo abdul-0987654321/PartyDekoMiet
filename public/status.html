@@ -34,6 +34,7 @@
     <div class="row"><span id="l_catalog"></span><span id="catalog">…</span></div>
     <div class="row"><span id="l_calendar"></span><span id="calendar">…</span></div>
     <div class="row"><span id="l_key"></span><span id="key">…</span></div>
+    <div class="row"><span id="l_ai">AI</span><span id="ai">…</span></div>
     <div class="row"><span id="l_owner"></span><span id="owner">…</span></div>
     <div class="row"><span id="l_paused"></span><span id="paused">…</span></div>
   </div>
@@ -80,6 +81,8 @@ function todoList(d) {
   const items = [];
   if (!d.config.hasSheet) items.push([t('fix_sheet'), '/settings']);
   if (!d.config.hasOpenAiKey) items.push([t('fix_key'), null]);
+  // A key that is set but rejected looks fine above, so call it out separately.
+  else if (d.ai && d.ai.lastError && /^401/.test(d.ai.lastError)) items.push([t('fix_ai'), null]);
   if (d.whatsapp.status !== 'connected') items.push([t('fix_wa'), '/whatsapp']);
   if (!d.config.calendarConfigured || d.calendarError) items.push([t('fix_cal'), '/settings']);
   if (!d.config.ownerNumber) items.push([t('fix_owner'), '/settings']);
@@ -134,6 +137,14 @@ async function refresh() {
   $('calendar').innerHTML = d.config.calendarConfigured && !d.calendarError
     ? pill(t('connected'),'ok') : pill(t('not_configured'),'warn');
   $('key').innerHTML = d.config.hasOpenAiKey ? pill(t('set'),'ok') : pill(t('missing'),'err');
+  if (d.ai && d.ai.lastError) {
+    const recent = Date.now() - new Date(d.ai.lastErrorAt).getTime() < 30 * 60000;
+    $('ai').innerHTML = recent
+      ? pill(String(d.ai.lastError).slice(0, 48), 'err')
+      : pill(t('ai_ok'), 'ok');
+  } else {
+    $('ai').innerHTML = pill(t('ai_ok'), 'ok');
+  }
   $('owner').textContent = d.config.ownerNumber || t('missing');
   $('paused').textContent = d.pausedChats.length ? d.pausedChats.map(p=>p.jid.split('@')[0]).join(', ') : t('none');
 

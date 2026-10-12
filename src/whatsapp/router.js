@@ -255,13 +255,22 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     if (!text && !photoNote) return;
 
     const history = recentHistory(jid);
-    const out = await agent.reply({
-      history,
-      message: (text || '[Bild ohne Text]') + photoNote,
-      services,
-      chatId: jid,
-      customerName: db.get('customers', jid)?.name,
-    });
+    let out;
+    try {
+      out = await agent.reply({
+        history,
+        message: (text || '[Bild ohne Text]') + photoNote,
+        services,
+        chatId: jid,
+        customerName: db.get('customers', jid)?.name,
+      });
+    } catch (err) {
+      // The AI failed (bad key, quota, outage). The customer must not be left in
+      // silence: say something honest, hand the chat to a human, and tell the
+      // owner once rather than on every message.
+      await handleAiFailure(jid, text, err);
+      return;
+    }
 
     await client.sendText(jid, out.text);
     remember(jid, 'in', text || '[Bild]');
@@ -279,6 +288,60 @@ function createRouter({ client, agent, services, notify, knowledge }) {
         `Eine Antwort wurde von den Regeln blockiert (${out.violations.map((v) => v.code).join(', ')}).\n` +
           `Chat: ${jid.split('@')[0]}`,
         { kind: 'guard_blocked', jid }
+      );
+    }
+  }
+
+  // ---- When the AI itself fails ---------------------------------------------
+
+  const aiHealth = { lastError: null, lastErrorAt: null, lastNotifiedAt: 0, count: 0 };
+  const NOTIFY_EVERY_MS = 15 * 60 * 1000;
+
+  const AI_DOWN = {
+    de: 'Sorry, bei mir klemmt es gerade technisch. Ich habe jemandem aus dem Team Bescheid gegeben, du hoerst gleich von uns.',
+    en: 'Sorry, I am having a technical problem right now. I have told a colleague, you will hear from us shortly.',
+  };
+
+  async function handleAiFailure(jid, text, err) {
+    const status = err?.status || err?.response?.status || null;
+    const message = String(err?.message || err);
+
+    aiHealth.lastError = status ? `${status}: ${message}` : message;
+    aiHealth.lastErrorAt = new Date().toISOString();
+    aiHealth.count += 1;
+    log.error(`AI call failed for ${jid}: ${aiHealth.lastError}`);
+
+    const lang = /\b(the|and|is|how|can|hello|hi|you|do|your|price|book)\b/i.test(String(text || ''))
+      ? 'en'
+      : 'de';
+
+    try {
+      await client.sendText(jid, AI_DOWN[lang]);
+      remember(jid, 'in', text || '[Bild]');
+      remember(jid, 'out', AI_DOWN[lang]);
+    } catch (sendErr) {
+      log.error(`Could not even send the fallback to ${jid}: ${sendErr.message}`);
+    }
+
+    // A human has to take this conversation over.
+    pause(jid, settings.get('takeoverPauseHours'), 'ai failure');
+
+    // An invalid key fails on every single message. Telling the owner each time
+    // would bury the chat it is meant to rescue.
+    const now = Date.now();
+    if (now - aiHealth.lastNotifiedAt > NOTIFY_EVERY_MS) {
+      aiHealth.lastNotifiedAt = now;
+      const hint =
+        status === 401
+          ? 'Der OpenAI-Schluessel wird abgelehnt (401). Bitte in Render einen neuen OPENAI_API_KEY setzen.'
+          : status === 429
+            ? 'OpenAI-Limit erreicht (429). Guthaben oder Rate Limit pruefen.'
+            : 'Die KI ist gerade nicht erreichbar.';
+      await notify.owner(
+        `BOT ANTWORTET NICHT\n\n${hint}\n\nFehler: ${aiHealth.lastError}\n` +
+          `Betroffene Nachrichten seit dem ersten Fehler: ${aiHealth.count}\n` +
+          `Chat: ${jid.split('@')[0]}`,
+        { kind: 'ai_failure', jid }
       );
     }
   }
@@ -303,6 +366,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
 
   return {
     handle,
+    aiHealth: () => ({ ...aiHealth }),
     init() {
       state = loadState();
       log.info(`Router ready (${Object.keys(state).length} known chats)`);

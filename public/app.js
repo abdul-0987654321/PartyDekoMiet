@@ -56,6 +56,8 @@ const T = {
     fix_cal: 'Kalender einrichten',
     fix_owner: 'Inhaber-Nummer eintragen',
     fix_wa: 'WhatsApp-Telefon verknüpfen',
+    fix_ai: 'OpenAI-Schlüssel wird abgelehnt – neuen Schlüssel in Render setzen',
+    ai_ok: 'antwortet', ai_bad: 'Fehler',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -106,6 +108,8 @@ const T = {
     fix_cal: 'Set up the calendar',
     fix_owner: 'Add the owner number',
     fix_wa: 'Link the WhatsApp phone',
+    fix_ai: 'OpenAI key is being rejected – set a new key in Render',
+    ai_ok: 'answering', ai_bad: 'failing',
   },
 };
 

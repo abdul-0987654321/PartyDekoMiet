@@ -91,6 +91,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       bootError: state.bootError,
       knowledge: state.knowledge,
       catalog: catalog ? catalog.status() : null,
+      ai: runtime.router ? runtime.router.aiHealth() : null,
       whatsapp: whatsapp ? whatsapp.getStatus() : { status: 'not-wired' },
       pausedChats: runtime.router ? runtime.router.listPaused() : [],
       lang: s.dashboardLanguage || 'de',

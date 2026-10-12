@@ -29,12 +29,11 @@ const STATE_KEY = 'settings';
 const SCHEMA = [
   // ── Bot ──────────────────────────────────────────────────────────────────
   {
-    key: 'botEnabled', group: 'bot', type: 'boolean', default: true,
+    // Not shown in the settings form: the switch on the status page and the
+    // /on and /off commands already control this, and a second control that
+    // can disagree with the first is worse than no control.
+    key: 'botEnabled', group: 'bot', type: 'boolean', default: true, hidden: true,
     label: { de: 'Bot aktiv', en: 'Bot active' },
-    help: {
-      de: 'Aus: der Bot liest Nachrichten, antwortet aber nicht. Notbremse.',
-      en: 'Off: the bot reads messages but does not answer. Emergency switch.',
-    },
   },
   {
     key: 'botLanguage', group: 'bot', type: 'enum', default: 'auto',
@@ -316,8 +315,9 @@ function all() {
 }
 
 /** Schema for the dashboard, with the current value and where it came from. */
+/** Schema for the settings form. Hidden entries are still settable by the API. */
 function describe() {
-  return SCHEMA.map((def) => ({
+  return SCHEMA.filter((def) => !def.hidden).map((def) => ({
     key: def.key,
     group: def.group,
     type: def.type,

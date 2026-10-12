@@ -137,8 +137,18 @@ function isOwnMessage(id) {
   return Boolean(id) && ownMessageIds.has(id);
 }
 
+/**
+ * Marks a message as read after a short pause rather than instantly.
+ *
+ * The whole exchange then reads as a person: the tick appears after about a
+ * second, "typing..." runs for a few seconds, and the reply lands around four
+ * seconds in. An instant read receipt followed by an instant answer is one of
+ * the patterns that makes an account look automated.
+ */
 async function markRead(msg) {
   try {
+    const delay = Number(settings.get('readDelayMs'));
+    if (delay > 0) await sleep(delay);
     await runtime.sock?.readMessages([msg.key]);
   } catch (err) {
     log.warn(`Could not mark message as read: ${err.message}`);

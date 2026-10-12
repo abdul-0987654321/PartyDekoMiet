@@ -13,6 +13,7 @@
 const log = require('../log');
 const db = require('../store/db');
 const settings = require('../settings');
+const { m } = require('../notify/messages');
 
 const STATE_KEY = 'chatstate'; // { [jid]: { pausedUntil, reason, count:[ts,...] } }
 
@@ -108,9 +109,13 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     return Boolean(until && until > Date.now());
   }
 
-  /** Per-chat hourly cap, so a loop or a troll cannot burn the OpenAI budget. */
+  /**
+   * Per-chat hourly cap. 0 switches it off, which is the default: the owner
+   * asked for it and accepts that a loop or a troll can then run up usage.
+   */
   function underRateLimit(jid) {
-    const max = Number(settings.get('maxMsgsPerChatPerHour')) || 30;
+    const max = Number(settings.get('maxMsgsPerChatPerHour'));
+    if (!max || max <= 0) return true;
     const cutoff = Date.now() - 3600 * 1000;
     const entry = (state[jid] = state[jid] || {});
     entry.count = (entry.count || []).filter((t) => t > cutoff);
@@ -198,22 +203,10 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     // nothing but a log line, which from the outside is indistinguishable from
     // the bot being broken. Every one of them now records the message, is
     // visible on the dashboard, and tells the owner a customer is waiting.
-    if (!settings.get('botEnabled')) {
-      await skip(jid, text, 'bot_off', 'Der Bot ist ausgeschaltet.');
-      return;
-    }
-    if (isPaused(jid)) {
-      await skip(jid, text, 'paused', 'Der Chat ist pausiert - jemand hat ihn uebernommen.');
-      return;
-    }
-    if (!underRateLimit(jid)) {
-      await skip(jid, text, 'rate_limit', 'Stundenlimit fuer diesen Chat erreicht.');
-      return;
-    }
-    if (!agent) {
-      await skip(jid, text, 'no_agent', 'Kein OPENAI_API_KEY gesetzt - der Bot kann nicht antworten.');
-      return;
-    }
+    if (!settings.get('botEnabled')) return skip(jid, text, 'bot_off');
+    if (isPaused(jid)) return skip(jid, text, 'paused');
+    if (!underRateLimit(jid)) return skip(jid, text, 'rate_limit');
+    if (!agent) return skip(jid, text, 'no_agent');
 
     // Belongs to the other business on this number: answer honestly, hand over,
     // and never let the model near it.
@@ -224,10 +217,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
       remember(jid, 'in', text);
       remember(jid, 'out', reply);
       pause(jid, settings.get('takeoverPauseHours'), 'other business');
-      await notify.owner(
-        `Anfrage zum anderen Betrieb von ${jid.split('@')[0]}\nNachricht: ${text}`,
-        { kind: 'other_business', jid }
-      );
+      await notify.owner(m().otherBusiness(jid, text), { kind: 'other_business', jid });
       log.info(`Message from ${jid} matched the other business - handed over`);
       return;
     }
@@ -246,11 +236,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
           referencePhotoFileId: fileId,
           updatedAt: new Date().toISOString(),
         });
-        await notify.owner(
-          `Referenzbild von ${jid.split('@')[0]}${text ? `\nText: ${text}` : ''}`,
-          { kind: 'reference_photo', jid },
-          buffer
-        );
+        await notify.owner(m().referencePhoto(jid, text), { kind: 'reference_photo', jid }, buffer);
         photoNote = '\n\n[Der Kunde hat ein Referenzbild geschickt. Es wurde gespeichert und ans Team weitergegeben.]';
       } catch (err) {
         log.error(`Could not handle the reference photo from ${jid}: ${err.message}`);
@@ -292,23 +278,14 @@ function createRouter({ client, agent, services, notify, knowledge }) {
           .filter((c) => c.result?.ok === false)
           .map((c) => `${c.name}: ${c.result.error}`)
           .join('\n');
-        await notify.owner(
-          `BOT KAM NICHT WEITER\n\nEr hat die Unterhaltung abgebrochen und an einen Menschen uebergeben.\n` +
-            `Chat: ${jid.split('@')[0]}\nLetzte Nachricht: ${text}\n` +
-            (failed ? `\nFehlgeschlagene Werkzeuge:\n${failed}` : ''),
-          { kind: 'step_limit', jid }
-        );
+        await notify.owner(m().stepLimit(jid, text, failed), { kind: 'step_limit', jid });
       } else if (!toolAlreadyTold) {
-        await notify.owner(
-          `Uebergabe noetig im Chat mit ${jid.split('@')[0]}\nLetzte Nachricht: ${text}`,
-          { kind: 'handoff', jid }
-        );
+        await notify.owner(m().handoff(jid, text), { kind: 'handoff', jid });
       }
     }
     if (out.blocked) {
       await notify.owner(
-        `Eine Antwort wurde von den Regeln blockiert (${out.violations.map((v) => v.code).join(', ')}).\n` +
-          `Chat: ${jid.split('@')[0]}`,
+        m().guardBlocked(out.violations.map((v) => v.code).join(', '), jid),
         { kind: 'guard_blocked', jid }
       );
     }
@@ -324,7 +301,8 @@ function createRouter({ client, agent, services, notify, knowledge }) {
    * recorded, so whoever picks the chat up sees it, and the owner is nudged,
    * because in every one of these cases a real person is waiting for a human.
    */
-  async function skip(jid, text, reason, explanation) {
+  async function skip(jid, text, reason) {
+    const explanation = m().skipReasons[reason] || reason;
     skipped.last = { jid, reason, at: new Date().toISOString(), text: String(text || '').slice(0, 120) };
     skipped.counts[reason] = (skipped.counts[reason] || 0) + 1;
     log.info(`Not answering ${jid}: ${reason} - ${explanation}`);
@@ -338,11 +316,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     if (now - (skipped.notifiedAt[key] || 0) < SKIP_NOTIFY_EVERY_MS) return;
     skipped.notifiedAt[key] = now;
 
-    await notify.owner(
-      `KUNDE WARTET\n\n${explanation}\n\nChat: ${jid.split('@')[0]}\n` +
-        `Nachricht: ${String(text || '[Bild]').slice(0, 300)}`,
-      { kind: 'skipped', reason, jid }
-    );
+    await notify.owner(m().customerWaiting(explanation, jid, text), { kind: 'skipped', reason, jid });
   }
 
   // ---- When the AI itself fails ---------------------------------------------
@@ -384,18 +358,9 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     const now = Date.now();
     if (now - aiHealth.lastNotifiedAt > NOTIFY_EVERY_MS) {
       aiHealth.lastNotifiedAt = now;
-      const hint =
-        status === 401
-          ? 'Der OpenAI-Schluessel wird abgelehnt (401). Bitte in Render einen neuen OPENAI_API_KEY setzen.'
-          : status === 429
-            ? 'OpenAI-Limit erreicht (429). Guthaben oder Rate Limit pruefen.'
-            : 'Die KI ist gerade nicht erreichbar.';
-      await notify.owner(
-        `BOT ANTWORTET NICHT\n\n${hint}\n\nFehler: ${aiHealth.lastError}\n` +
-          `Betroffene Nachrichten seit dem ersten Fehler: ${aiHealth.count}\n` +
-          `Chat: ${jid.split('@')[0]}`,
-        { kind: 'ai_failure', jid }
-      );
+      const t = m();
+      const hint = t.aiHints[status] || t.aiHints.other;
+      await notify.owner(t.aiDown(hint, aiHealth.lastError, aiHealth.count, jid), { kind: 'ai_failure', jid });
     }
   }
 

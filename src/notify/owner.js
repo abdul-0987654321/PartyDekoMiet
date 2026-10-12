@@ -9,6 +9,7 @@
 
 const log = require('../log');
 const settings = require('../settings');
+const { m } = require('./messages');
 
 function createNotifier({ client }) {
   /**
@@ -71,25 +72,28 @@ function createNotifier({ client }) {
 
   /** The message the owner gets for a new booking request. */
   async function bookingRequest(booking, extra = {}) {
+    const t = m();
+    const f = t.bookingFields;
+    const pad = (label) => `${label}:`.padEnd(11);
     const lines = [
-      'NEUE BUCHUNGSANFRAGE',
+      t.bookingTitle,
       '',
-      `Kunde:     ${booking.customerName}`,
-      `WhatsApp:  ${booking.phone}`,
-      `Set:       ${booking.productTitle}`,
-      `Abholung:  ${booking.pickupDate}`,
-      `Rueckgabe: ${booking.returnDate}`,
-      booking.priceChf ? `Preis:     ${priceLine(booking.priceChf)}` : null,
-      booking.occasion ? `Anlass:    ${booking.occasion}` : null,
-      booking.childAge ? `Alter:     ${booking.childAge}` : null,
-      booking.themeNotes ? `Motto:     ${booking.themeNotes}` : null,
-      booking.referencePhotoFileId ? 'Referenzbild: ja' : null,
+      `${pad(f.customer)}${booking.customerName}`,
+      `${pad(f.whatsapp)}${booking.phone}`,
+      `${pad(f.set)}${booking.productTitle}`,
+      `${pad(f.pickup)}${booking.pickupDate}`,
+      `${pad(f.ret)}${booking.returnDate}`,
+      booking.priceChf ? `${pad(f.price)}${priceLine(booking.priceChf)}` : null,
+      booking.occasion ? `${pad(f.occasion)}${booking.occasion}` : null,
+      booking.childAge ? `${pad(f.age)}${booking.childAge}` : null,
+      booking.themeNotes ? `${pad(f.theme)}${booking.themeNotes}` : null,
+      booking.referencePhotoFileId ? `${pad(f.photo)}${t.photoYes}` : null,
       '',
-      booking.productUrl ? `Shop: ${booking.productUrl}` : null,
-      extra.calendarLink ? `Kalender: ${extra.calendarLink}` : null,
+      booking.productUrl ? `${f.shop}: ${booking.productUrl}` : null,
+      extra.calendarLink ? `${f.calendar}: ${extra.calendarLink}` : null,
       '',
-      'Status [PENDING]. Nach Zahlungseingang im Kalender auf [CONFIRMED] aendern.',
-    ].filter(Boolean);
+      t.bookingFooter,
+    ].filter((l) => l !== null);
 
     return owner(lines.join('\n'), { kind: 'booking_request', bookingId: booking.id });
   }

@@ -134,10 +134,8 @@ function createBookings({ catalog, calendar, notify }) {
     if (notify) {
       await notify.bookingRequest(booking, { calendarLink });
       if (!booking.calendarEventId) {
-        await notify.owner(
-          `ACHTUNG: Buchung ${booking.id} konnte nicht in den Kalender geschrieben werden. Bitte von Hand eintragen.`,
-          { kind: 'calendar_error', bookingId: booking.id }
-        );
+        const { m } = require('./notify/messages');
+        await notify.owner(m().calendarFailed(booking.id), { kind: 'calendar_error', bookingId: booking.id });
       }
     }
 

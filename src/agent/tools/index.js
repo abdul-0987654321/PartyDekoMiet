@@ -129,10 +129,8 @@ const DEFS = [
     handler: async (args, { notify, chatId, onHandoff }) => {
       if (onHandoff) onHandoff(args);
       if (notify) {
-        await notify.owner(
-          `Uebergabe an Mensch (${args.reason})\nChat: ${chatId || 'n/a'}\n${args.summary || ''}`,
-          { kind: 'handoff', ...args }
-        );
+        const { m } = require('../../notify/messages');
+        await notify.owner(m().handoffTool(args.reason, chatId, args.summary), { kind: 'handoff', ...args });
       }
       return { ok: true, handed_off: true, reason: args.reason };
     },

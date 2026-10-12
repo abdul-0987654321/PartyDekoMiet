@@ -91,7 +91,13 @@ describe('the bot switched off', () => {
 });
 
 describe('the hourly limit', () => {
-  test('is reported rather than dropping the customer silently', async () => {
+  test('is off by default', async () => {
+    const r = makeRouter();
+    for (let i = 0; i < 40; i++) await r.handle(incoming('m' + i));
+    assert.strictEqual(sent.length, 40, 'nothing is capped when the limit is 0');
+  });
+
+  test('is reported rather than dropping the customer silently when switched on', async () => {
     await settings.update({ maxMsgsPerChatPerHour: 2 });
     const r = makeRouter();
     await r.handle(incoming('one'));

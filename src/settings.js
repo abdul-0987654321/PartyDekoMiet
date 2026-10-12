@@ -54,13 +54,25 @@ const SCHEMA = [
     },
   },
   {
-    key: 'maxMsgsPerChatPerHour', group: 'bot', type: 'number', default: 30, min: 1, max: 200,
+    key: 'maxMsgsPerChatPerHour', group: 'bot', type: 'number', default: 0, min: 0, max: 500,
     env: 'MAX_MSGS_PER_CHAT_PER_HOUR',
     label: { de: 'Max. Nachrichten pro Chat / Stunde', en: 'Max messages per chat / hour' },
-    help: { de: 'Schutz vor Schleifen und Spam.', en: 'Protection against loops and spam.' },
+    help: {
+      de: '0 = kein Limit. Ein Limit schuetzt vor Schleifen und vor einem Kunden, der den OpenAI-Verbrauch hochtreibt.',
+      en: '0 = no limit. A limit protects against loops and against one customer running up the OpenAI usage.',
+    },
   },
   {
-    key: 'typingMinMs', group: 'bot', type: 'number', default: 2000, min: 0, max: 15000,
+    key: 'readDelayMs', group: 'bot', type: 'number', default: 1000, min: 0, max: 10000,
+    env: 'READ_DELAY_MS',
+    label: { de: 'Warten bis "gelesen" (ms)', en: 'Wait before marking as read (ms)' },
+    help: {
+      de: 'Der Bot setzt den Haken nicht sofort. Zusammen mit der Tippdauer ergibt das einen natuerlichen Ablauf.',
+      en: 'The bot does not tick the message as read instantly. Together with the typing delay this reads as natural.',
+    },
+  },
+  {
+    key: 'typingMinMs', group: 'bot', type: 'number', default: 3000, min: 0, max: 15000,
     env: 'TYPING_MIN_MS',
     label: { de: 'Tippdauer min. (ms)', en: 'Typing delay min (ms)' },
     help: {
@@ -69,7 +81,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'typingMaxMs', group: 'bot', type: 'number', default: 5000, min: 0, max: 30000,
+    key: 'typingMaxMs', group: 'bot', type: 'number', default: 4000, min: 0, max: 30000,
     env: 'TYPING_MAX_MS',
     label: { de: 'Tippdauer max. (ms)', en: 'Typing delay max (ms)' },
   },

@@ -101,6 +101,7 @@ client's live number, use the paid starter plan.
 | Page | |
 |---|---|
 | `/` | status: WhatsApp, storage, catalog, calendar, paused chats |
+| `/test` | chat with the real bot without WhatsApp, with the tools it used shown |
 | `/chats` | read conversations and reply by hand; replying pauses the bot there |
 | `/whatsapp` | link the phone by QR **or** pairing code, and re-link |
 | `/bookings` | all requests |
@@ -121,8 +122,34 @@ there by hand, so it never talks over a human.
 ```bash
 npm test                  # unit tests
 npm run chat -- --dry     # scripted fake model, no API key
-npm run chat              # real model, tools report themselves unavailable until configured
+npm run chat              # real model, in the terminal
 ```
+
+Easier: open **/test** in the dashboard. It talks to the real agent with the real
+catalog and calendar, shows which tools were called and flags a reply the guards
+blocked, but never touches WhatsApp and never writes to the customer tables. It
+is safe to use on the live deployment, and it is the surface to record for a demo.
+
+For a demo recording, fill the dashboard with invented data first:
+
+```bash
+npm run seed:demo             # dry run
+node tools/seed-demo.js --write
+node tools/seed-demo.js --clear
+```
+
+It refuses to write into storage that already holds real data, because recording
+the live dashboard would put customers' phone numbers and conversations on
+screen.
+
+## One number, two businesses
+
+If the same WhatsApp number is also used for another business, set
+**Settings → Bot → Keywords for other businesses**. A message containing one of
+them is answered with a short honest note and handed to a human, without the
+model ever seeing it. That check is deliberately not left to the prompt: a
+question about the other business is not a rule violation, so no guard would
+catch the bot answering it with the rental rules - confidently and wrongly.
 
 Worth knowing about the test suite: it asserts that none of the 15 official FAQ
 answers trips a guard. Several of them contain the exact words the guards look

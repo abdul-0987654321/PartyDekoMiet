@@ -94,6 +94,26 @@ const SCHEMA = [
     },
   },
 
+  {
+    key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '',
+    placeholder: 'hochzeitsplanung, eventplanung, catering',
+    label: { de: 'Stichwoerter fuer andere Betriebe', en: 'Keywords for other businesses' },
+    help: {
+      de: 'Wenn dieselbe Nummer auch fuer einen anderen Betrieb genutzt wird: Nachrichten mit diesen Woertern beantwortet der Bot NICHT, sondern gibt sie weiter. Mit Komma trennen. Leer = aus.',
+      en: 'If the same number is also used for another business: messages containing these words are NOT answered by the bot but handed to a human. Comma separated. Empty = off.',
+    },
+  },
+  {
+    key: 'otherBusinessReplyDe', group: 'bot', type: 'string',
+    default: 'Hoi! Hier bin ich nur fuer die Partydeko-Vermietung zustaendig. Deine Frage gebe ich direkt an jemanden aus dem Team weiter, du hoerst gleich von uns.',
+    label: { de: 'Antwort bei anderem Betrieb (DE)', en: 'Reply for the other business (DE)' },
+  },
+  {
+    key: 'otherBusinessReplyEn', group: 'bot', type: 'string',
+    default: 'Hi! I only handle the party decoration rental here. I am passing your question to a colleague, you will hear from us shortly.',
+    label: { de: 'Antwort bei anderem Betrieb (EN)', en: 'Reply for the other business (EN)' },
+  },
+
   // ── Business rules ───────────────────────────────────────────────────────
   {
     key: 'rentalDays', group: 'business', type: 'number', default: 3, min: 1, max: 30,

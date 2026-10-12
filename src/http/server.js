@@ -24,6 +24,7 @@ const express = require('express');
 const log = require('../log');
 const auth = require('./auth');
 const db = require('../store/db');
+const { matchesOtherBusiness } = require('../whatsapp/router');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
@@ -74,6 +75,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   app.get('/whatsapp', page('whatsapp.html'));
   app.get('/bookings', page('bookings.html'));
   app.get('/chats', page('chats.html'));
+  app.get('/test', page('test.html'));
 
   app.get('/api/status', (req, res) => {
     const s = settings ? settings.all() : {};
@@ -233,6 +235,67 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     }
     await db.flush();
     res.json({ ok: true });
+  }));
+
+  // ---- Test chat ----
+  // Talks to the real agent with the real catalog and calendar, but never
+  // touches WhatsApp and never writes to the customer tables. Safe to use on a
+  // live deployment, and the surface to use for a demo recording.
+  const testSessions = new Map(); // id -> [{role, content}]
+
+  app.post('/api/test/chat', safe(async (req, res) => {
+    if (!runtime.agent) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kein Agent aktiv - OPENAI_API_KEY fehlt.',
+      });
+    }
+    const id = String(req.body?.session || 'default');
+    if (req.body?.reset) {
+      testSessions.delete(id);
+      return res.json({ ok: true, reset: true });
+    }
+
+    const message = String(req.body?.message || '').trim();
+    if (!message) return res.status(400).json({ ok: false, error: 'message required' });
+
+    const history = testSessions.get(id) || [];
+
+    // The out-of-scope check lives in the router, so mirror it here or the test
+    // chat would behave differently from the real one.
+    const otherBusiness = matchesOtherBusiness(message, settings ? settings.get('otherBusinessKeywords') : '');
+    if (otherBusiness) {
+      const lang = /\b(the|and|is|how|can|hello|hi|you|do|your)\b/i.test(message) ? 'en' : 'de';
+      const text = settings.get(lang === 'en' ? 'otherBusinessReplyEn' : 'otherBusinessReplyDe');
+      history.push({ role: 'user', content: message }, { role: 'assistant', content: text });
+      testSessions.set(id, history.slice(-24));
+      return res.json({ ok: true, text, handoff: true, otherBusiness: true, toolCalls: [], violations: [] });
+    }
+
+    const out = await runtime.agent.reply({
+      history: [...history],
+      message,
+      services: { ...runtime.services, messenger: null }, // no real sending from the test chat
+      chatId: `test:${id}`,
+    });
+
+    history.push({ role: 'user', content: message }, { role: 'assistant', content: out.text });
+    testSessions.set(id, history.slice(-24));
+
+    res.json({
+      ok: true,
+      text: out.text,
+      lang: out.lang,
+      handoff: out.handoff,
+      blocked: out.blocked,
+      violations: out.violations || [],
+      toolCalls: (out.toolCalls || []).map((c) => ({
+        name: c.name,
+        args: c.args,
+        ok: c.result?.ok !== false,
+        result: c.result,
+      })),
+    });
   }));
 
   // ---- Bookings ----

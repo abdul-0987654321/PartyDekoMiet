@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Test – PartyDekoMiet</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="intro"></p>
+
+  <div class="card" style="padding:12px 14px">
+    <div class="muted" style="font-size:12px;margin-bottom:7px" id="try_label"></div>
+    <div class="inline" id="presets"></div>
+  </div>
+
+  <div class="thread" style="height:min(62vh,560px)">
+    <div class="head">
+      <div style="flex:1"><div style="font-weight:600" id="who"></div>
+        <div class="muted" style="font-size:12px" id="sub"></div></div>
+      <button class="ghost" id="reset"></button>
+    </div>
+    <div class="body" id="body"></div>
+    <div class="compose">
+      <textarea id="msg" rows="1"></textarea>
+      <button class="primary" id="send"></button>
+    </div>
+  </div>
+
+  <div id="trace"></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/test');
+$('h1').textContent = t('nav_test');
+$('intro').textContent = t('test_intro');
+$('try_label').textContent = t('test_try');
+$('who').textContent = t('test_who');
+$('sub').textContent = t('test_sub');
+$('send').textContent = t('chat_send');
+$('reset').textContent = t('test_reset');
+$('msg').placeholder = t('chat_ph');
+
+const PRESETS = [
+  ['FAQ', 'Wo kann ich die Deko abholen?'],
+  ['Lieferung', 'Könnt ihr die Deko zu uns nach Hause liefern?'],
+  ['Suche', 'Hallo! Ich suche Deko für einen Einhorn-Geburtstag, meine Tochter wird 5'],
+  ['Datum', 'Ist das Einhorn Set am 20.12.2026 frei?'],
+  ['Kaution', 'Wie hoch ist die Kaution und wann bekomme ich sie zurück?'],
+  ['Schaden', 'Bei uns ist der Vorhang eingerissen. Was kostet das?'],
+  ['Storno', 'Ich muss die Buchung leider absagen'],
+  ['English', 'Hi! Do you deliver to Zurich and how much is the deposit?'],
+];
+$('presets').innerHTML = PRESETS.map(([label, text], i) =>
+  `<button class="ghost" style="font-size:12.5px;padding:6px 11px" onclick="preset(${i})">${esc(label)}</button>`
+).join('');
+function preset(i) { $('msg').value = PRESETS[i][1]; send(); }
+
+const SESSION = 'dash-' + Math.random().toString(36).slice(2, 8);
+let busy = false;
+
+function bubble(cls, text, extra = '') {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.innerHTML = esc(text) + extra;
+  $('body').appendChild(d);
+  $('body').scrollTop = $('body').scrollHeight;
+  return d;
+}
+
+async function send() {
+  const text = $('msg').value.trim();
+  if (!text || busy) return;
+  busy = true; $('send').disabled = true;
+  bubble('in', text);
+  $('msg').value = '';
+  const thinking = bubble('out', '…');
+
+  try {
+    const res = await api('/api/test/chat', { method: 'POST', body: { session: SESSION, message: text } });
+    thinking.remove();
+    if (!res.ok) { bubble('out', '⚠ ' + (res.error || 'error')); return; }
+
+    const marks = [];
+    if (res.blocked) marks.push(`<span class="ts">⛔ ${t('test_blocked')}: ${esc((res.violations||[]).map(v=>v.code).join(', '))}</span>`);
+    else if (res.otherBusiness) marks.push(`<span class="ts">↗ ${t('test_other')}</span>`);
+    else if (res.handoff) marks.push(`<span class="ts">↗ ${t('test_handoff')}</span>`);
+    bubble('out', res.text, marks.join(''));
+
+    const calls = res.toolCalls || [];
+    $('trace').innerHTML = calls.length
+      ? `<h2>${t('test_tools')}</h2><div class="card scroll"><table><tbody>` +
+        calls.map(c => `<tr><td><code>${esc(c.name)}</code></td>
+          <td class="muted">${esc(JSON.stringify(c.args))}</td>
+          <td>${c.ok ? pill('ok','ok') : pill('–','warn')}</td></tr>`).join('') +
+        `</tbody></table></div>`
+      : '';
+  } catch (e) {
+    thinking.remove(); bubble('out', '⚠ ' + e.message);
+  } finally { busy = false; $('send').disabled = false; $('msg').focus(); }
+}
+
+$('send').onclick = send;
+$('msg').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$('reset').onclick = async () => {
+  await api('/api/test/chat', { method: 'POST', body: { session: SESSION, reset: true } });
+  $('body').innerHTML = ''; $('trace').innerHTML = '';
+};
+</script>
+</body></html>

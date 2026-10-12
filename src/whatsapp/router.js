@@ -49,6 +49,37 @@ function hasImage(msg) {
   return Boolean(msg.message?.imageMessage);
 }
 
+/**
+ * Folds umlauts and strips punctuation so keyword matching survives the way
+ * customers actually type.
+ */
+const flatten = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/\u00e4/g, 'ae').replace(/\u00f6/g, 'oe').replace(/\u00fc/g, 'ue').replace(/\u00df/g, 'ss')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
+ * The same WhatsApp number may be used for a second business. The bot only
+ * knows the rental rules, so a question about the other business must never be
+ * answered here - it would be answered confidently and wrongly, and no rule
+ * guard would catch it, because nothing is being violated.
+ *
+ * This check runs BEFORE the model, so there is no chance of it improvising.
+ *
+ * @returns {boolean} true when the message belongs to the other business
+ */
+function matchesOtherBusiness(text, keywordsRaw) {
+  const keywords = String(keywordsRaw || '')
+    .split(',')
+    .map((k) => flatten(k))
+    .filter((k) => k.length > 2);
+  if (!keywords.length) return false;
+  const haystack = ` ${flatten(text)} `;
+  return keywords.some((k) => haystack.includes(` ${k} `) || haystack.includes(k));
+}
+
 function createRouter({ client, agent, services, notify, knowledge }) {
   let state = {};
 
@@ -179,6 +210,23 @@ function createRouter({ client, agent, services, notify, knowledge }) {
       return;
     }
 
+    // Belongs to the other business on this number: answer honestly, hand over,
+    // and never let the model near it.
+    if (matchesOtherBusiness(text, settings.get('otherBusinessKeywords'))) {
+      const lang = /\b(the|and|is|how|can|hello|hi|you|do|your)\b/i.test(text) ? 'en' : 'de';
+      const reply = settings.get(lang === 'en' ? 'otherBusinessReplyEn' : 'otherBusinessReplyDe');
+      await client.sendText(jid, reply);
+      remember(jid, 'in', text);
+      remember(jid, 'out', reply);
+      pause(jid, settings.get('takeoverPauseHours'), 'other business');
+      await notify.owner(
+        `Anfrage zum anderen Betrieb von ${jid.split('@')[0]}\nNachricht: ${text}`,
+        { kind: 'other_business', jid }
+      );
+      log.info(`Message from ${jid} matched the other business - handed over`);
+      return;
+    }
+
     // A reference photo: accept it, store it, pass it to the owner.
     let photoNote = '';
     if (hasImage(msg)) {
@@ -270,4 +318,4 @@ function createRouter({ client, agent, services, notify, knowledge }) {
   };
 }
 
-module.exports = { createRouter, textOf, hasImage, jidOf, digits };
+module.exports = { createRouter, textOf, hasImage, jidOf, digits, matchesOtherBusiness, flatten };

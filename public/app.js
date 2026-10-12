@@ -38,6 +38,11 @@ const T = {
     chat_paused: 'Bot pausiert', chat_back: 'Zurück',
     chat_sent_note: 'Wenn du hier schreibst, pausiert der Bot in diesem Chat.',
     resume_bot: 'Bot wieder aktivieren',
+    nav_test: 'Testen', test_intro: 'Mit dem echten Bot schreiben, ohne WhatsApp. Kunden sehen davon nichts.',
+    test_try: 'Schnell ausprobieren:', test_who: 'Test-Kunde', test_sub: 'nur zum Testen, kein echter Chat',
+    test_reset: 'Neu starten', test_tools: 'Benutzte Werkzeuge',
+    test_blocked: 'Antwort von den Regeln blockiert', test_handoff: 'wird an einen Menschen weitergegeben',
+    test_other: 'anderer Betrieb – weitergegeben',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -70,6 +75,11 @@ const T = {
     chat_paused: 'Bot paused', chat_back: 'Back',
     chat_sent_note: 'Writing here pauses the bot in this chat.',
     resume_bot: 'Re-activate the bot',
+    nav_test: 'Test', test_intro: 'Chat with the real bot, without WhatsApp. Customers never see this.',
+    test_try: 'Try quickly:', test_who: 'Test customer', test_sub: 'testing only, not a real chat',
+    test_reset: 'Restart', test_tools: 'Tools used',
+    test_blocked: 'reply blocked by the rules', test_handoff: 'handed to a human',
+    test_other: 'other business - handed over',
   },
 };
 
@@ -94,6 +104,7 @@ function renderNav(active) {
   const links = [
     ['/', 'nav_status', '◉'],
     ['/chats', 'nav_chats', '💬'],
+    ['/test', 'nav_test', '▶'],
     ['/bookings', 'nav_bookings', '🗓'],
     ['/whatsapp', 'nav_whatsapp', '🔗'],
     ['/settings', 'nav_settings', '⚙'],

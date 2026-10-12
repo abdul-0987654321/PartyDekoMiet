@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node src/index.js",
     "chat": "node tools/chat.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "seed:demo": "node tools/seed-demo.js"
   },
   "dependencies": {
     "@itsliaaa/baileys": "^0.3.18-final",

@@ -11,24 +11,45 @@ const log = require('../log');
 const settings = require('../settings');
 
 function createNotifier({ client }) {
-  async function owner(text, meta = {}, imageBuffer = null) {
-    const number = String(settings.get('ownerWhatsapp') || '').replace(/[^0-9]/g, '');
-    if (!number) {
-      log.warn(`No owner number configured - notification not sent: ${text.split('\n')[0]}`);
-      return { ok: false, error: 'no owner number' };
-    }
-    const jid = `${number}@s.whatsapp.net`;
-    const body = `🔔 ${text}`;
+  /**
+   * Who gets alerts. The dedicated alert list wins; when it is empty the owner
+   * number is used, so a fresh install still notifies someone.
+   */
+  function recipients() {
+    const raw = String(settings.get('alertNumbers') || '').trim();
+    const list = (raw || String(settings.get('ownerWhatsapp') || ''))
+      .split(',')
+      .map((n) => n.replace(/[^0-9]/g, ''))
+      .filter((n) => n.length >= 8);
+    return [...new Set(list)]; // the same number listed twice would send twice
+  }
 
-    try {
-      if (imageBuffer) await client.forwardImage(jid, imageBuffer, body);
-      else await client.sendText(jid, body);
-      log.info(`Owner notified (${meta.kind || 'info'})`);
-      return { ok: true };
-    } catch (err) {
-      log.error(`Could not notify the owner (${meta.kind || 'info'}): ${err.message}`);
-      return { ok: false, error: err.message };
+  async function owner(text, meta = {}, imageBuffer = null) {
+    const numbers = recipients();
+    if (!numbers.length) {
+      log.warn(`No alert number configured - notification not sent: ${text.split('\n')[0]}`);
+      return { ok: false, error: 'no alert number' };
     }
+    const body = `\u{1F514} ${text}`;
+    const failed = [];
+
+    for (const number of numbers) {
+      const jid = `${number}@s.whatsapp.net`;
+      try {
+        if (imageBuffer) await client.forwardImage(jid, imageBuffer, body);
+        else await client.sendText(jid, body);
+      } catch (err) {
+        // One unreachable number must not stop the others.
+        failed.push(`${number}: ${err.message}`);
+        log.error(`Could not notify ${number} (${meta.kind || 'info'}): ${err.message}`);
+      }
+    }
+
+    const sent = numbers.length - failed.length;
+    if (sent) log.info(`Alert sent to ${sent}/${numbers.length} number(s) (${meta.kind || 'info'})`);
+    return failed.length === numbers.length
+      ? { ok: false, error: failed.join('; ') }
+      : { ok: true, sent, failed };
   }
 
   /** The message the owner gets for a new booking request. */
@@ -56,7 +77,7 @@ function createNotifier({ client }) {
     return owner(lines.join('\n'), { kind: 'booking_request', bookingId: booking.id });
   }
 
-  return { owner, bookingRequest };
+  return { owner, bookingRequest, recipients };
 }
 
 module.exports = { createNotifier };

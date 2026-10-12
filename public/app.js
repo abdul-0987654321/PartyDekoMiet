@@ -110,6 +110,23 @@ const T = {
 };
 
 let LANG = localStorage.getItem('dashLang') || 'de';
+
+/**
+ * Saves the chosen language on the server too, so the dashboard opens in the
+ * same language on the phone and on the laptop, and so the setting shown under
+ * Settings matches what the switch did.
+ */
+async function persistLang(lang) {
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dashboardLanguage: lang }),
+    });
+  } catch {
+    /* the local choice already applies; a failed save is not worth an alert */
+  }
+}
 const t = (k) => (T[LANG] && T[LANG][k]) || T.de[k] || k;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -119,7 +136,7 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString(LANG === 'en' ? 'en
 function setLang(lang) {
   LANG = lang;
   localStorage.setItem('dashLang', lang);
-  location.reload();
+  persistLang(lang).finally(() => location.reload());
 }
 
 /**
@@ -130,7 +147,6 @@ function renderNav(active) {
   const links = [
     ['/', 'nav_status', '◉'],
     ['/chats', 'nav_chats', '💬'],
-    ['/test', 'nav_test', '▶'],
     ['/bookings', 'nav_bookings', '🗓'],
     ['/whatsapp', 'nav_whatsapp', '🔗'],
     ['/settings', 'nav_settings', '⚙'],
@@ -165,6 +181,29 @@ function renderNav(active) {
   const content = document.getElementById('content');
   content.insertBefore(bar, content.firstChild);
 }
+
+/**
+ * First visit on a new device: follow the language saved on the server instead of
+ * defaulting to German. Runs once per tab and only when this browser has no
+ * explicit choice of its own, so switching language here always wins afterwards.
+ */
+async function syncLangFromServer() {
+  if (localStorage.getItem('dashLang')) return;      // this browser already chose
+  if (sessionStorage.getItem('langSynced')) return;  // guard against a reload loop
+  sessionStorage.setItem('langSynced', '1');
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.lang && d.lang !== LANG) {
+      localStorage.setItem('dashLang', d.lang);
+      location.reload();
+    }
+  } catch {
+    /* stay on the default */
+  }
+}
+syncLangFromServer();
 
 async function api(path, options) {
   const res = await fetch(path, {

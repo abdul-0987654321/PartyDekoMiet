@@ -73,9 +73,15 @@ describe('validation', () => {
     assert.strictEqual((await settings.update({ takeoverPauseHours: 0 })).ok, false);
   });
 
-  test('rejects a badly formatted owner number', async () => {
-    assert.strictEqual((await settings.update({ ownerWhatsapp: '+41 79 123 45 67' })).ok, false);
+  test('cleans a pasted owner number instead of rejecting it', async () => {
+    assert.strictEqual((await settings.update({ ownerWhatsapp: '+41 79 123 45 67' })).ok, true);
+    assert.strictEqual(settings.get('ownerWhatsapp'), '41791234567', 'stored without + and spaces');
     assert.strictEqual((await settings.update({ ownerWhatsapp: '41791234567' })).ok, true);
+  });
+
+  test('still rejects something that cannot be a phone number', async () => {
+    assert.strictEqual((await settings.update({ ownerWhatsapp: '079' })).ok, false);
+    assert.strictEqual((await settings.update({ ownerWhatsapp: 'nope' })).ok, false);
   });
 
   test('rejects an invalid enum value', async () => {
@@ -100,5 +106,25 @@ describe('validation', () => {
     const res = await settings.update({ depositChf: 77, bufferDays: 999 });
     assert.strictEqual(res.ok, false);
     assert.strictEqual(settings.get('depositChf'), before, 'a rejected batch must not partly apply');
+  });
+});
+
+describe('alert numbers', () => {
+  test('accept one or several international numbers', async () => {
+    assert.strictEqual((await settings.update({ alertNumbers: '41791234567' })).ok, true);
+    assert.strictEqual((await settings.update({ alertNumbers: '41791234567, 923001234567' })).ok, true);
+  });
+
+  test('clean pasted numbers and keep the list', async () => {
+    assert.strictEqual((await settings.update({ alertNumbers: '+41 79 123 45 67, +92 300 1234567' })).ok, true);
+    assert.strictEqual(settings.get('alertNumbers'), '41791234567, 923001234567');
+  });
+
+  test('reject an entry that cannot be a phone number', async () => {
+    assert.strictEqual((await settings.update({ alertNumbers: '41791234567, 079' })).ok, false);
+  });
+
+  test('empty is allowed - it falls back to the owner number', async () => {
+    assert.strictEqual((await settings.update({ alertNumbers: '' })).ok, true);
   });
 });

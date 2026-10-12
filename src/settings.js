@@ -81,8 +81,17 @@ const SCHEMA = [
     placeholder: '41791234567',
     label: { de: 'WhatsApp des Inhabers', en: 'Owner WhatsApp number' },
     help: {
-      de: 'Bekommt alle Buchungsanfragen und Meldungen. International, ohne + und ohne Leerzeichen.',
-      en: 'Receives all booking requests and alerts. International format, no + and no spaces.',
+      de: 'Identifiziert den Inhaber fuer Befehle wie /status. International, z.B. 41791234567.',
+      en: 'Identifies the owner for commands like /status. International, e.g. 41791234567.',
+    },
+  },
+  {
+    key: 'alertNumbers', group: 'contacts', type: 'string', default: '', env: 'ALERT_NUMBERS',
+    placeholder: '41791234567, 923001234567',
+    label: { de: 'Nummern fuer Benachrichtigungen', en: 'Numbers for alerts' },
+    help: {
+      de: 'Wer Buchungsanfragen, Referenzbilder und Uebergaben per WhatsApp bekommt. Mehrere Nummern mit Komma trennen. Leer = die Inhaber-Nummer oben.',
+      en: 'Who receives booking requests, reference photos and handovers on WhatsApp. Several numbers separated by commas. Empty = the owner number above.',
     },
   },
   {
@@ -258,8 +267,23 @@ function validate(def, raw) {
     if (def.min !== undefined && value < def.min) return { ok: false, error: `${def.key}: minimum is ${def.min}` };
     if (def.max !== undefined && value > def.max) return { ok: false, error: `${def.key}: maximum is ${def.max}` };
   }
-  if (def.key === 'ownerWhatsapp' && value && !/^[0-9]{8,15}$/.test(value)) {
-    return { ok: false, error: 'ownerWhatsapp: digits only, international format, no + and no spaces' };
+  // Phone numbers are cleaned rather than rejected: people paste "+41 79 123 45 67"
+  // and a dashboard that refuses that over a plus sign is just annoying. Only a
+  // number that cannot be a phone number at all is an error.
+  if (def.key === 'ownerWhatsapp' && value) {
+    const digits = String(value).replace(/[^0-9]/g, '');
+    if (!/^[0-9]{8,15}$/.test(digits)) {
+      return { ok: false, error: 'ownerWhatsapp: not a valid international number (8-15 digits)' };
+    }
+    return { ok: true, value: digits };
+  }
+  if (def.key === 'alertNumbers' && value) {
+    const parts = String(value).split(',').map((n) => n.replace(/[^0-9]/g, '')).filter(Boolean);
+    const bad = parts.filter((n) => !/^[0-9]{8,15}$/.test(n));
+    if (bad.length) {
+      return { ok: false, error: `alertNumbers: not a valid international number: ${bad.join(', ')}` };
+    }
+    return { ok: true, value: parts.join(', ') };
   }
   return { ok: true, value };
 }

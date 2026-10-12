@@ -1,150 +1,221 @@
-# Calendar setup — the short version
+# Calendar setup — click by click
 
-Do these in order. Nothing else matters. About 15 minutes.
+Open each link, do the one thing written under it, move on.
+The links jump straight to the right page, so you never have to search a menu.
 
-> **Everything here happens in YOUR OWN Google account.** Not the client's.
-> You do not need anything from Simone for steps 1–8.
+Total: 15 minutes.
 
----
-
-## PART A — Make a calendar (2 min)
-
-**1.** Go to **calendar.google.com**
-
-**2.** On the left, find **"Other calendars"**. Click the **+** next to it → **Create new calendar**
-
-**3.** Name: `PartyDekoMiet Buchungen`
-Time zone: **(GMT+01:00) Zurich**
-Click **Create calendar**
-
-✅ Done. A new calendar now exists in your account.
+> Everything is done in **YOUR OWN** Google account. You need nothing from the
+> client until the very last step.
 
 ---
 
-## PART B — Make a robot account (7 min)
+## STEP 1 — Create the calendar
 
-This is a Google account for the bot. It is not a person and has no password —
-it logs in with a key file.
+🔗 **https://calendar.google.com**
 
-**4.** Go to **console.cloud.google.com**
-If it asks you to create a project: create one, call it `partydekomiet`.
+On the left side, scroll down to **"Other calendars"**.
+Click the small **+** → choose **"Create new calendar"**.
 
-**5.** In the search bar at the top, type **"Google Calendar API"** → open it →
-click the blue **ENABLE** button.
-*(If it already says "Manage", it is already enabled. Fine.)*
+Fill in:
+- Name: `PartyDekoMiet Buchungen`
+- Time zone: **(GMT+01:00) Zurich**
 
-**6.** In the search bar, type **"Service Accounts"** → open it →
-**+ CREATE SERVICE ACCOUNT**
-- Name: `partydekomiet-bot`
+Click the blue **"Create calendar"** button.
+
+Wait 5 seconds. The calendar appears in the left list.
+
+---
+
+## STEP 2 — Create a Google Cloud project
+
+🔗 **https://console.cloud.google.com/projectcreate**
+
+- Project name: `partydekomiet`
+- Location: leave as it is
+
+Click **CREATE**. Wait ~20 seconds until it is ready.
+
+> If you already have a project, you can use it. Nothing breaks.
+
+---
+
+## STEP 3 — Switch on the Calendar API
+
+🔗 **https://console.cloud.google.com/apis/library/calendar-json.googleapis.com**
+
+Make sure the project name at the **top left** says `partydekomiet`.
+If not, click it and pick `partydekomiet`.
+
+Click the blue **ENABLE** button.
+
+> If the button says **MANAGE** instead, it is already on. Go to step 4.
+
+---
+
+## STEP 4 — Create the robot account
+
+🔗 **https://console.cloud.google.com/iam-admin/serviceaccounts/create**
+
+Screen 1:
+- Service account name: `partydekomiet-bot`
 - Click **CREATE AND CONTINUE**
-- The next screen asks for a role → **skip it**, click **CONTINUE**
+
+Screen 2 (asks for a role):
+- Click **CONTINUE** — do not pick anything
+
+Screen 3:
 - Click **DONE**
 
-**7.** You now see it in a list. Click on it.
-Go to the **KEYS** tab → **ADD KEY** → **Create new key** → choose **JSON** → **CREATE**
+> A "service account" is a login for a program. It has no password and no inbox.
+> It is how the bot gets into the calendar.
 
-📁 A file downloads. Something like `partydekomiet-abc123.json`.
-**Keep this file. It is a password.**
+---
 
-**8.** Open that file with Notepad / TextEdit. Find the line that says
-`"client_email"`. Copy the address. It looks like:
+## STEP 5 — Download the key file
+
+🔗 **https://console.cloud.google.com/iam-admin/serviceaccounts**
+
+You see a table with `partydekomiet-bot` in it. **Click on the email address**
+in that row.
+
+Now at the top, click the tab **KEYS**.
+
+Click **ADD KEY** → **Create new key** → select **JSON** → **CREATE**.
+
+📁 A file downloads, e.g. `partydekomiet-4f2a1b.json`
+
+**Do not lose this file. It is a password.**
+
+---
+
+## STEP 6 — Copy the robot's email address
+
+Open the downloaded file with **Notepad** (Windows) or **TextEdit** (Mac).
+
+Find the line starting with `"client_email"`. Copy only the address inside the
+quotes:
 
 ```
-partydekomiet-bot@partydekomiet.iam.gserviceaccount.com
+"client_email": "partydekomiet-bot@partydekomiet.iam.gserviceaccount.com",
+                 └──────────────── copy this part ─────────────────────┘
+```
+
+Paste it somewhere for a moment (Notes, a chat to yourself).
+
+---
+
+## STEP 7 — ⚠️ Let the robot into the calendar
+
+**This is the step that fails for everybody. Read it twice.**
+
+🔗 **https://calendar.google.com**
+
+1. On the left, move the mouse over **`PartyDekoMiet Buchungen`**
+2. Three dots **⋮** appear → click them
+3. Click **"Settings and sharing"**
+4. Scroll down to the box **"Share with specific people or groups"**
+5. Click **"+ Add people and groups"**
+6. Paste the robot email from step 6
+7. **Next to it there is a dropdown. Open it.**
+   Choose **"Make changes to events"**
+   ❌ NOT "See all event details"
+   ❌ NOT "See only free/busy"
+8. Click **Send**
+
+### After clicking Send, NOTHING will happen.
+
+No confirmation. No pending invite. No email.
+**This is correct.** A robot cannot accept invitations. It already works.
+
+To check it worked: reload the page, scroll to the same box. The robot's address
+should be listed there with "Make changes to events" next to it.
+
+---
+
+## STEP 8 — Copy the Calendar ID
+
+Stay on the same page (Settings and sharing).
+
+Scroll further down to the section **"Integrate calendar"**.
+
+The first field is **Calendar ID**. Copy it. It looks like:
+
+```
+c_8f3a9b2cd4e5f6a7b8c9@group.calendar.google.com
 ```
 
 ---
 
-## PART C — Let the robot into the calendar (2 min)
+## STEP 9 — Put both values into Render
 
-### ⚠️ This is the step everybody gets wrong. Do not skip it.
+Open the downloaded `.json` file again.
+Select everything: **Ctrl+A** (Windows) or **Cmd+A** (Mac), then copy.
 
-**9.** Back to **calendar.google.com**
+It starts with `{` and ends with `}`. Copy ALL of it, including both brackets.
 
-**10.** Hover over `PartyDekoMiet Buchungen` on the left → click the **⋮** (three
-dots) → **Settings and sharing**
+Go to Render → your service → **Environment** → **Add Environment Variable**.
 
-**11.** Scroll down to **"Share with specific people or groups"** → **+ Add people and groups**
-
-**12.** Paste the `client_email` address from step 8.
-
-**13.** ⚠️ In the dropdown next to it, choose **"Make changes to events"**.
-NOT "See all event details". The bot has to write, not only read.
-
-**14.** Click **Send**.
-
-> Nothing will appear to happen. There is no invitation to accept, no "pending".
-> That is normal — a robot account cannot accept invitations. It just works.
-
----
-
-## PART D — Get the calendar ID (1 min)
-
-**15.** Stay on the same settings page. Scroll down to **"Integrate calendar"**.
-
-**16.** Copy the **Calendar ID**. It looks like:
-
-```
-c_8f3a9b2c...@group.calendar.google.com
-```
-
----
-
-## PART E — Put it into Render (3 min)
-
-**17.** Open the downloaded `.json` file again. Select **everything**
-(Ctrl+A / Cmd+A) and copy. It starts with `{` and ends with `}`.
-
-**18.** Render → your service → **Environment** → add two variables:
+Add these two:
 
 | Key | Value |
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | paste the whole file contents |
-| `GOOGLE_CALENDAR_ID` | the ID from step 16 |
+| `GOOGLE_CALENDAR_ID` | the ID from step 8 |
 
-> No base64. No commands. Just paste the file contents.
+Click **Save Changes**. Render restarts automatically (~2 minutes).
 
-**19.** Save. Render restarts by itself.
-
-**20.** Open the dashboard. On the Status page, **Calendar** should say
-**connected**.
+> No base64. No terminal commands. Just copy and paste the file.
 
 ---
 
-## PART F — Give the client access (1 min)
+## STEP 10 — Check it
 
-**Only now** does Simone come in.
+Open the dashboard → **Status** page.
 
-**21.** calendar.google.com → the calendar → ⋮ → **Settings and sharing** →
-**Add people** → `partydekomiet@gmail.com` → **Make changes to events** → Send.
+The row **Calendar** should say **connected**.
 
-She gets an email, accepts, and the calendar appears in her Google Calendar app.
-She can then see bookings and change `[PENDING]` to `[CONFIRMED]`.
+If it shows an error instead:
 
----
-
-## If the dashboard shows an error
-
-| Message | What it means | Fix |
+| Error on screen | What went wrong | Go back to |
 |---|---|---|
-| `Calendar not found` | wrong ID, or the robot was never added | redo steps 12–14 and 16 |
-| `Calendar access denied` | the robot was added, but only as a viewer | step 13 → change to **Make changes to events** |
-| `not valid JSON` | the paste was incomplete | copy the file again, all of it, `{` to `}` |
+| `Calendar not found` | wrong Calendar ID, or step 7 was not done | step 7 and step 8 |
+| `Calendar access denied` | robot added, but only as a viewer | step 7, point 7 |
+| `not valid JSON` / `could not be parsed` | the paste was cut off | step 9, copy the whole file |
 
-The dashboard prints the robot's email address in the error, so you can check
-you added the right one.
+The error message on the dashboard prints the robot's email address, so you can
+compare it with what you added in step 7.
 
 ---
 
-## What the client's existing access does NOT do
+## STEP 11 — Only now: invite the client
 
-Simone sharing her **"Simone Frei"** calendar with your Google account does not
-help the bot. That is her personal calendar, and the bot uses a different
-account (the robot from Part B).
+🔗 **https://calendar.google.com** → `PartyDekoMiet Buchungen` → ⋮ →
+**Settings and sharing** → **Add people and groups**
 
-We deliberately do **not** use her personal calendar:
-- the bot would see her private appointments
-- her dentist appointment could block a rental
-- every change would need her to click something
+- Email: `partydekomiet@gmail.com`
+- Permission: **Make changes to events**
+- **Send**
 
-The new calendar is cleaner, and she still sees everything through step 21.
+She gets a real email, clicks accept, and the calendar appears in her Google
+Calendar app on her phone.
+
+---
+
+## Questions you might have
+
+**Do I need the client's calendar access that she already sent me?**
+No. That is her personal calendar. The bot uses the new one from step 1. You can
+ignore what she shared.
+
+**Why not just use her existing calendar?**
+The bot would see all her private appointments, her dentist appointment could
+block a rental, and every change would need her to click something.
+
+**Is the key file dangerous?**
+It gives access to this one calendar only, because that is the only thing you
+shared with it in step 7. Still, do not put it in GitHub or send it in a chat.
+
+**What does the client do with the calendar afterwards?**
+Two things: change `[PENDING]` to `[CONFIRMED]` when a payment arrives, and
+create an all-day event called `Geschlossen` to block a day.

@@ -1,4 +1,6 @@
 'use strict';
+const { languageInstruction } = require('./language');
+
 /**
  * Builds the system prompt from the knowledge pack.
  *
@@ -42,14 +44,20 @@ function renderBusiness(b) {
  * @param {object} [ctx]
  * @param {string} [ctx.today]        ISO date, so the model can resolve "naechsten Samstag"
  * @param {string} [ctx.customerName]
+ * @param {string} [ctx.lang]         'de' | 'en' - the language already decided for this turn
+ * @param {string} [ctx.langSource]   why, so a fixed setting can be stated as fixed
  * @returns {string}
  */
 function buildSystemPrompt(knowledge, ctx = {}) {
   const { business, faq, rules, persona } = knowledge;
   const today = ctx.today || new Date().toISOString().slice(0, 10);
+  // The language is decided outside the model and stated here as an instruction.
+  // Leaving it to the model meant it re-decided every turn and drifted back to
+  // German mid-conversation.
+  const langBlock = ctx.lang ? `\n${languageInstruction(ctx.lang, ctx.langSource)}\n` : '';
 
   return `${persona}
-
+${langBlock}
 # Heute
 Heutiges Datum: ${today} (Zeitzone Europe/Zurich).
 Rechne relative Datumsangaben ("naechsten Samstag", "in zwei Wochen") selbst aus und

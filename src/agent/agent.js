@@ -11,20 +11,18 @@
 const log = require('../log');
 const { buildSystemPrompt } = require('./prompt');
 const { toolSchemas, runTool } = require('./tools');
+const { resolveLanguage, scoreText } = require('./language');
+const settings = require('../settings');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Crude but sufficient: decide the reply language from the customer's own text. */
-function detectLang(history) {
-  const lastUser = [...history].reverse().find((m) => m.role === 'user');
-  const text = String(lastUser?.content || '');
-  if (!text) return 'de';
-  const de = /\b(ich|und|nicht|das|ist|für|wie|kann|hallo|guten|deko|geburtstag|miete)\b/i;
-  const en = /\b(the|and|not|is|how|can|hello|hi|birthday|rent|available|price)\b/i;
-  const deHits = (text.match(de) || []).length;
-  const enHits = (text.match(en) || []).length;
-  if (enHits > deHits) return 'en';
-  return 'de';
+/** Settings need storage; in unit tests there is none, so fall back to auto. */
+function safeSetting() {
+  try {
+    return settings.get('botLanguage');
+  } catch {
+    return 'auto';
+  }
 }
 
 /**
@@ -69,12 +67,16 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
    * @param {string} [input.customerName]
    * @returns {Promise<{text:string, toolCalls:object[], handoff:boolean, violations:object[], blocked:boolean}>}
    */
-  async function reply({ history = [], message, services = {}, chatId, customerName }) {
-    const lang = detectLang([...history, { role: 'user', content: message }]);
+  async function reply({ history = [], message, services = {}, chatId, customerName, langSetting }) {
+    const setting = langSetting || safeSetting();
+    const { lang, source } = resolveLanguage({ message, history, setting });
     const system = buildSystemPrompt(knowledge, {
       today: new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || 'Europe/Zurich' }),
       customerName,
+      lang,
+      langSource: source,
     });
+    log.debug(`Reply language: ${lang} (${source})`);
 
     const messages = [
       { role: 'system', content: system },
@@ -144,7 +146,7 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
     };
   }
 
-  return { reply, detectLang };
+  return { reply };
 }
 
-module.exports = { createAgent, detectLang };
+module.exports = { createAgent };

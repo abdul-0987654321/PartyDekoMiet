@@ -6,7 +6,8 @@
  */
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const { createAgent, detectLang } = require('../src/agent/agent');
+const { createAgent } = require('../src/agent/agent');
+const { resolveLanguage } = require('../src/agent/language');
 const { createGuards } = require('../src/agent/guards');
 const knowledge = require('../src/knowledge/from-files').load();
 
@@ -210,8 +211,8 @@ describe('agent: limits and language', () => {
   });
 
   test('detects the customer language', () => {
-    assert.strictEqual(detectLang([{ role: 'user', content: 'Hallo, ich suche Deko für einen Geburtstag' }]), 'de');
-    assert.strictEqual(detectLang([{ role: 'user', content: 'Hi, how much is it to rent the unicorn set?' }]), 'en');
+    assert.strictEqual(resolveLanguage({ message: 'Hallo, ich suche Deko für einen Geburtstag' }).lang, 'de');
+    assert.strictEqual(resolveLanguage({ message: 'Hi, how much is it to rent the unicorn set?' }).lang, 'en');
   });
 
   test('an English chat gets an English fallback when blocked', async () => {

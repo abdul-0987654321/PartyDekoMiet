@@ -55,7 +55,10 @@ npm test                 # 111 tests
    wiped on every deploy, so the WhatsApp session lives in the sheet; without it
    you rescan a QR code after every deploy. *(5 min)*
 2. **OpenAI key** — `OPENAI_API_KEY` from platform.openai.com.
-3. **[Google Calendar](docs/GOOGLE_CALENDAR_SETUP.md)** — availability. *(15 min)*
+3. **Google Calendar** — availability. *(15 min)*
+   Follow **[docs/CALENDAR_SIMPLE.md](docs/CALENDAR_SIMPLE.md)** — numbered clicks,
+   nothing else. [The longer version](docs/GOOGLE_CALENDAR_SETUP.md) explains why
+   each step exists.
 4. **Deploy** — see below.
 5. **Link WhatsApp** — dashboard → WhatsApp. Two ways, both offered:
    **QR code**, or **pairing code**: type the bot phone's number and enter the

@@ -189,3 +189,46 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 
 /* ── Login ───────────────────────────────────────────────────────────────── */
 .login { max-width: 350px; margin: 14vh auto 0; }
+
+/* ── Hero card: the one thing the owner looks at first ───────────────────── */
+.hero {
+  background: var(--card); border: 1px solid var(--line); border-radius: 15px;
+  padding: 18px 20px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.hero .dot { width: 13px; height: 13px; border-radius: 50%; flex: none; background: var(--muted); }
+.hero.on  .dot { background: var(--ok);   box-shadow: 0 0 0 5px rgba(52,211,153,.16); }
+.hero.off .dot { background: var(--warn); box-shadow: 0 0 0 5px rgba(251,191,36,.16); }
+.hero.bad .dot { background: var(--err);  box-shadow: 0 0 0 5px rgba(248,113,113,.16); }
+.hero .txt { flex: 1; min-width: 150px; }
+.hero .state { font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+.hero .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+/* iOS-style switch, big enough for a thumb */
+.switch { position: relative; display: inline-block; width: 58px; height: 32px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track {
+  position: absolute; inset: 0; cursor: pointer; border-radius: 99px;
+  background: var(--line); transition: background .18s;
+}
+.switch .track::before {
+  content: ''; position: absolute; height: 26px; width: 26px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: transform .18s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.switch input:checked + .track { background: var(--ok); }
+.switch input:checked + .track::before { transform: translateX(26px); }
+.switch input:disabled + .track { opacity: .45; cursor: not-allowed; }
+
+/* Quick links row */
+.quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.quick a {
+  flex: 1 1 auto; min-width: 128px; text-align: center; text-decoration: none;
+  padding: 13px 10px; border-radius: 11px; background: var(--card);
+  border: 1px solid var(--line); color: var(--text); font-size: 13.5px; font-weight: 600;
+}
+.quick a:hover { border-color: var(--accent); color: var(--accent); }
+.quick a .ic { display: block; font-size: 19px; margin-bottom: 4px; }
+
+/* A row that needs attention gets a left edge, not a whole red card */
+.row.attn { border-left: 3px solid var(--warn); padding-left: 11px; margin-left: -14px; }

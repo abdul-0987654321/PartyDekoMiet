@@ -65,6 +65,20 @@ const T = {
     referencePhoto: (jid, text) => `Referenzbild von ${short(jid)}${text ? `\nText: ${cut(text)}` : ''}`,
     calendarFailed: (id) =>
       `ACHTUNG: Buchung ${id} konnte nicht in den Kalender geschrieben werden. Bitte von Hand eintragen.`,
+
+    // Voice replies dictated by the owner
+    voicePreview: (jid, langName, heard, message) =>
+      `VORSCHAU an ${short(jid)} (${langName})\n\n${message}\n\n` +
+      `Verstanden: "${cut(heard, 200)}"\n\nAntworte *ok* zum Senden oder *nein* zum Verwerfen.`,
+    voiceSent: (jid) => `Gesendet an ${short(jid)}. Der Bot pausiert in diesem Chat, damit er dir nicht dazwischenredet.`,
+    voiceCancelled: 'Verworfen, nichts gesendet.',
+    voiceNoTarget:
+      'An wen soll das gehen? Antworte auf (zitiere) eine Benachrichtigung des Bots zu dem Kunden, ' +
+      'oder nenne die Nummer, z.B. "41791234567 Das Set ist frei, auf Italienisch".',
+    voiceFailed: (err) => `Die Sprachnachricht konnte nicht verarbeitet werden (${cut(err, 120)}). Bitte nochmals oder als Text.`,
+    voiceNoAi: 'Sprachbefehle brauchen einen gueltigen OpenAI-Schluessel. Er fehlt gerade.',
+    customerVoiceFailed: (jid) =>
+      `Sprachnachricht von ${short(jid)} konnte nicht abgehoert werden. Der Kunde wurde gebeten, kurz zu schreiben.`,
   },
 
   en: {
@@ -109,6 +123,19 @@ const T = {
     referencePhoto: (jid, text) => `Reference photo from ${short(jid)}${text ? `\nText: ${cut(text)}` : ''}`,
     calendarFailed: (id) =>
       `WARNING: booking ${id} could not be written to the calendar. Please add it by hand.`,
+
+    voicePreview: (jid, langName, heard, message) =>
+      `PREVIEW to ${short(jid)} (${langName})\n\n${message}\n\n` +
+      `I heard: "${cut(heard, 200)}"\n\nReply *ok* to send or *no* to discard.`,
+    voiceSent: (jid) => `Sent to ${short(jid)}. The bot is paused in that chat so it does not talk over you.`,
+    voiceCancelled: 'Discarded, nothing was sent.',
+    voiceNoTarget:
+      'Who should this go to? Reply to (quote) one of the bot\'s notifications about that customer, ' +
+      'or say the number, e.g. "41791234567 the set is free, in Italian".',
+    voiceFailed: (err) => `The voice message could not be processed (${cut(err, 120)}). Please try again or type it.`,
+    voiceNoAi: 'Voice commands need a valid OpenAI key. It is missing right now.',
+    customerVoiceFailed: (jid) =>
+      `Voice message from ${short(jid)} could not be transcribed. The customer was asked to type instead.`,
   },
 };
 

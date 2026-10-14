@@ -78,6 +78,7 @@ function createBookings({ catalog, calendar, notify }) {
     const win = rentalWindow(args.start_date, {
       returnDayOffset: settings.get('returnDayOffset'),
       bufferDays: settings.get('bufferDays'),
+      closedWeekdays: settings.get('closedWeekdays'),
     });
 
     const jid = args.chatId || '';

@@ -46,7 +46,7 @@ cp .env.example .env     # fill in at least OPENAI_API_KEY
 npm run chat -- --dry    # talk to it with a fake model, no key, no network
 npm run chat             # talk to it with the real model
 npm start                # full service: HTTP + WhatsApp
-npm test                 # 111 tests
+npm test                 # all unit tests
 ```
 
 ## Setup, in order
@@ -116,6 +116,12 @@ carries nothing secret.
 ## Owner commands (WhatsApp)
 
 `/status` · `/pause <number>` · `/resume <number>` · `/off` · `/on` · `/help`
+
+**Voice replies:** the owner replies to a bot alert with a voice note ("tell him
+it's free on Saturday, in Italian"). It is transcribed (`OPENAI_TRANSCRIBE_MODEL`,
+default `whisper-1`), written as the customer message in the language named,
+shown as a preview, and sent on "ok". Customer voice notes are transcribed and
+answered like text. See `src/voice/` and `src/whatsapp/router.js`.
 
 The bot also pauses itself in a chat for 12 hours whenever the owner answers
 there by hand, so it never talks over a human.

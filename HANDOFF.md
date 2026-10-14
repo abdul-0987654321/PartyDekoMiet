@@ -3,7 +3,7 @@
 Everything a new session (or a new developer) needs to continue without asking.
 Read this first, then `README.md`.
 
-Last updated at commit `b6312e4`. 196 tests passing.
+Last updated 2026-10-15. Added: closed weekdays, voice notes, bot language following the dashboard.
 
 ---
 
@@ -107,6 +107,15 @@ there sits in the revision history forever.
 **Language is decided in code**, before the model call, and written into the
 prompt. Leaving it to the model made it drift back to German mid-conversation.
 
+**Voice replies need a preview.** The owner dictates while driving, and speech
+recognition makes mistakes, so a dictated reply goes out only after "ok"
+(`ownerVoicePreview`, on by default). The target customer comes from the alert
+the owner quotes, or a number he says - never guessed.
+
+**Bot language follows the dashboard switch (testing only).** `botLanguage`
+defaults to `dashboard`. Set it to `auto` before going live, or English
+customers get German whenever the dashboard is on DE.
+
 **The hourly per-chat cap is off** (`maxMsgsPerChatPerHour: 0`). The owner asked
 for this and accepts that a loop can run up OpenAI usage.
 
@@ -134,7 +143,9 @@ To verify live, add those domains under the environment's Network access.
    only knows PartyDekoMiet and would answer the other business with rental
    rules. A keyword handoff exists (`Settings → Bot → Keywords for other
    businesses`) but is **empty** until she names the business.
-2. **Rental window.** `returnDayOffset` is 2 (Fri → Sun). Could be 3.
+2. ~~Rental window.~~ Answered: Friday pickup returns Monday, he does not work
+   on Sundays. Done as the `closedWeekdays` setting (default `sun`), not by
+   changing `returnDayOffset`, which would have made every rental longer.
 3. **Pickup hours.** Empty, so the bot promises no times.
 4. **Deposit mode.** `included` assumed. Could be `separate` or `manual`.
 5. **Stock per set.** `defaultStock` 1. Some sets may exist several times.

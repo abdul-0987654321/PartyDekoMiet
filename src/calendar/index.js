@@ -34,6 +34,7 @@ function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zuric
     return {
       returnDayOffset: settings.get('returnDayOffset'),
       bufferDays: settings.get('bufferDays'),
+      closedWeekdays: settings.get('closedWeekdays'),
       blockedKeywords: settings.get('blockedKeywords'),
       timeZone,
     };
@@ -91,7 +92,9 @@ function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zuric
         note:
           res.reason === 'blocked_day'
             ? 'An diesem Datum ist generell geschlossen.'
-            : 'Das Set ist in diesem Zeitraum schon vergeben.',
+            : res.reason === 'closed_day'
+              ? 'An diesem Wochentag ist geschlossen, Abholung nicht moeglich. Biete eines der freien Daten an.'
+              : 'Das Set ist in diesem Zeitraum schon vergeben.',
       };
     },
 

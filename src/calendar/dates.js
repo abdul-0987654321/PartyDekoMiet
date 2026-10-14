@@ -34,16 +34,54 @@ function todayIn(timeZone = 'Europe/Zurich') {
   return new Date().toLocaleDateString('en-CA', { timeZone });
 }
 
+/** 0 = Sunday ... 6 = Saturday, for a YYYY-MM-DD day. */
+function weekdayOf(day) {
+  return new Date(dayToMs(day)).getUTCDay();
+}
+
+const WEEKDAY_NAMES = {
+  0: ['sun', 'sunday', 'so', 'sonntag'],
+  1: ['mon', 'monday', 'mo', 'montag'],
+  2: ['tue', 'tuesday', 'di', 'dienstag'],
+  3: ['wed', 'wednesday', 'mi', 'mittwoch'],
+  4: ['thu', 'thursday', 'do', 'donnerstag'],
+  5: ['fri', 'friday', 'fr', 'freitag'],
+  6: ['sat', 'saturday', 'sa', 'samstag'],
+};
+
+/**
+ * "sun", "So, Mo", "sunday,monday", "0" -> [0] / [0, 1]. Unknown words are ignored,
+ * so a typo in the dashboard can never block every day.
+ */
+function parseWeekdays(raw) {
+  if (Array.isArray(raw)) return raw.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  const out = new Set();
+  for (const part of String(raw || '').toLowerCase().split(/[\s,;]+/)) {
+    if (!part) continue;
+    if (/^[0-6]$/.test(part)) { out.add(Number(part)); continue; }
+    for (const [n, names] of Object.entries(WEEKDAY_NAMES)) {
+      if (names.includes(part.replace(/\.$/, ''))) out.add(Number(n));
+    }
+  }
+  // Every day closed would make the shop unbookable - treat it as a mistake.
+  return out.size >= 7 ? [] : [...out].sort();
+}
+
 /**
  * The days a booking occupies.
  * returnDayOffset 2 means: pickup Friday, return Sunday - three consecutive days.
+ * closedWeekdays: days the shop is closed. A return that would fall on one moves
+ * to the next open day (pickup Friday -> return Monday when Sunday is closed),
+ * and the set stays blocked until then.
  * bufferDays extends the block after the return for checking and cleaning.
  *
  * @returns {{pickup:string, return:string, blockStart:string, blockEnd:string}}
  *          blockEnd is inclusive.
  */
-function rentalWindow(pickup, { returnDayOffset = 2, bufferDays = 0 } = {}) {
-  const ret = addDays(pickup, returnDayOffset);
+function rentalWindow(pickup, { returnDayOffset = 2, bufferDays = 0, closedWeekdays = [] } = {}) {
+  const closed = parseWeekdays(closedWeekdays);
+  let ret = addDays(pickup, returnDayOffset);
+  for (let i = 0; i < 7 && closed.includes(weekdayOf(ret)); i++) ret = addDays(ret, 1);
   return {
     pickup,
     return: ret,
@@ -83,4 +121,5 @@ function eventDayRange(event, timeZone = 'Europe/Zurich') {
 
 module.exports = {
   isIsoDay, addDays, diffDays, todayIn, rentalWindow, overlaps, eventDayRange, dayToMs, msToDay,
+  weekdayOf, parseWeekdays,
 };

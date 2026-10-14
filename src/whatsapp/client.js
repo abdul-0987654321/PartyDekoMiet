@@ -159,6 +159,9 @@ async function downloadImage(msg) {
   return downloadMediaMessage(msg, 'buffer', {}, { logger: baileysLogger, reuploadRequest: runtime.sock.updateMediaMessage });
 }
 
+/** Any media (image, voice note) as a Buffer. */
+const downloadMedia = downloadImage;
+
 function isPrivateChat(jid) {
   return typeof jid === 'string' && (jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid'));
 }
@@ -260,7 +263,11 @@ async function start() {
         runtime.pairingError = null;
         runtime.reconnectAttempts = 0;
         runtime.connectedAt = new Date().toISOString();
-        runtime.me = { id: sock.user?.id || null, name: sock.user?.name || sock.user?.verifiedName || null };
+        runtime.me = {
+          id: sock.user?.id || null,
+          lid: sock.user?.lid || null, // the self-chat can arrive under the LID
+          name: sock.user?.name || sock.user?.verifiedName || null,
+        };
         log.info(`WhatsApp connected as ${runtime.me.name || ''} ${runtime.me.id || ''}`);
       }
       if (connection === 'close') {
@@ -393,6 +400,6 @@ async function logoutAndRelink() {
 
 module.exports = {
   start, stop, logoutAndRelink, getStatus, isConnected, onMessage,
-  sendText, sendImage, forwardImage, downloadImage, isPrivateChat, isOwnMessage,
+  sendText, sendImage, forwardImage, downloadImage, downloadMedia, isPrivateChat, isOwnMessage,
   startPairing, cancelPairing,
 };

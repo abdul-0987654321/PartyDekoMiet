@@ -26,6 +26,7 @@ const config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1',
     timeoutMs: num(process.env.OPENAI_TIMEOUT_MS, 30000),
     maxRetries: num(process.env.OPENAI_MAX_RETRIES, 2),
     maxSteps: num(process.env.AGENT_MAX_STEPS, 6),

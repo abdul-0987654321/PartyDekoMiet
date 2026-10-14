@@ -3,8 +3,12 @@
  * Decides what happens with every incoming WhatsApp message.
  *
  *   owner's own number  -> commands (/pause, /resume, /status, /on, /off)
+ *                          and dictated replies: a voice note (or a typed reply
+ *                          quoting a bot alert) becomes a message to that customer,
+ *                          in the language the owner names, sent after "ok"
  *   owner typing in a customer chat from the phone -> pause the bot there
- *   customer            -> agent reply, unless that chat is paused
+ *   customer            -> agent reply, unless that chat is paused; customer
+ *                          voice notes are transcribed and answered like text
  *
  * Group chats, status updates and broadcasts never get here: client.js drops
  * anything that is not a private chat.
@@ -50,6 +54,42 @@ function hasImage(msg) {
   return Boolean(msg.message?.imageMessage);
 }
 
+function hasAudio(msg) {
+  return Boolean(msg.message?.audioMessage);
+}
+
+/** Text of the message the owner replied to (quoted), if any. */
+function quotedTextOf(msg) {
+  const m = msg.message || {};
+  const ctx =
+    m.extendedTextMessage?.contextInfo ||
+    m.audioMessage?.contextInfo ||
+    m.imageMessage?.contextInfo ||
+    m.videoMessage?.contextInfo;
+  const q = ctx?.quotedMessage;
+  if (!q) return '';
+  return String(q.conversation || q.extendedTextMessage?.text || q.imageMessage?.caption || '').trim();
+}
+
+/** First phone-number-like run of digits (8-15) in a text: "Chat: 41791234567". */
+function numberIn(text) {
+  const match = String(text || '').match(/\+?\d[\d ]{6,18}\d/);
+  if (!match) return null;
+  const n = match[0].replace(/[^0-9]/g, '');
+  return n.length >= 8 && n.length <= 15 ? { number: n, raw: match[0] } : null;
+}
+
+/** The user part of a jid: "41791234567:12@s.whatsapp.net" -> "41791234567". */
+const userOf = (jid) => String(jid || '').split('@')[0].split(':')[0];
+
+const CONFIRM = /^(ok|okay|ja|jep|yes|yep|senden|send|si|s\u00ec|oui|go)\b[\s.!]*$/i;
+const CANCEL = /^(nein|no|nee|cancel|abbrechen|stop|verwerfen|discard)\b[\s.!]*$/i;
+const PENDING_TTL_MS = 30 * 60 * 1000;
+
+const VOICE_UNREADABLE =
+  'Sorry, deine Sprachnachricht kann ich gerade nicht abhoeren - schreib mir bitte kurz. ' +
+  '/ Sorry, I cannot listen to your voice message right now - please type it.';
+
 /**
  * Folds umlauts and strips punctuation so keyword matching survives the way
  * customers actually type.
@@ -81,13 +121,21 @@ function matchesOtherBusiness(text, keywordsRaw) {
   return keywords.some((k) => haystack.includes(` ${k} `) || haystack.includes(k));
 }
 
-function createRouter({ client, agent, services, notify, knowledge }) {
+function createRouter({ client, agent, services, notify, knowledge, voice = null }) {
   let state = {};
+  const pendingReplies = new Map(); // ownerJid -> { target, message, heard, langName, at }
 
   const isOwner = (jid) => {
     const owner = digits(settings.get('ownerWhatsapp'));
     return Boolean(owner) && digits(jid).startsWith(owner);
   };
+
+  /** The bot's own chat ("Message yourself") - where the owner talks to it on the same number. */
+  function isSelfChat(jid) {
+    const me = client.getStatus?.().me || {};
+    const user = userOf(jid);
+    return Boolean(user) && (user === userOf(me.id) || user === userOf(me.lid));
+  }
 
   function pause(jid, hours, reason) {
     state[jid] = { ...(state[jid] || {}), pausedUntil: Date.now() + hours * 3600 * 1000, reason };
@@ -170,6 +218,10 @@ function createRouter({ client, agent, services, notify, knowledge }) {
           '/pause <nummer>    Bot in einem Chat stoppen',
           '/resume <nummer>   Bot dort wieder starten',
           '/off  /on          Bot global aus / an',
+          '',
+          'Sprachbefehl: auf eine Benachrichtigung antworten (zitieren) und eine',
+          'Sprachnachricht schicken, z.B. "Sag ihm, das Set ist am Samstag frei,',
+          'auf Italienisch". Du bekommst eine Vorschau, mit "ok" wird gesendet.',
         ].join('\n');
       default:
         return null; // not a command: the owner is just writing
@@ -178,9 +230,99 @@ function createRouter({ client, agent, services, notify, knowledge }) {
 
   // ---- Main entry -----------------------------------------------------------
 
+  // ---- Owner input: commands and dictated replies ---------------------------
+
+  async function handleOwnerInput(msg, jid, text) {
+    if (text.startsWith('/')) {
+      const reply = await handleOwnerCommand(jid, text);
+      if (reply) await client.sendText(jid, reply);
+      return;
+    }
+
+    // Answer to a preview?
+    const pending = pendingReplies.get(jid);
+    if (pending && Date.now() - pending.at > PENDING_TTL_MS) pendingReplies.delete(jid);
+    if (pendingReplies.has(jid) && text && !hasAudio(msg)) {
+      if (CONFIRM.test(text)) return sendPending(jid);
+      if (CANCEL.test(text)) {
+        pendingReplies.delete(jid);
+        return client.sendText(jid, m().voiceCancelled);
+      }
+    }
+
+    // A dictated reply is a voice note, or typed text quoting one of the bot's alerts.
+    const quoted = quotedTextOf(msg);
+    if (!hasAudio(msg) && !(text && quoted)) return; // the owner is just writing
+
+    if (!voice) return client.sendText(jid, m().voiceNoAi);
+
+    let instruction = text;
+    try {
+      if (hasAudio(msg)) {
+        const buffer = await client.downloadMedia(msg);
+        instruction = await voice.transcribe(buffer, msg.message.audioMessage?.mimetype);
+      }
+    } catch (err) {
+      log.error(`Owner voice note could not be transcribed: ${err.message}`);
+      return client.sendText(jid, m().voiceFailed(err.message));
+    }
+
+    // Who is it for: the customer in the quoted alert, or a number the owner said.
+    let target = null;
+    const fromQuote = numberIn(quoted);
+    if (fromQuote) target = jidOf(fromQuote.number);
+    if (!target) {
+      const said = numberIn(instruction);
+      if (said) {
+        target = jidOf(said.number);
+        instruction = instruction.replace(said.raw, ' ').trim();
+      }
+    }
+    if (!target || isOwner(target) || isSelfChat(target)) return client.sendText(jid, m().voiceNoTarget);
+
+    let composed;
+    try {
+      const lastIn = db.all('chat')
+        .filter((c) => c.jid === target && c.direction === 'in')
+        .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+        .pop();
+      composed = await voice.composeOwnerReply(instruction, { lastCustomerText: lastIn?.text });
+    } catch (err) {
+      log.error(`Owner reply could not be composed: ${err.message}`);
+      return client.sendText(jid, m().voiceFailed(err.message));
+    }
+
+    pendingReplies.set(jid, {
+      target, message: composed.message, heard: instruction, langName: composed.languageName, at: Date.now(),
+    });
+    if (!settings.get('ownerVoicePreview')) return sendPending(jid);
+    return client.sendText(jid, m().voicePreview(target, composed.languageName, instruction, composed.message));
+  }
+
+  async function sendPending(ownerJid) {
+    const p = pendingReplies.get(ownerJid);
+    pendingReplies.delete(ownerJid);
+    if (!p) return;
+    try {
+      await client.sendText(p.target, p.message);
+    } catch (err) {
+      return client.sendText(ownerJid, m().voiceFailed(err.message));
+    }
+    remember(p.target, 'out', p.message);
+    // A human is now talking in this chat: the bot must not answer over him.
+    pause(p.target, settings.get('takeoverPauseHours'), 'owner voice reply');
+    log.info(`Owner reply sent to ${p.target} (${p.langName})`);
+    await client.sendText(ownerJid, m().voiceSent(p.target));
+  }
+
+  // ---- Main entry -----------------------------------------------------------
+
   async function handle(msg) {
     const jid = msg.key.remoteJid;
-    const text = textOf(msg);
+    let text = textOf(msg);
+
+    // 0. The owner talking to the bot in its own chat (same number as the bot).
+    if (msg.key.fromMe && isSelfChat(jid)) return handleOwnerInput(msg, jid, text);
 
     // 1. The owner answered a customer by hand from the phone -> step aside.
     if (msg.key.fromMe) {
@@ -190,12 +332,8 @@ function createRouter({ client, agent, services, notify, knowledge }) {
       return;
     }
 
-    // 2. A message from the owner's own number: commands.
-    if (isOwner(jid)) {
-      const reply = text.startsWith('/') ? await handleOwnerCommand(jid, text) : null;
-      if (reply) await client.sendText(jid, reply);
-      return;
-    }
+    // 2. A message from the owner's own number: commands and dictated replies.
+    if (isOwner(jid)) return handleOwnerInput(msg, jid, text);
 
     // 3. Everything else is a customer.
     //
@@ -207,6 +345,25 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     if (isPaused(jid)) return skip(jid, text, 'paused');
     if (!underRateLimit(jid)) return skip(jid, text, 'rate_limit');
     if (!agent) return skip(jid, text, 'no_agent');
+
+    // A voice note: transcribe it and carry on as if the customer had typed it.
+    let voiceMark = '';
+    if (hasAudio(msg)) {
+      try {
+        if (!voice) throw new Error('voice is not set up');
+        const buffer = await client.downloadMedia(msg);
+        text = await voice.transcribe(buffer, msg.message.audioMessage?.mimetype);
+        voiceMark = '\u{1F3A4} '; // tells the model (and the dashboard) it was spoken
+        log.info(`Voice note from ${jid} transcribed (${text.length} chars)`);
+      } catch (err) {
+        log.error(`Voice note from ${jid} could not be transcribed: ${err.message}`);
+        await client.sendText(jid, VOICE_UNREADABLE);
+        remember(jid, 'in', '[Sprachnachricht]');
+        remember(jid, 'out', VOICE_UNREADABLE);
+        await notify.owner(m().customerVoiceFailed(jid), { kind: 'voice_failed', jid });
+        return;
+      }
+    }
 
     // Belongs to the other business on this number: answer honestly, hand over,
     // and never let the model near it.
@@ -250,7 +407,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     try {
       out = await agent.reply({
         history,
-        message: (text || '[Bild ohne Text]') + photoNote,
+        message: voiceMark + (text || '[Bild ohne Text]') + photoNote,
         services,
         chatId: jid,
         customerName: db.get('customers', jid)?.name,
@@ -264,7 +421,7 @@ function createRouter({ client, agent, services, notify, knowledge }) {
     }
 
     await client.sendText(jid, out.text);
-    remember(jid, 'in', text || '[Bild]');
+    remember(jid, 'in', voiceMark + (text || '[Bild]'));
     remember(jid, 'out', out.text);
 
     if (out.handoff) {
@@ -401,4 +558,6 @@ function createRouter({ client, agent, services, notify, knowledge }) {
   };
 }
 
-module.exports = { createRouter, textOf, hasImage, jidOf, digits, matchesOtherBusiness, flatten };
+module.exports = {
+  createRouter, textOf, hasImage, hasAudio, quotedTextOf, numberIn, jidOf, digits, matchesOtherBusiness, flatten,
+};

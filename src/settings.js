@@ -36,12 +36,12 @@ const SCHEMA = [
     label: { de: 'Bot aktiv', en: 'Bot active' },
   },
   {
-    key: 'botLanguage', group: 'bot', type: 'enum', default: 'auto',
-    options: ['auto', 'de', 'en'],
+    key: 'botLanguage', group: 'bot', type: 'enum', default: 'dashboard',
+    options: ['dashboard', 'auto', 'de', 'en'],
     label: { de: 'Sprache des Bots', en: 'Bot language' },
     help: {
-      de: 'auto: antwortet in der Sprache des Kunden. de/en: immer diese Sprache.',
-      en: 'auto: replies in the customer language. de/en: always that language.',
+      de: 'dashboard: der Bot spricht die Sprache, die oben rechts (DE/EN) gewählt ist - zum Testen. auto: antwortet in der Sprache des Kunden (für den Live-Betrieb). de/en: immer diese Sprache.',
+      en: 'dashboard: the bot speaks the language chosen top right (DE/EN) - for testing. auto: replies in the customer language (for live use). de/en: always that language.',
     },
   },
   {
@@ -51,6 +51,14 @@ const SCHEMA = [
     help: {
       de: 'Antwortet der Inhaber selbst im Chat, schweigt der Bot so lange in diesem Chat.',
       en: 'If the owner answers in a chat, the bot stays quiet in that chat for this long.',
+    },
+  },
+  {
+    key: 'ownerVoicePreview', group: 'bot', type: 'boolean', default: true,
+    label: { de: 'Sprachbefehl: erst Vorschau zeigen', en: 'Voice command: show a preview first' },
+    help: {
+      de: 'Ein diktierter Text geht erst nach "ok" an den Kunden. Aus = sofort senden (Tippfehler der Spracherkennung gehen dann direkt raus).',
+      en: 'A dictated reply goes to the customer only after "ok". Off = send at once (speech recognition mistakes then go straight out).',
     },
   },
   {
@@ -148,6 +156,15 @@ const SCHEMA = [
     help: {
       de: '2 = Abholung Freitag, Rückgabe Sonntag (Abholtag zählt als Tag 1). 3 = Rückgabe Montag.',
       en: '2 = pickup Friday, return Sunday (pickup day counts as day 1). 3 = return Monday.',
+    },
+  },
+  {
+    key: 'closedWeekdays', group: 'business', type: 'string', default: 'sun', env: 'CLOSED_WEEKDAYS',
+    placeholder: 'sun',
+    label: { de: 'Ruhetage (keine Abholung/Rückgabe)', en: 'Closed days (no pickup or return)' },
+    help: {
+      de: 'z.B. "So" oder "So, Mo". Fällt die Rückgabe auf einen Ruhetag, verschiebt sie sich auf den nächsten offenen Tag (Abholung Freitag -> Rückgabe Montag). Leer = jeden Tag offen.',
+      en: 'e.g. "sun" or "sun, mon". A return that falls on a closed day moves to the next open day (pickup Friday -> return Monday). Empty = open every day.',
     },
   },
   {

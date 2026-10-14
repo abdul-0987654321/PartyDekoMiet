@@ -217,7 +217,8 @@ describe('agent: limits and language', () => {
 
   test('an English chat gets an English fallback when blocked', async () => {
     const { agent } = agentWith([text('Your booking is confirmed, see you!')]);
-    const out = await agent.reply({ message: 'Can you confirm my booking for the unicorn set?' });
+    // 'auto' = live behaviour: follow the customer (the default follows the dashboard switch for testing)
+    const out = await agent.reply({ message: 'Can you confirm my booking for the unicorn set?', langSetting: 'auto' });
     assert.ok(out.blocked);
     assert.strictEqual(out.lang, 'en');
     assert.match(out.text, /colleague/);

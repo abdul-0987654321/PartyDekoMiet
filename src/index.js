@@ -24,6 +24,7 @@ const { createBookings } = require('./bookings');
 const { createNotifier } = require('./notify/owner');
 const { createMessenger } = require('./whatsapp/messenger');
 const { createRouter } = require('./whatsapp/router');
+const { createVoice } = require('./voice');
 const whatsapp = require('./whatsapp/client');
 const { createServer } = require('./http/server');
 
@@ -37,7 +38,7 @@ const state = {
   bootError: null,
 };
 
-const runtime = { agent: null, calendar: null, bookings: null, router: null, notify: null, services: {} };
+const runtime = { agent: null, voice: null, calendar: null, bookings: null, router: null, notify: null, services: {} };
 
 async function connectStorage() {
   let backend;
@@ -80,13 +81,20 @@ async function boot() {
 
   if (config.openai.apiKey) {
     const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: config.openai.apiKey });
     runtime.agent = createAgent({
-      openai: new OpenAI({ apiKey: config.openai.apiKey }),
+      openai,
       knowledge,
       guards,
       config: config.openai,
     });
-    log.info(`Agent ready (${config.openai.model})`);
+    // Voice notes: customers' are transcribed, the owner's become dictated replies.
+    runtime.voice = createVoice({
+      openai,
+      model: config.openai.model,
+      transcribeModel: config.openai.transcribeModel,
+    });
+    log.info(`Agent ready (${config.openai.model}), voice notes via ${config.openai.transcribeModel}`);
   } else {
     log.warn('OPENAI_API_KEY is not set - the bot cannot answer customers.');
   }
@@ -141,6 +149,7 @@ async function boot() {
     agent: runtime.agent,
     services: runtime.services,
     notify: runtime.notify,
+    voice: runtime.voice,
   });
   runtime.router.init();
   whatsapp.onMessage((msg) => runtime.router.handle(msg));

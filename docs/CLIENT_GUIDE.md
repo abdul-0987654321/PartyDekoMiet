@@ -103,6 +103,37 @@ Write the number without `+` and without spaces.
 
 ---
 
+## Answering by voice (for example while driving)
+
+1. The assistant sends you a notification about a customer.
+2. **Reply to that notification** (swipe it to the right, or long-press → Reply)
+   with a **voice message**, in any language. Say what to answer and in which
+   language, for example:
+   *"Sag ihm, das Set ist am Samstag frei, auf Italienisch."*
+3. You get a **preview** of the exact message, in the language you asked for.
+4. Answer **ok** to send it, or **nein** to throw it away.
+
+The assistant then stays quiet in that chat, so it does not talk over you.
+
+- No language named → it answers in the customer's language (German if unknown).
+- You can also say the number instead of replying to a notification:
+  *"41791234567, das Set ist frei, auf Spanisch."*
+- Typing works too: reply to a notification with text instead of a voice note.
+- Customers can send voice messages as well. The assistant listens to them and
+  answers in writing.
+
+---
+
+## Closed days
+
+Settings → Business rules → **Closed days**. Default: Sunday.
+
+- No pickup on a closed day.
+- A return that would fall on a closed day moves to the next open day:
+  pickup **Friday** → return **Monday**. The set stays blocked until Monday.
+
+---
+
 ## The dashboard
 
 Open the web address you were given and log in with the dashboard password.

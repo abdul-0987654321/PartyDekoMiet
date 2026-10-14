@@ -11,7 +11,7 @@
  * blocking keyword ("Blocked", "Geschlossen", ...) blocks every set that day.
  */
 
-const { rentalWindow, overlaps, eventDayRange, addDays, isIsoDay } = require('./dates');
+const { rentalWindow, overlaps, eventDayRange, addDays, isIsoDay, weekdayOf, parseWeekdays } = require('./dates');
 
 const PENDING = 'PENDING';
 const CONFIRMED = 'CONFIRMED';
@@ -62,6 +62,7 @@ function parseKeywords(raw) {
  * @param {number}   opts.bufferDays
  * @param {number}   opts.stock         how many copies of this set exist
  * @param {string}   opts.blockedKeywords
+ * @param {string|number[]} [opts.closedWeekdays]  no pickup on these days, returns move past them
  * @returns {{available:boolean, reason:string|null, window:object, used:number, stock:number, conflicts:object[]}}
  */
 function checkWindow({
@@ -73,10 +74,16 @@ function checkWindow({
   bufferDays = 0,
   stock = 1,
   blockedKeywords = '',
+  closedWeekdays = [],
   timeZone = 'Europe/Zurich',
 }) {
   if (!isIsoDay(pickup)) throw new Error(`pickup must be YYYY-MM-DD, got "${pickup}"`);
-  const win = rentalWindow(pickup, { returnDayOffset, bufferDays });
+  const win = rentalWindow(pickup, { returnDayOffset, bufferDays, closedWeekdays });
+
+  // Nobody is there to hand the set over on a closed day.
+  if (parseWeekdays(closedWeekdays).includes(weekdayOf(pickup))) {
+    return { available: false, reason: 'closed_day', window: win, used: 0, stock, conflicts: [] };
+  }
   const keywords = parseKeywords(blockedKeywords);
   const conflicts = [];
 

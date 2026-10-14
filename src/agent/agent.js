@@ -16,10 +16,16 @@ const settings = require('../settings');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Settings need storage; in unit tests there is none, so fall back to auto. */
+/**
+ * Settings need storage; in unit tests there is none, so fall back to auto.
+ * 'dashboard' means: answer in whatever language the dashboard is switched to
+ * (DE/EN toggle top right). Meant for testing; switch back to 'auto' for live use.
+ */
 function safeSetting() {
   try {
-    return settings.get('botLanguage');
+    const value = settings.get('botLanguage');
+    if (value === 'dashboard') return settings.get('dashboardLanguage') === 'en' ? 'en' : 'de';
+    return value;
   } catch {
     return 'auto';
   }

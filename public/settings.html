@@ -9,6 +9,7 @@
 <body><div class="shell"><main class="content" id="content">
   <h1 id="h1"></h1>
   <p class="muted" id="intro"></p>
+  <div class="chips" id="chips"></div>
   <div id="alerts"></div>
   <form id="form" onsubmit="return false"><p class="muted" id="loading"></p></form>
 </main></div>
@@ -27,8 +28,12 @@ function fieldHtml(s) {
   const help = s.help ? (s.help[LANG] || s.help.de) : '';
   const src = { env: t('src_env'), dashboard: t('src_dashboard'), default: t('src_default') }[s.source];
   let input;
-  if (s.type === 'boolean') input = `<input type="checkbox" id="f_${s.key}" ${s.value?'checked':''}>`;
-  else if (s.type === 'enum') input = `<select id="f_${s.key}">${s.options.map(o=>`<option value="${esc(o)}" ${o===s.value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  if (s.type === 'boolean') input = `<label class="check"><input type="checkbox" id="f_${s.key}" ${s.value?'checked':''}></label>`;
+  else if (s.type === 'enum') input = `<select id="f_${s.key}">${s.options.map(o=>{
+      const ol = s.optionLabels && s.optionLabels[o];
+      const txt = ol ? (ol[LANG] || ol.de) : o;
+      return `<option value="${esc(o)}" ${o===s.value?'selected':''}>${esc(txt)}</option>`;
+    }).join('')}</select>`;
   else if (s.type === 'number') input = `<input type="number" inputmode="numeric" id="f_${s.key}" value="${esc(s.value)}"${s.min!==undefined?` min="${s.min}"`:''}${s.max!==undefined?` max="${s.max}"`:''}>`;
   else input = `<input type="text" id="f_${s.key}" value="${esc(s.value)}" placeholder="${esc(s.placeholder||'')}">`;
   return `<div class="field"><label for="f_${s.key}">${esc(label)}<span class="src">${esc(src)}</span></label>
@@ -37,14 +42,21 @@ function fieldHtml(s) {
 
 function render() {
   const groups = GROUPS.filter(g => schema.some(s => s.group === g));
-  $('form').innerHTML = groups.map(g =>
-    `<h2>${t('g_'+g)}</h2><div class="card">${schema.filter(s=>s.group===g).map(fieldHtml).join('')}</div>`
-  ).join('') + `<div class="actions inline">
+  $('chips').innerHTML = groups.map(g => `<a href="#g_${g}">${esc(t('g_'+g))}</a>`).join('');
+  $('form').innerHTML = groups.map(g => {
+    const all = schema.filter(s => s.group === g);
+    const main = all.filter(s => !s.advanced), adv = all.filter(s => s.advanced);
+    return `<section class="group" id="g_${g}"><h2>${t('g_'+g)}</h2><div class="card">
+      ${main.map(fieldHtml).join('')}
+      ${adv.length ? `<details class="adv"><summary>${esc(t('s_adv'))} (${adv.length})</summary>${adv.map(fieldHtml).join('')}</details>` : ''}
+    </div></section>`;
+  }).join('') + `<div class="actions inline">
       <button class="primary" type="button" id="save">${t('save')}</button>
       <button class="ghost" type="button" id="reload">${t('refresh')}</button>
       <span id="msg" class="muted"></span></div>`;
   $('save').onclick = save;
   $('reload').onclick = load;
+  $('form').oninput = () => { $('msg').textContent = t('s_unsaved'); };
 }
 
 function collect() {
@@ -66,7 +78,8 @@ async function save() {
     return;
   }
   schema = res.settings; render();
-  $('msg').textContent = t('saved') + (res.changed.length ? ` (${res.changed.join(', ')})` : '');
+  const names = res.changed.map(k => { const d = schema.find(x => x.key === k); return d ? (d.label[LANG] || d.label.de) : k; });
+  $('msg').textContent = t('saved') + (names.length ? ` – ${names.join(', ')}` : '');
   const dash = schema.find(s => s.key === 'dashboardLanguage');
   if (dash && !localStorage.getItem('dashLang')) setLang(dash.value);
 }

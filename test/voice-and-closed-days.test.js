@@ -323,3 +323,53 @@ describe('bot language follows the dashboard switch', () => {
     assert.strictEqual(out.lang, 'en');
   });
 });
+
+describe('product pictures', () => {
+  const { createMessenger } = require('../src/whatsapp/messenger');
+  const product = { title: 'Einhorn Set', priceLabel: 'CHF 89.-', url: 'https://shop/p/einhorn', image: '//cdn.shop/einhorn.jpg' };
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+  });
+
+  test('a sent product shows up in the dashboard chat, with its picture', async () => {
+    const sent = [];
+    const client = { sendImage: async (jid, url, caption) => sent.push({ url, caption }) };
+    await createMessenger({ client }).sendProduct('41790000777@s.whatsapp.net', product);
+    assert.strictEqual(sent[0].url, 'https://cdn.shop/einhorn.jpg', 'protocol-relative URLs are fixed');
+    const row = db.all('chat')[0];
+    assert.strictEqual(row.image, 'https://cdn.shop/einhorn.jpg');
+    assert.match(row.text, /Einhorn Set/);
+  });
+
+  test('when WhatsApp cannot fetch the URL, the picture is downloaded and sent as a file', async () => {
+    const forwarded = [];
+    const client = {
+      sendImage: async () => { throw new Error('media upload failed'); },
+      forwardImage: async (jid, buffer, caption, type) => forwarded.push({ size: buffer.length, type }),
+      sendText: async () => { throw new Error('should not fall back to text'); },
+    };
+    const fetchImpl = async () => ({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+    const out = await createMessenger({ client, fetchImpl }).sendProduct('41790000777@s.whatsapp.net', product);
+    assert.ok(out.withImage);
+    assert.deepStrictEqual(forwarded, [{ size: 3, type: 'image/jpeg' }]);
+  });
+
+  test('if the picture is truly unavailable, the text and link still go out', async () => {
+    const texts = [];
+    const client = {
+      sendImage: async () => { throw new Error('x'); },
+      forwardImage: async () => { throw new Error('x'); },
+      sendText: async (jid, text) => texts.push(text),
+    };
+    const fetchImpl = async () => ({ ok: false, status: 404, headers: { get: () => '' } });
+    const out = await createMessenger({ client, fetchImpl }).sendProduct('41790000777@s.whatsapp.net', product);
+    assert.strictEqual(out.withImage, false);
+    assert.match(texts[0], /https:\/\/shop\/p\/einhorn/);
+  });
+});

@@ -74,7 +74,7 @@ const TABLES = {
   },
   chat: {
     key: 'id',
-    view: (m) => ({ id: m.id, at: m.at, jid: m.jid, direction: m.direction, text: m.text }),
+    view: (m) => ({ id: m.id, at: m.at, jid: m.jid, direction: m.direction, text: m.text, image: m.image || '' }),
   },
 };
 

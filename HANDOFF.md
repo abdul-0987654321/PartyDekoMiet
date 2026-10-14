@@ -112,6 +112,15 @@ recognition makes mistakes, so a dictated reply goes out only after "ok"
 (`ownerVoicePreview`, on by default). The target customer comes from the alert
 the owner quotes, or a number he says - never guessed.
 
+**Product cards are stored in the chat history** with their picture, so the
+dashboard shows what the customer saw. If WhatsApp cannot fetch a picture URL,
+the messenger downloads it and sends the bytes; only if that fails too does the
+text with the link go out alone.
+
+**Dashboard layout (15 Oct):** bookings are cards with filters (the table hid the
+buttons off-screen), chats render pictures, links and *bold*, settings fold the
+technical options under "Erweitert" and show readable option names.
+
 **Bot language follows the dashboard switch (testing only).** `botLanguage`
 defaults to `dashboard`. Set it to `auto` before going live, or English
 customers get German whenever the dashboard is on DE.

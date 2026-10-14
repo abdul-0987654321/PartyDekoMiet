@@ -38,6 +38,12 @@ const SCHEMA = [
   {
     key: 'botLanguage', group: 'bot', type: 'enum', default: 'dashboard',
     options: ['dashboard', 'auto', 'de', 'en'],
+    optionLabels: {
+      dashboard: { de: 'Wie das Dashboard (DE/EN oben) – zum Testen', en: 'Same as the dashboard (DE/EN switch) – for testing' },
+      auto: { de: 'Automatisch: Sprache des Kunden (Live-Betrieb)', en: 'Automatic: the customer\'s language (live use)' },
+      de: { de: 'Immer Deutsch', en: 'Always German' },
+      en: { de: 'Immer Englisch', en: 'Always English' },
+    },
     label: { de: 'Sprache des Bots', en: 'Bot language' },
     help: {
       de: 'dashboard: der Bot spricht die Sprache, die oben rechts (DE/EN) gewählt ist - zum Testen. auto: antwortet in der Sprache des Kunden (für den Live-Betrieb). de/en: immer diese Sprache.',
@@ -62,7 +68,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'maxMsgsPerChatPerHour', group: 'bot', type: 'number', default: 0, min: 0, max: 500,
+    key: 'maxMsgsPerChatPerHour', advanced: true, group: 'bot', type: 'number', default: 0, min: 0, max: 500,
     env: 'MAX_MSGS_PER_CHAT_PER_HOUR',
     label: { de: 'Max. Nachrichten pro Chat / Stunde', en: 'Max messages per chat / hour' },
     help: {
@@ -71,7 +77,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'readDelayMs', group: 'bot', type: 'number', default: 1000, min: 0, max: 10000,
+    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 1000, min: 0, max: 10000,
     env: 'READ_DELAY_MS',
     label: { de: 'Warten bis "gelesen" (ms)', en: 'Wait before marking as read (ms)' },
     help: {
@@ -80,7 +86,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'typingMinMs', group: 'bot', type: 'number', default: 3000, min: 0, max: 15000,
+    key: 'typingMinMs', advanced: true, group: 'bot', type: 'number', default: 3000, min: 0, max: 15000,
     env: 'TYPING_MIN_MS',
     label: { de: 'Tippdauer min. (ms)', en: 'Typing delay min (ms)' },
     help: {
@@ -89,7 +95,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'typingMaxMs', group: 'bot', type: 'number', default: 4000, min: 0, max: 30000,
+    key: 'typingMaxMs', advanced: true, group: 'bot', type: 'number', default: 4000, min: 0, max: 30000,
     env: 'TYPING_MAX_MS',
     label: { de: 'Tippdauer max. (ms)', en: 'Typing delay max (ms)' },
   },
@@ -132,12 +138,12 @@ const SCHEMA = [
     },
   },
   {
-    key: 'otherBusinessReplyDe', group: 'bot', type: 'string',
+    key: 'otherBusinessReplyDe', advanced: true, group: 'bot', type: 'string',
     default: 'Hoi! Hier bin ich nur fuer die Partydeko-Vermietung zustaendig. Deine Frage gebe ich direkt an jemanden aus dem Team weiter, du hoerst gleich von uns.',
     label: { de: 'Antwort bei anderem Betrieb (DE)', en: 'Reply for the other business (DE)' },
   },
   {
-    key: 'otherBusinessReplyEn', group: 'bot', type: 'string',
+    key: 'otherBusinessReplyEn', advanced: true, group: 'bot', type: 'string',
     default: 'Hi! I only handle the party decoration rental here. I am passing your question to a colleague, you will hear from us shortly.',
     label: { de: 'Antwort bei anderem Betrieb (EN)', en: 'Reply for the other business (EN)' },
   },
@@ -150,7 +156,7 @@ const SCHEMA = [
     help: { de: 'Laut AGB: drei aufeinanderfolgende Tage.', en: 'Per the AGB: three consecutive days.' },
   },
   {
-    key: 'returnDayOffset', group: 'business', type: 'number', default: 2, min: 1, max: 29,
+    key: 'returnDayOffset', advanced: true, group: 'business', type: 'number', default: 2, min: 1, max: 29,
     env: 'RETURN_DAY_OFFSET',
     label: { de: 'Rückgabe = Abholung + X Tage', en: 'Return = pickup + X days' },
     help: {
@@ -168,7 +174,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'bufferDays', group: 'business', type: 'number', default: 0, min: 0, max: 7,
+    key: 'bufferDays', advanced: true, group: 'business', type: 'number', default: 0, min: 0, max: 7,
     env: 'BUFFER_DAYS',
     label: { de: 'Puffertage nach Rückgabe', en: 'Buffer days after return' },
     help: {
@@ -197,6 +203,11 @@ const SCHEMA = [
   {
     key: 'depositMode', group: 'business', type: 'enum', default: 'included',
     options: ['included', 'separate', 'manual'],
+    optionLabels: {
+      included: { de: 'Im Shop-Preis enthalten', en: 'Included in the shop price' },
+      separate: { de: 'Eigenes Kautions-Produkt im Shop', en: 'Separate deposit product in the shop' },
+      manual: { de: 'Bar bei der Abholung', en: 'Paid at pickup' },
+    },
     label: { de: 'Wie wird die Kaution bezahlt?', en: 'How is the deposit paid?' },
     help: {
       de: 'included: im Shop-Preis enthalten. separate: eigenes Kautions-Produkt im Shop. manual: bei der Abholung.',
@@ -229,7 +240,7 @@ const SCHEMA = [
     label: { de: 'Shop-Adresse', en: 'Shop URL' },
   },
   {
-    key: 'catalogRefreshHours', group: 'shop', type: 'number', default: 6, min: 1, max: 168,
+    key: 'catalogRefreshHours', advanced: true, group: 'shop', type: 'number', default: 6, min: 1, max: 168,
     env: 'CATALOG_REFRESH_HOURS',
     label: { de: 'Katalog neu laden alle (Std.)', en: 'Reload catalog every (hours)' },
   },
@@ -245,7 +256,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'blockedKeywords', group: 'calendar', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub',
+    key: 'blockedKeywords', advanced: true, group: 'calendar', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub',
     label: { de: 'Stichwörter für Sperrtage', en: 'Keywords for blocked days' },
     help: {
       de: 'Ganztägige Termine mit einem dieser Wörter im Titel sperren alle Sets an dem Tag.',
@@ -256,6 +267,7 @@ const SCHEMA = [
   // ── Dashboard ────────────────────────────────────────────────────────────
   {
     key: 'dashboardLanguage', group: 'dashboard', type: 'enum', default: 'de', options: ['de', 'en'],
+    optionLabels: { de: { de: 'Deutsch', en: 'German' }, en: { de: 'Englisch', en: 'English' } },
     label: { de: 'Sprache des Dashboards', en: 'Dashboard language' },
   },
 ];
@@ -351,6 +363,8 @@ function describe() {
     group: def.group,
     type: def.type,
     options: def.options,
+    optionLabels: def.optionLabels,
+    advanced: Boolean(def.advanced),
     label: def.label,
     help: def.help,
     placeholder: def.placeholder,

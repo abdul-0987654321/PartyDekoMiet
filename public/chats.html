@@ -52,9 +52,17 @@ async function loadList() {
         <span class="who">${esc(c.name || c.phone)}</span>
         <span class="when">${esc(shortTime(c.lastAt))}</span>
       </div>
-      <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(c.lastText)}</div>
+      <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(String(c.lastText || '').replace(/\*/g, '').split('\n')[0])}</div>
       ${c.paused ? `<div style="margin-top:5px">${pill(t('chat_paused'), 'warn')}</div>` : ''}
     </div>`).join('');
+}
+
+/** WhatsApp formatting for display: *bold*, _italic_, clickable links. */
+function waText(raw) {
+  return esc(raw)
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[\s>])\*([^*\n]+)\*(?=[\s<.,!?]|$)/g, '$1<b>$2</b>')
+    .replace(/(^|[\s>])_([^_\n]+)_(?=[\s<.,!?]|$)/g, '$1<i>$2</i>');
 }
 
 function shortTime(iso) {
@@ -79,10 +87,15 @@ async function openChat(jid) {
     await api('/api/whatsapp/resume', { method:'POST', body:{ jid } });
     openChat(jid); loadList();
   };
-  $('body').innerHTML = (d.messages || []).map((m) => `
-    <div class="msg ${m.direction === 'in' ? 'in' : 'out'}">${esc(m.text)}
-      <span class="ts">${esc(shortTime(m.at))}</span>
-    </div>`).join('') || `<p class="empty">${t('chat_none')}</p>`;
+  let lastDay = '';
+  $('body').innerHTML = (d.messages || []).map((m) => {
+    const day = m.at ? new Date(m.at).toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-CH', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
+    const sep = day && day !== lastDay ? `<div class="daysep">${esc(day)}</div>` : '';
+    lastDay = day || lastDay;
+    const dir = m.direction === 'in' ? 'in' : 'out';
+    const img = m.image ? `<a href="${esc(m.image)}" target="_blank" rel="noopener"><img src="${esc(m.image)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></a>` : '';
+    return `${sep}<div class="msg ${dir}${m.image ? ' prod' : ''}">${img}<div class="txt">${waText(m.text)}</div><span class="ts">${esc(shortTime(m.at))}</span></div>`;
+  }).join('') || `<p class="empty">${t('chat_none')}</p>`;
   $('body').scrollTop = $('body').scrollHeight;
   loadList();
 }
@@ -104,7 +117,12 @@ $('msg').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
 
-loadList();
+// Opened from a booking card: /chats#41791234567
+loadList().then(() => {
+  const want = decodeURIComponent(location.hash.slice(1)).replace(/[^0-9]/g, '');
+  const hit = want && chats.find((c) => c.phone === want);
+  if (hit) openChat(hit.jid);
+});
 setInterval(() => { loadList(); if (current) openChat(current); }, 15000);
 </script>
 </body></html>

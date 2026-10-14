@@ -27,6 +27,7 @@
   <h2 id="h_todo"></h2>
   <div class="card" id="todo"></div>
 
+  <div class="cols"><div>
   <h2 id="h_sys">System</h2>
   <div class="card">
     <div class="row"><span id="l_wa"></span><span id="wa">…</span></div>
@@ -40,6 +41,7 @@
     <div class="row"><span id="l_paused"></span><span id="paused">…</span></div>
   </div>
 
+  </div><div>
   <h2 id="h_det">Details</h2>
   <div class="card">
     <div class="row"><span id="l_model"></span><span id="model">…</span></div>
@@ -48,6 +50,7 @@
     <div class="row"><span id="l_flushed"></span><span id="flushed">…</span></div>
     <div class="row"><span id="l_started"></span><span id="started">…</span></div>
   </div>
+  </div></div>
 
 </main></div>
 <script src="/app.js"></script>
@@ -159,7 +162,9 @@ async function refresh() {
   } else {
     $('skiprow').hidden = true;
   }
-  $('paused').textContent = d.pausedChats.length ? d.pausedChats.map(p=>p.jid.split('@')[0]).join(', ') : t('none');
+  $('paused').innerHTML = d.pausedChats.length
+    ? d.pausedChats.map(p => { const n = p.jid.split('@')[0]; return `<a href="/chats#${esc(n)}">${esc(n)}</a>`; }).join('<br>')
+    : esc(t('none'));
 
   // ---- details ----
   $('model').textContent = d.config.model;

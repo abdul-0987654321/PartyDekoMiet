@@ -8,42 +8,71 @@
 </head>
 <body><div class="shell"><main class="content" id="content">
   <h1 id="h1"></h1>
-  <div class="card scroll" id="wrap"><p class="muted" id="loading"></p></div>
+  <p class="muted" id="intro"></p>
+  <div class="filters" id="filters"></div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
 </main></div>
 <script src="/app.js"></script>
 <script>
 renderNav('/bookings');
 $('h1').textContent = t('nav_bookings');
+$('intro').textContent = t('b_intro');
 $('loading').textContent = t('loading');
+
+let rows = [];
+let filter = 'open';
+const FILTERS = [['open', 'b_f_open'], ['CONFIRMED', 'b_f_conf'], ['CANCELLED', 'b_f_canc'], ['all', 'b_f_all']];
+const STATUS_TXT = { PENDING: 'b_s_pending', CONFIRMED: 'b_s_confirmed', CANCELLED: 'b_s_cancelled' };
+
+/** 2026-10-17 -> "Fr 17.10." */
+function day(iso) {
+  if (!iso) return '–';
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' });
+}
+
+function renderFilters() {
+  const count = (f) => rows.filter((b) => matches(b, f)).length;
+  $('filters').innerHTML = FILTERS.map(([f, key]) =>
+    `<button class="${f === filter ? 'on' : ''}" onclick="filter='${f}';render()">${esc(t(key))} (${count(f)})</button>`).join('');
+}
+const matches = (b, f) => f === 'all' || (f === 'open' ? b.status === 'PENDING' : b.status === f);
+
+function render() {
+  renderFilters();
+  const list = rows.filter((b) => matches(b, filter));
+  if (!list.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_bookings')}</p></div>`; return; }
+  $('wrap').innerHTML = `<div class="bk-list">${list.map((b) => `
+    <div class="bk ${esc(b.status)}">
+      <div class="top">
+        ${pill(t(STATUS_TXT[b.status]) || b.status, b.status === 'CONFIRMED' ? 'ok' : b.status === 'CANCELLED' ? 'err' : 'warn')}
+        <span class="muted">${esc(b.id)} · ${esc(fmtDate(b.createdAt))}</span>
+      </div>
+      <div class="set">${b.productUrl ? `<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)} ↗</a>` : esc(b.productTitle)}
+        ${b.priceChf ? `<div class="muted">CHF ${esc(b.priceChf)}</div>` : ''}</div>
+      <div class="dates">
+        <div><small>${t('b_pickup')}</small><b>${esc(day(b.pickupDate))}</b></div>
+        <div><small>${t('b_return')}</small><b>${esc(day(b.returnDate))}</b></div>
+      </div>
+      <div class="who">${esc(b.customerName || '–')}
+        ${b.phone ? `<br><a href="/chats#${esc(b.phone)}">${esc(b.phone)} · ${t('b_open_chat')}</a>` : ''}</div>
+      <div class="acts">${actions(b)}</div>
+    </div>`).join('')}</div>`;
+}
+
 async function refresh() {
   const d = await api('/api/bookings');
-  const rows = d.bookings || [];
-  if (!rows.length) { $('wrap').innerHTML = `<p class="muted">${t('no_bookings')}</p>`; return; }
-  $('wrap').innerHTML = `<table><thead><tr>
-      <th>${t('b_id')}</th><th>${t('b_status')}</th><th>${t('b_customer')}</th><th>${t('b_product')}</th>
-      <th>${t('b_pickup')}</th><th>${t('b_return')}</th><th>${t('b_action')}</th>
-    </tr></thead><tbody>${rows.map((b)=>`<tr>
-      <td>${esc(b.id)}<br><span class="muted">${fmtDate(b.createdAt)}</span></td>
-      <td>${pill(b.status, b.status==='CONFIRMED'?'ok':b.status==='CANCELLED'?'err':'warn')}</td>
-      <td>${esc(b.customerName)}<br><span class="muted">${esc(b.phone)}</span></td>
-      <td>${b.productUrl?`<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)}</a>`:esc(b.productTitle)}</td>
-      <td>${esc(b.pickupDate)}</td><td>${esc(b.returnDate)}</td>
-      <td>${actions(b)}</td>
-    </tr>`).join('')}</tbody></table>`;
+  rows = d.bookings || [];
+  render();
 }
 
 /** Only the moves that make sense from the current status are offered. */
 function actions(b) {
   const btn = (label, status, cls) =>
-    `<button class="${cls}" style="padding:6px 11px;font-size:12.5px;margin:2px 0"
-       onclick="setStatus('${esc(b.id)}','${status}')">${esc(label)}</button>`;
-  if (b.status === 'PENDING') {
-    return `<div class="inline">${btn(t('b_confirm'),'CONFIRMED','primary')}${btn(t('b_cancel'),'CANCELLED','ghost')}</div>`;
-  }
-  if (b.status === 'CONFIRMED') {
-    return `<div class="inline">${btn(t('b_cancel'),'CANCELLED','ghost')}</div>`;
-  }
-  return `<div class="inline">${btn(t('b_pending'),'PENDING','ghost')}</div>`;
+    `<button class="${cls}" onclick="setStatus('${esc(b.id)}','${status}')">${esc(label)}</button>`;
+  if (b.status === 'PENDING') return btn(t('b_confirm'), 'CONFIRMED', 'primary') + btn(t('b_cancel'), 'CANCELLED', 'ghost');
+  if (b.status === 'CONFIRMED') return btn(t('b_cancel'), 'CANCELLED', 'ghost');
+  return btn(t('b_pending'), 'PENDING', 'ghost');
 }
 
 async function setStatus(id, status) {

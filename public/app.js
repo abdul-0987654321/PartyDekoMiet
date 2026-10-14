@@ -65,6 +65,11 @@ const T = {
     last_skip: 'Zuletzt nicht beantwortet',
     sk_paused: 'Chat pausiert', sk_bot_off: 'Bot ausgeschaltet',
     sk_rate_limit: 'Stundenlimit', sk_no_agent: 'kein OpenAI-Schlüssel',
+    b_intro: 'Neue Anfragen sind offen, bis die Zahlung im Shop eingegangen ist. Dann auf «Bestätigen» tippen.',
+    b_f_open: 'Offen', b_f_conf: 'Bestätigt', b_f_canc: 'Storniert', b_f_all: 'Alle',
+    b_s_pending: 'Offen', b_s_confirmed: 'Bestätigt', b_s_cancelled: 'Storniert',
+    b_open_chat: 'Chat öffnen',
+    s_adv: 'Erweitert', s_unsaved: 'Ungespeicherte Änderungen',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -124,6 +129,11 @@ const T = {
     last_skip: 'Last message not answered',
     sk_paused: 'chat paused', sk_bot_off: 'bot switched off',
     sk_rate_limit: 'hourly limit', sk_no_agent: 'no OpenAI key',
+    b_intro: 'New requests stay open until the payment arrives in the shop. Then tap "Confirm".',
+    b_f_open: 'Open', b_f_conf: 'Confirmed', b_f_canc: 'Cancelled', b_f_all: 'All',
+    b_s_pending: 'Open', b_s_confirmed: 'Confirmed', b_s_cancelled: 'Cancelled',
+    b_open_chat: 'open chat',
+    s_adv: 'Advanced', s_unsaved: 'Unsaved changes',
   },
 };
 

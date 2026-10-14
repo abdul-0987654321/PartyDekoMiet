@@ -16,6 +16,54 @@ const settings = require('../settings');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const MAX_AUTO_CARDS = 3;
+
+/**
+ * The model is told to show products with send_product (picture + price + link),
+ * but it sometimes writes them as a text list of links instead. On WhatsApp that
+ * is a wall of URLs and no pictures. When that happens, the products it named are
+ * sent as picture cards here, and their lines are taken out of the text.
+ *
+ * Only products from this turn's search results count, so nothing is invented.
+ * @returns {Promise<{text:string, sent:object[]}>}
+ */
+async function sendListedProducts(text, toolCalls, services, chatId) {
+  const out = { text, sent: [] };
+  if (!services.messenger || !services.catalog || !chatId) return out;
+  if (toolCalls.some((c) => c.name === 'send_product' && c.result?.ok)) return out;
+
+  const found = toolCalls
+    .filter((c) => c.name === 'search_products' && c.result?.ok)
+    .flatMap((c) => c.result.products || []);
+  const seen = new Set();
+  const listed = found.filter((p) => {
+    if (!p || seen.has(p.id)) return false;
+    const hit = (p.url && text.includes(p.url)) || (p.title && p.title.length > 5 && text.includes(p.title));
+    if (hit) seen.add(p.id);
+    return hit;
+  });
+  if (!listed.length) return out;
+
+  for (const p of listed.slice(0, MAX_AUTO_CARDS)) {
+    try {
+      const product = await services.catalog.byId(p.id);
+      if (!product) continue;
+      await services.messenger.sendProduct(chatId, product);
+      out.sent.push(p);
+    } catch (err) {
+      log.warn(`Could not send the product card for ${p.id}: ${err.message}`);
+    }
+  }
+  if (!out.sent.length) return out;
+
+  // Drop the lines that only repeated what the cards now show.
+  const sentTerms = out.sent.flatMap((p) => [p.url, p.title].filter(Boolean));
+  const lines = text.split('\n').filter((line) => !sentTerms.some((term) => line.includes(term)));
+  out.text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  log.info(`Model listed ${listed.length} product(s) as text - sent ${out.sent.length} as picture cards instead`);
+  return out;
+}
+
 /**
  * Settings need storage; in unit tests there is none, so fall back to auto.
  * 'dashboard' means: answer in whatever language the dashboard is switched to
@@ -127,7 +175,13 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
         continue; // let the model use the results
       }
 
-      const guarded = guards.enforce(msg.content || '', { lang });
+      // Products written as a list of links -> send them as picture cards instead.
+      const cards = await sendListedProducts(msg.content || '', toolCalls, services, chatId);
+      for (const p of cards.sent) {
+        toolCalls.push({ name: 'send_product', args: { product_id: p.id }, result: { ok: true, sent: p.title, auto: true } });
+      }
+
+      const guarded = guards.enforce(cards.text, { lang });
       if (guarded.blocked) {
         log.error(
           `Guard blocked a reply: ${guarded.violations.map((v) => v.code).join(', ')} | ` +
@@ -161,4 +215,4 @@ function createAgent({ openai, knowledge, guards, config = {} }) {
   return { reply };
 }
 
-module.exports = { createAgent };
+module.exports = { createAgent, sendListedProducts };

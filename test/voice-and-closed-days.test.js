@@ -373,3 +373,84 @@ describe('product pictures', () => {
     assert.match(texts[0], /https:\/\/shop\/p\/einhorn/);
   });
 });
+
+describe('products written as a text list are sent as pictures', () => {
+  const { createAgent } = require('../src/agent/agent');
+  const { createGuards } = require('../src/agent/guards');
+  const knowledge = require('../src/knowledge/from-files').load();
+  const guards = createGuards({ faqAnswers: [], depositChf: 50, lateFeeChf: 50 });
+
+  const PRODUCTS = [
+    { id: 'kindergeburtstag-deko-dschungel', title: 'Junge-KinderGeburtstag Deko Dschungel safari Auto Set', price: 'CHF 250.–', url: 'https://partydekomiet.ch/products/kindergeburtstag-deko-dschungel' },
+    { id: 'kindergeburtstag-einhorn', title: 'KinderGeburtstag Einhorn Deko', price: 'CHF 350.–', url: 'https://partydekomiet.ch/products/kindergeburtstag-einhorn' },
+  ];
+
+  // Exactly what the live bot answered on 15 Oct: a list of links, no pictures.
+  const LISTED = [
+    "Here are some decoration sets for your daughter's 10th birthday:",
+    '',
+    `• *${PRODUCTS[0].title}*: CHF 250.– View Set: ${PRODUCTS[0].url}`,
+    `• *${PRODUCTS[1].title}*: CHF 350.– View Set: ${PRODUCTS[1].url}`,
+    '',
+    'Do any of these themes catch your interest?',
+  ].join('\n');
+
+  function run(queue, services) {
+    const openai = { chat: { completions: { create: async () => ({ choices: [{ message: queue.shift() }] }) } } };
+    const agent = createAgent({ openai, knowledge, guards, config: { maxRetries: 0 } });
+    return agent.reply({ message: 'party for my daughter 10 years, 20 October', services, chatId: '41790000777@s.whatsapp.net', langSetting: 'auto' });
+  }
+
+  const searchCall = {
+    role: 'assistant', content: null,
+    tool_calls: [{ id: 'c1', type: 'function', function: { name: 'search_products', arguments: '{"query":"Geburtstag"}' } }],
+  };
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+  });
+
+  test('the listed products go out as picture cards and leave the text', async () => {
+    const cards = [];
+    const services = {
+      catalog: { search: async () => PRODUCTS, byId: async (id) => PRODUCTS.find((p) => p.id === id) },
+      messenger: { sendProduct: async (jid, product) => cards.push(product.title) },
+    };
+    const out = await run([searchCall, { role: 'assistant', content: LISTED }], services);
+    assert.deepStrictEqual(cards, [PRODUCTS[0].title, PRODUCTS[1].title]);
+    assert.doesNotMatch(out.text, /https:\/\//, 'no wall of links left');
+    assert.match(out.text, /catch your interest/, 'the question stays');
+    assert.ok(out.toolCalls.some((c) => c.name === 'send_product' && c.result.auto));
+  });
+
+  test('nothing extra is sent when the model already used send_product', async () => {
+    const cards = [];
+    const services = {
+      catalog: { search: async () => PRODUCTS, byId: async (id) => PRODUCTS.find((p) => p.id === id) },
+      messenger: { sendProduct: async (jid, product) => cards.push(product.title) },
+    };
+    const sendCall = {
+      role: 'assistant', content: null,
+      tool_calls: [{ id: 'c2', type: 'function', function: { name: 'send_product', arguments: `{"product_id":"${PRODUCTS[0].id}"}` } }],
+    };
+    await run([searchCall, sendCall, { role: 'assistant', content: `Gefällt dir das? ${PRODUCTS[0].url}` }], services);
+    assert.deepStrictEqual(cards, [PRODUCTS[0].title], 'only the one the model sent itself');
+  });
+
+  test('products never searched are never sent', async () => {
+    const cards = [];
+    const services = {
+      catalog: { search: async () => [], byId: async () => PRODUCTS[0] },
+      messenger: { sendProduct: async (jid, product) => cards.push(product.title) },
+    };
+    await run([{ role: 'assistant', content: LISTED }], services);
+    assert.strictEqual(cards.length, 0);
+  });
+
+  test('the test page (no messenger) keeps the text as it is', async () => {
+    const services = { catalog: { search: async () => PRODUCTS, byId: async (id) => PRODUCTS.find((p) => p.id === id) } };
+    const out = await run([searchCall, { role: 'assistant', content: LISTED }], services);
+    assert.match(out.text, /View Set/);
+  });
+});

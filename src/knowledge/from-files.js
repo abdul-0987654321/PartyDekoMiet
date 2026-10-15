@@ -22,6 +22,8 @@ function load() {
     faq: faq.entries,
     rules: readText('rules.md'),
     persona: readText('persona.md'),
+    // Optional: the owner's official damage / loss price list.
+    damagePrices: fs.existsSync(path.join(ROOT, 'damage-prices.md')) ? readText('damage-prices.md') : '',
   };
 }
 

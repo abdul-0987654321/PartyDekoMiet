@@ -50,7 +50,7 @@ function renderBusiness(b) {
  * @returns {string}
  */
 function buildSystemPrompt(knowledge, ctx = {}) {
-  const { business, faq, rules, persona } = knowledge;
+  const { business, faq, rules, persona, damagePrices } = knowledge;
   const today = ctx.today || new Date().toISOString().slice(0, 10);
   // The language is decided outside the model and stated here as an instruction.
   // Leaving it to the model meant it re-decided every turn and drifted back to
@@ -72,6 +72,15 @@ ${rules}
 
 # Offizielle Antworten (Wortlaut des Kunden - bevorzugt genau so verwenden)
 ${renderFaq(faq)}
+${damagePrices ? `
+# Schadensliste (offiziell, vom Inhaber)
+Fragt jemand, was ein Schaden oder Verlust kostet, nenne den Betrag aus dieser Liste
+("laut unserer Schadensliste ..."), immer mit dem Hinweis, dass das Team den
+endgueltigen Betrag nach der Kontrolle festlegt. Nenne nie einen Betrag, der nicht
+in der Liste steht. Ist wirklich etwas kaputt oder fehlt, gib den Fall danach mit
+handoff_to_human weiter.
+
+${damagePrices}` : ''}
 
 # Werkzeuge
 Du hast Werkzeuge. Benutze sie, statt zu raten:

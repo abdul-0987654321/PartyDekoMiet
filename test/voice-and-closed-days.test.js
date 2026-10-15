@@ -612,3 +612,32 @@ describe('test of 15 Oct 18:10: multi-line product list and hidden WhatsApp ids'
     assert.strictEqual(contacts.phoneOf('888@lid'), '888');
   });
 });
+
+describe('official damage price list (15 Oct)', () => {
+  const k = require('../src/knowledge/from-files').load();
+  const { createGuards } = require('../src/agent/guards');
+  const { buildSystemPrompt } = require('../src/agent/prompt');
+  const guards = createGuards({ faqAnswers: k.faq.flatMap((e) => [e.a_de, e.a_en]), damagePrices: k.damagePrices });
+  const codes = (t) => guards.check(t).map((v) => v.code);
+
+  test('the list is loaded and in the prompt', () => {
+    assert.match(k.damagePrices, /Grosse Glasvasen[^\n]*CHF 30/);
+    assert.match(buildSystemPrompt(k), /Schadensliste \(offiziell/);
+  });
+
+  test('prices from the list may be quoted', () => {
+    assert.deepStrictEqual(codes('Laut unserer Schadensliste kostet eine zerbrochene grosse Glasvase CHF 30.–.'), []);
+    assert.deepStrictEqual(codes('A missing screw costs CHF 20 according to our damage list.'), []);
+    assert.deepStrictEqual(codes('Für die Reinigung von Flecken rechnen wir CHF 5.– bis CHF 6.– pro Artikel.'), []);
+  });
+
+  test('any other amount next to a damage word is still blocked', () => {
+    assert.deepStrictEqual(codes('Die Reparatur des Vorhangs kostet CHF 80.–.'), ['INVENTED_PRICE']);
+    assert.deepStrictEqual(codes('Replacing the damaged panel costs CHF 120.'), ['INVENTED_PRICE']);
+  });
+
+  test('no list -> old behaviour: only deposit and late fee', () => {
+    const plain = createGuards({ faqAnswers: [] });
+    assert.deepStrictEqual(plain.check('Eine grosse Glasvase kostet bei Schaden CHF 30.–.').map((v) => v.code), ['INVENTED_PRICE']);
+  });
+});

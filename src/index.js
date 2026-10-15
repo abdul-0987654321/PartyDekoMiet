@@ -77,6 +77,7 @@ async function boot() {
     faqAnswers: knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
     depositChf: settings.get('depositChf'),
     lateFeeChf: settings.get('lateFeeChf'),
+    damagePrices: knowledge.damagePrices || '',
   });
 
   if (config.openai.apiKey) {

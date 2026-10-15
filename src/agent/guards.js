@@ -86,14 +86,14 @@ const RULES = [
   },
   {
     code: 'INVENTED_PRICE',
-    hint: 'Never state a repair, cleaning or replacement price. Only CHF 50 deposit and CHF 50 per started late day are allowed. Hand damage cases to a human.',
+    hint: 'Never invent a repair, cleaning or replacement price. Only the CHF 50 deposit, CHF 50 per started late day and the amounts of the official damage list are allowed. Hand damage cases to a human.',
     // Handled by a custom test below, because it needs the amount, not just a match.
     patterns: [],
     custom: (sentence, ctx) => {
       const damage =
-        /\b(reparatur|ersatz|ersatzkosten|schaden|schaeden|beschaedig|verschmutz|fleck|verlust|fehlend|repair|replacement|damage|cleaning|reinigung|stain|lost|missing)\b/i;
+        /\b(reparatur\w*|ersatz\w*|schaden|schaeden|beschaedig\w*|verschmutz\w*|fleck\w*|verlust\w*|fehlend\w*|kaputt\w*|zerbroch\w*|gerissen\w*|reinigung\w*|repair\w*|replac\w*|damag\w*|broke\w*|torn|clean\w*|stain\w*|lost|missing)\b/i;
       if (!damage.test(sentence)) return false;
-      const allowed = new Set([ctx.depositChf, ctx.lateFeeChf].map(Number));
+      const allowed = new Set([ctx.depositChf, ctx.lateFeeChf, ...(ctx.extraAllowedChf || [])].map(Number));
       const amounts = [];
       const re = /(?:chf|fr\.?|franken)\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:chf|fr\.?|franken)/gi;
       let m;
@@ -130,13 +130,19 @@ const RULES = [
  * @param {number} opts.depositChf
  * @param {number} opts.lateFeeChf
  */
-function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50 } = {}) {
+function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damagePrices = '' } = {}) {
   // Whitelist every sentence of every official answer.
   const allowed = new Set();
   for (const answer of faqAnswers) {
     for (const s of sentences(answer)) allowed.add(normalise(s));
   }
-  const ctx = { depositChf, lateFeeChf };
+  // Amounts from the owner's official damage list may be quoted; any other
+  // amount next to a damage word is still treated as invented.
+  const extraAllowedChf = [];
+  const amountRe = /(?:chf|fr\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/gi;
+  let am;
+  while ((am = amountRe.exec(String(damagePrices)))) extraAllowedChf.push(Number(am[1].replace(',', '.')));
+  const ctx = { depositChf, lateFeeChf, extraAllowedChf };
 
   /** Fixes what can be fixed safely, without changing meaning. */
   function autofix(text) {

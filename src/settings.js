@@ -113,7 +113,7 @@ const SCHEMA = [
   {
     key: 'alertNumbers', group: 'contacts', type: 'string', default: '', env: 'ALERT_NUMBERS',
     placeholder: '41791234567, 923001234567',
-    label: { de: 'Nummern fuer Benachrichtigungen', en: 'Numbers for alerts' },
+    label: { de: 'Nummern für Benachrichtigungen', en: 'Numbers for alerts' },
     help: {
       de: 'Wer Buchungsanfragen, Referenzbilder und Uebergaben per WhatsApp bekommt. Mehrere Nummern mit Komma trennen. Leer = die Inhaber-Nummer oben.',
       en: 'Who receives booking requests, reference photos and handovers on WhatsApp. Several numbers separated by commas. Empty = the owner number above.',
@@ -131,7 +131,7 @@ const SCHEMA = [
   {
     key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '',
     placeholder: 'hochzeitsplanung, eventplanung, catering',
-    label: { de: 'Stichwoerter fuer andere Betriebe', en: 'Keywords for other businesses' },
+    label: { de: 'Stichwörter für andere Betriebe', en: 'Keywords for other businesses' },
     help: {
       de: 'Wenn dieselbe Nummer auch fuer einen anderen Betrieb genutzt wird: Nachrichten mit diesen Woertern beantwortet der Bot NICHT, sondern gibt sie weiter. Mit Komma trennen. Leer = aus.',
       en: 'If the same number is also used for another business: messages containing these words are NOT answered by the bot but handed to a human. Comma separated. Empty = off.',

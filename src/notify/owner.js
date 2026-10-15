@@ -62,7 +62,9 @@ function createNotifier({ client }) {
     const deposit = settings.get('depositChf');
     switch (settings.get('depositMode')) {
       case 'separate':
-        return `CHF ${priceChf} + CHF ${deposit}.- Kaution (eigenes Produkt im Shop)`;
+        return settings.get('depositProductUrl')
+          ? `CHF ${priceChf} + CHF ${deposit}.- Kaution (eigenes Produkt im Shop)`
+          : `CHF ${priceChf} + CHF ${deposit}.- Kaution (separat, Zahlungsweg mit dem Kunden klaeren)`;
       case 'manual':
         return `CHF ${priceChf} im Shop + CHF ${deposit}.- Kaution bei der Abholung`;
       default:

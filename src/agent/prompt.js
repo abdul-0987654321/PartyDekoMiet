@@ -28,6 +28,7 @@ function renderBusiness(b) {
         : 'wird immer vorab vereinbart. Nenne keine festen Zeiten, du kennst die Oeffnungszeiten nicht.'
     }`,
     `Fahrzeug: ${b.pickup.vehicleNote}`,
+    b.showroom ? `Showroom/Atelier: ${b.showroom.address}. ${b.showroom.note}` : null,
     '',
     `Mietdauer: ${b.rental.daysLabel} (${b.rental.days} Tage).`,
     `Kaution: CHF ${b.money.depositChf}.- , zurueck nach ${b.money.depositRefundCondition}.`,
@@ -36,7 +37,7 @@ function renderBusiness(b) {
     '',
     `Nicht im Angebot: ${b.notOffered.join(', ')}.`,
   ];
-  return lines.join('\n');
+  return lines.filter((l) => l !== null).join('\n');
 }
 
 /**

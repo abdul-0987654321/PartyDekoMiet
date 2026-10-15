@@ -31,6 +31,13 @@ function paymentHint(lang = 'de') {
     separate: `Please also add the deposit item (CHF ${deposit}.-) to your cart: ${settings.get('depositProductUrl')}`,
     manual: `The CHF ${deposit}.- deposit is handed over at pickup.`,
   };
+  // "Separate" but no deposit item in the shop yet: say honestly that it comes on
+  // top, without inventing how it is paid.
+  if (mode === 'separate' && !settings.get('depositProductUrl')) {
+    return lang === 'en'
+      ? `On top of the rental price comes a CHF ${deposit}.- deposit, refunded after a complete return. We will tell you how to pay it when we confirm.`
+      : `Zum Mietpreis kommt eine Kaution von CHF ${deposit}.-, die du nach vollstaendiger Rueckgabe zurueckbekommst. Wie du sie bezahlst, sagen wir dir mit der Bestaetigung.`;
+  }
   return (lang === 'en' ? en : de)[mode] || '';
 }
 

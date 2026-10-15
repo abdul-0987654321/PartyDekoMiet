@@ -18,11 +18,16 @@
     "vehicleNote": "geeignetes, möglichst leeres Fahrzeug; störende Kindersitze oder Gegenstände vorher entfernen"
   },
 
+  "showroom": {
+    "address": "Schaffhauserstrasse 280, 8057 Zürich",
+    "note": "Showroom / Atelier. Nur nennen, wenn jemand nach Showroom, Atelier oder Besichtigung fragt; Besuche nur nach Absprache. Abgeholt wird IMMER an der Abholadresse, nie hier."
+  },
+
   "rental": {
     "days": 3,
     "daysLabel": "drei aufeinanderfolgende Tage",
     "returnDayOffset": 2,
-    "bufferDays": 0
+    "bufferDays": 1
   },
 
   "money": {

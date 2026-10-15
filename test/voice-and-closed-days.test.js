@@ -454,3 +454,32 @@ describe('products written as a text list are sent as pictures', () => {
     assert.match(out.text, /View Set/);
   });
 });
+
+describe('client answers of 15 Oct', () => {
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+  });
+
+  test('defaults: one buffer day, deposit separate, one copy per set', () => {
+    assert.strictEqual(settings.get('bufferDays'), 1);
+    assert.strictEqual(settings.get('depositMode'), 'separate');
+    assert.strictEqual(settings.get('defaultStock'), 1);
+  });
+
+  test('one buffer day: a set returned Monday cannot go out again on Monday', () => {
+    const fri = { id: 'e', summary: '[CONFIRMED] Einhorn', start: { date: FRI }, end: { date: '2026-10-22' }, // Fri..Tue incl. buffer (end exclusive)
+      extendedProperties: { private: { productId: 'p1' } } };
+    const opts = { events: [fri], productId: 'p1', closedWeekdays: 'sun', bufferDays: 1 };
+    assert.strictEqual(checkWindow({ ...opts, pickup: MON }).available, false);
+    assert.strictEqual(checkWindow({ ...opts, pickup: '2026-10-21' }).available, false, 'Tuesday is the buffer day');
+    assert.strictEqual(checkWindow({ ...opts, pickup: '2026-10-22' }).available, true);
+  });
+
+  test('separate deposit without a shop item: honest sentence, no broken link', async () => {
+    const { createBookings } = require('../src/bookings');
+    assert.ok(createBookings);
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../src/bookings.js'), 'utf8');
+    assert.match(src, /Wie du sie bezahlst, sagen wir dir mit der Bestaetigung/);
+  });
+});

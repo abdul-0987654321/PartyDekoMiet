@@ -174,7 +174,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'bufferDays', advanced: true, group: 'business', type: 'number', default: 0, min: 0, max: 7,
+    key: 'bufferDays', group: 'business', type: 'number', default: 1, min: 0, max: 7,
     env: 'BUFFER_DAYS',
     label: { de: 'Puffertage nach Rückgabe', en: 'Buffer days after return' },
     help: {
@@ -201,11 +201,11 @@ const SCHEMA = [
     label: { de: 'Verspätungsgebühr pro Tag (CHF)', en: 'Late fee per started day (CHF)' },
   },
   {
-    key: 'depositMode', group: 'business', type: 'enum', default: 'included',
+    key: 'depositMode', group: 'business', type: 'enum', default: 'separate',
     options: ['included', 'separate', 'manual'],
     optionLabels: {
       included: { de: 'Im Shop-Preis enthalten', en: 'Included in the shop price' },
-      separate: { de: 'Eigenes Kautions-Produkt im Shop', en: 'Separate deposit product in the shop' },
+      separate: { de: 'Separat zum Mietpreis (mit oder ohne Kautions-Produkt im Shop)', en: 'Separate from the rental price (with or without a deposit item in the shop)' },
       manual: { de: 'Bar bei der Abholung', en: 'Paid at pickup' },
     },
     label: { de: 'Wie wird die Kaution bezahlt?', en: 'How is the deposit paid?' },
@@ -217,7 +217,10 @@ const SCHEMA = [
   {
     key: 'depositProductUrl', group: 'business', type: 'string', default: '', env: 'DEPOSIT_PRODUCT_URL',
     label: { de: 'Link zum Kautions-Produkt', en: 'Deposit product link' },
-    help: { de: 'Nur nötig, wenn oben "separate" gewählt ist.', en: 'Only needed when "separate" is selected above.' },
+    help: {
+      de: 'Optional. Gibt es im Shop ein Kautions-Produkt, hier den Link eintragen - der Bot schickt ihn dann mit. Leer: der Bot sagt, dass die Kaution dazukommt und ihr den Zahlungsweg mitteilt.',
+      en: 'Optional. If the shop has a deposit item, paste its link - the bot then sends it. Empty: the bot says the deposit comes on top and that you will tell the customer how to pay it.',
+    },
   },
   {
     key: 'pickupAddress', group: 'business', type: 'string', default: 'Langstrasse 175, 8004 Zürich (SBB-Bürogebäude, Erdgeschoss)',
@@ -408,9 +411,6 @@ async function update(patch) {
     if (next.returnDayOffset > next.rentalDays) {
       errors.push('returnDayOffset must not be larger than rentalDays');
     }
-  }
-  if (next.depositMode === 'separate' && !next.depositProductUrl) {
-    errors.push('depositProductUrl is required when depositMode is "separate"');
   }
 
   if (errors.length) return { ok: false, errors };

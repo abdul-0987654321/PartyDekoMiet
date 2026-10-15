@@ -56,8 +56,8 @@ describe('saving', () => {
   test('notifies listeners only on a real change', async () => {
     const seen = [];
     settings.onChange((changed) => seen.push(changed));
-    await settings.update({ bufferDays: 1 });
-    await settings.update({ bufferDays: 1 });
+    await settings.update({ bufferDays: 2 });
+    await settings.update({ bufferDays: 2 });
     assert.strictEqual(seen.length, 1);
   });
 });
@@ -93,8 +93,10 @@ describe('validation', () => {
     assert.strictEqual((await settings.update({ typingMinMs: 9000, typingMaxMs: 1000 })).ok, false);
   });
 
-  test('requires a deposit link when the mode is "separate"', async () => {
-    assert.strictEqual((await settings.update({ depositMode: 'separate' })).ok, false);
+  // Changed 15 Oct: the client's deposit is separate but his shop has no deposit
+  // item yet, so "separate" must be allowed without a link.
+  test('"separate" works with or without a deposit link', async () => {
+    assert.strictEqual((await settings.update({ depositMode: 'separate' })).ok, true);
     assert.strictEqual(
       (await settings.update({ depositMode: 'separate', depositProductUrl: 'https://x.ch/p/kaution' })).ok,
       true

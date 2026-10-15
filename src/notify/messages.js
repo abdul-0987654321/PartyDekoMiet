@@ -19,7 +19,15 @@ function ownerLang() {
   }
 }
 
-const short = (jid) => String(jid || '').split('@')[0];
+/** A chat's number as the owner can use it: the real phone, not WhatsApp's hidden id. */
+const short = (jid) => {
+  if (!jid) return '';
+  try {
+    return require('../contacts').phoneOf(jid);
+  } catch {
+    return String(jid).split('@')[0];
+  }
+};
 const cut = (s, n = 300) => String(s || '').slice(0, n);
 
 const T = {

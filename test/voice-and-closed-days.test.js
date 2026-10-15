@@ -553,3 +553,62 @@ describe('test of 15 Oct 18:02: "more options" repeated the same sets', () => {
     assert.strictEqual(out.text, 'Let me know if any of these catch your eye!');
   });
 });
+
+describe('test of 15 Oct 18:10: multi-line product list and hidden WhatsApp ids', () => {
+  const { sendListedProducts } = require('../src/agent/agent');
+  const contacts = require('../src/contacts');
+  const JID = '150375495651422@lid';
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+  });
+
+  const U = (h) => `https://partydekomiet.ch/products/${h}`;
+  const products = [
+    { id: 'a', title: 'Geburtstagsdeko mieten in Zürich Deko Set', url: U('a') },
+    { id: 'b', title: 'KinderGeburtstag deko set Dschu baby 2', url: U('b') },
+    { id: 'c', title: 'KinderGeburtstag Deko Super Mario', url: U('c') },
+    { id: 'd', title: 'Party dekoration- kindergeburtstag deko 1jahr- dschunglel party deko set beige weiss', url: U('party-deko-to-go-safari-weiss') },
+    { id: 'e', title: 'KinderGeburtstag Dekoration Fr 350 Auktion Fr 270 Mause G sarn', url: U('fr-350-auktion-fr-270-mause-g-sarn') },
+  ];
+  // What the bot wrote live: numbered items over three lines each.
+  const LIVE = [
+    "Here are some decoration options for your son's 10th birthday party with blue accents:",
+    '',
+    ...products.flatMap((p, i) => [`${i + 1}. **${p.title}**`, '   CHF 150.–', `   Link zur Deko: ${p.url}`, '']),
+    'The decoration is available for pickup tomorrow, October 16th, and you would return it on October 19th.',
+    '',
+    'Let me know which one you like!',
+  ].join('\n');
+
+  test('every listed set goes out as a card and no lone price lines stay behind', async () => {
+    const cards = [];
+    const out = await sendListedProducts(
+      LIVE,
+      [{ name: 'search_products', result: { ok: true, products } }],
+      { catalog: { byId: async (id) => products.find((p) => p.id === id) }, messenger: { sendProduct: async (j, p) => cards.push(p.id) } },
+      JID
+    );
+    assert.deepStrictEqual(cards, ['a', 'b', 'c', 'd', 'e']);
+    assert.doesNotMatch(out.text, /CHF|https?:|\*\*/);
+    assert.strictEqual(
+      out.text,
+      'The decoration is available for pickup tomorrow, October 16th, and you would return it on October 19th.\n\nLet me know which one you like!'
+    );
+  });
+
+  test('the real phone number is kept for a hidden-id chat and shown instead of the id', () => {
+    contacts.remember({ key: { remoteJid: JID, fromMe: false, remoteJidAlt: '41791234567@s.whatsapp.net' }, pushName: 'Anma' });
+    assert.strictEqual(contacts.phoneOf(JID), '41791234567');
+    assert.strictEqual(db.get('customers', JID).pushName, 'Anma');
+    const { m } = require('../src/notify/messages');
+    assert.match(m().handoff(JID, 'x'), /41791234567/);
+  });
+
+  test('older Baileys field senderPn works too; unknown stays the id', () => {
+    contacts.remember({ key: { remoteJid: '999@lid', fromMe: false, senderPn: '41765550000@s.whatsapp.net' } });
+    assert.strictEqual(contacts.phoneOf('999@lid'), '41765550000');
+    assert.strictEqual(contacts.phoneOf('888@lid'), '888');
+  });
+});

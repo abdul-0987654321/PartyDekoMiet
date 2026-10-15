@@ -95,7 +95,7 @@ function createBookings({ catalog, calendar, notify }) {
       id: newId(),
       status: 'PENDING',
       jid,
-      phone: jid.split('@')[0] || '',
+      phone: require('./contacts').phoneOf(jid) || '',
       customerName: args.customer_name,
       productId: product.id,
       productHandle: product.handle,

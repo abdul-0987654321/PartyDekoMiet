@@ -16,7 +16,7 @@ const settings = require('../settings');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const MAX_AUTO_CARDS = 3;
+const MAX_AUTO_CARDS = 5;
 
 /**
  * The model is told to show products with send_product (picture + price + link),
@@ -56,11 +56,32 @@ async function sendListedProducts(text, toolCalls, services, chatId) {
   }
   if (!out.sent.length) return out;
 
-  // Drop the lines that only repeated what the cards now show.
-  const sentTerms = out.sent.flatMap((p) => [p.url, p.title].filter(Boolean));
-  const lines = text.split('\n').filter((line) => !sentTerms.some((term) => line.includes(term)));
+  // Take the product list out of the text: the cards show it now. A list item
+  // often spans several lines (name / price / link), so whole items go, not
+  // just the lines naming the product - otherwise lone "CHF 150.-" lines stay.
+  const terms = found.flatMap((p) => [p.url, p.title && p.title.length > 5 ? p.title : null].filter(Boolean));
+  const mentions = (block) => terms.some((t) => block.includes(t));
+  const ITEM_START = /^\s*(?:[-•*]|\d+[.)])\s+/;
+  const isPriceOrLink = (l) => /^\s*(?:[-•*]\s*)?(?:CHF|Fr\.?|Preis|Price|Link|View|Ansehen|https?:\/\/)/i.test(l) || /^\s*CHF\s*[\d.,'–-]+\s*$/i.test(l);
+
+  // Group the text into items: an item starts at a bullet/number line and runs
+  // until the next item, a blank line followed by plain text, or the end.
+  const lines = text.split('\n');
+  const keep = new Array(lines.length).fill(true);
+  for (let i = 0; i < lines.length; i++) {
+    if (!ITEM_START.test(lines[i]) && !mentions(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && !ITEM_START.test(lines[j]) && (isPriceOrLink(lines[j]) || /^\s{2,}\S/.test(lines[j]) || (!lines[j].trim() && j + 1 < lines.length && isPriceOrLink(lines[j + 1])))) j++;
+    const block = lines.slice(i, j).join('\n');
+    if (mentions(block)) for (let k = i; k < j; k++) keep[k] = false;
+    i = j - 1;
+  }
+  // Stray price or link lines of the sent products.
+  lines.forEach((l, i) => { if (keep[i] && isPriceOrLink(l) && mentions(l)) keep[i] = false; });
+  const rest = lines.filter((_, i) => keep[i]);
+
   // "Here are some sets:" now introduces nothing, since the cards went out first.
-  const kept = lines.filter((line, i) => !(/:\s*$/.test(line) && !lines.slice(i + 1).some((l) => l.trim() && !/:\s*$/.test(l) && /^\s*[-•*\d]/.test(l))));
+  const kept = rest.filter((line, i) => !(/:\s*$/.test(line) && !rest.slice(i + 1).some((l) => l.trim() && ITEM_START.test(l))));
   out.text = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   log.info(`Model listed ${listed.length} product(s) as text - sent ${out.sent.length} as picture cards instead`);
   return out;

@@ -18,6 +18,7 @@ const log = require('../log');
 const db = require('../store/db');
 const settings = require('../settings');
 const { m } = require('../notify/messages');
+const contacts = require('../contacts');
 
 const STATE_KEY = 'chatstate'; // { [jid]: { pausedUntil, reason, count:[ts,...] } }
 
@@ -320,6 +321,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
   async function handle(msg) {
     const jid = msg.key.remoteJid;
     let text = textOf(msg);
+    contacts.remember(msg); // real phone number + WhatsApp name, for alerts and the dashboard
 
     // 0. The owner talking to the bot in its own chat (same number as the bot).
     if (msg.key.fromMe && isSelfChat(jid)) return handleOwnerInput(msg, jid, text);

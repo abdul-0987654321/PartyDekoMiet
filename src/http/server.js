@@ -188,7 +188,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
         const customer = db.get('customers', jid);
         return {
           jid,
-          phone: jid.split('@')[0],
+          phone: require('../contacts').phoneOf(jid),
           name: customer?.name || customer?.pushName || null,
           lastAt: last.at,
           lastText: String(last.text || '').slice(0, 120),
@@ -210,7 +210,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       .slice(-300);
     const customer = db.get('customers', jid) || null;
     const paused = (runtime.router ? runtime.router.listPaused() : []).find((p) => p.jid === jid) || null;
-    res.json({ ok: true, jid, phone: jid.split('@')[0], customer, paused, messages });
+    res.json({ ok: true, jid, phone: require('../contacts').phoneOf(jid), customer, paused, messages });
   });
 
   app.post('/api/chats/:jid/send', safe(async (req, res) => {

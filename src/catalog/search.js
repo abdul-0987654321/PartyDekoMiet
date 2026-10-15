@@ -52,6 +52,8 @@ const SYNONYMS = {
   pastell: ['pastell', 'pastel'],
 };
 
+const COLOURS = ['rosa', 'blau', 'gold', 'silber', 'weiss', 'schwarz', 'gruen', 'rot', 'lila', 'tuerkis', 'pastell'];
+
 /** Words that carry no meaning for matching. */
 const STOP = new Set(
   norm(
@@ -91,30 +93,44 @@ function search(products, { query = '', theme = '', color = '', limit = 5 } = {}
     return products.filter((p) => p.available).slice(0, limit);
   }
 
-  const scored = products.map((p) => {
+  // Colours only refine a theme. "Einhorn, blau" must return unicorn sets first,
+  // not a blue tablecloth: a colour word used to weigh as much as the theme.
+  const colourWords = new Set(COLOURS.flatMap((c) => [c, ...SYNONYMS[c]]));
+  const themeWanted = [...wanted].filter((w) => w && !colourWords.has(w));
+  const colourWanted = [...wanted].filter((w) => w && colourWords.has(w));
+
+  const scoreFor = (p, words) => {
     const title = norm(p.title);
     const tags = norm(p.tags.join(' '));
     const type = norm(p.productType);
     const body = norm(p.description);
     let score = 0;
-
-    for (const w of wanted) {
-      if (!w) continue;
+    for (const w of words) {
       // A word in the title is the strongest signal, then tags, then type, then text.
       if (title.includes(w)) score += 10;
       if (tags.includes(w)) score += 6;
       if (type.includes(w)) score += 3;
       if (body.includes(w)) score += 1;
     }
-    if (!p.available) score -= 5; // still show it, but after the available ones
-    return { product: p, score };
-  });
+    return score;
+  };
+
+  let scored = products.map((p) => ({
+    product: p,
+    theme: scoreFor(p, themeWanted),
+    colour: scoreFor(p, colourWanted),
+  }));
+
+  // If anything matches the theme, only theme matches are offered.
+  const anyTheme = scored.some((s) => s.theme > 0);
+  scored = scored
+    .filter((s) => (anyTheme ? s.theme > 0 : s.colour > 0))
+    .map((s) => ({ ...s, score: s.theme * 3 + s.colour - (s.product.available ? 0 : 5) }));
 
   return scored
-    .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score || a.product.title.localeCompare(b.product.title))
     .slice(0, limit)
     .map((s) => s.product);
 }
 
-module.exports = { search, tokenise, expand, norm, SYNONYMS };
+module.exports = { search, tokenise, expand, norm, SYNONYMS, COLOURS };

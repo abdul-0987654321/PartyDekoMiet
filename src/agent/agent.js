@@ -59,7 +59,9 @@ async function sendListedProducts(text, toolCalls, services, chatId) {
   // Drop the lines that only repeated what the cards now show.
   const sentTerms = out.sent.flatMap((p) => [p.url, p.title].filter(Boolean));
   const lines = text.split('\n').filter((line) => !sentTerms.some((term) => line.includes(term)));
-  out.text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  // "Here are some sets:" now introduces nothing, since the cards went out first.
+  const kept = lines.filter((line, i) => !(/:\s*$/.test(line) && !lines.slice(i + 1).some((l) => l.trim() && !/:\s*$/.test(l) && /^\s*[-•*\d]/.test(l))));
+  out.text = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   log.info(`Model listed ${listed.length} product(s) as text - sent ${out.sent.length} as picture cards instead`);
   return out;
 }

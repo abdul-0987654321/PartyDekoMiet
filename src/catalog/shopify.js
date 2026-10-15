@@ -1,4 +1,16 @@
 'use strict';
+
+/**
+ * Shop titles are the owner's own text and some carry contact details, e.g.
+ * "KinderGeburtstag Einhorn deko whats 0786353632 Zurich". Customers should see
+ * the set's name, not a phone number glued to it.
+ */
+function cleanTitle(title) {
+  return String(title || '')
+    .replace(/\s*\b(whats\s*app|whatsapp|whats|tel\.?|phone|telefon)?\s*\+?\d[\d\s\/.-]{7,}\d(\s+(z(u|ue|ü)rich))?/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim() || String(title || '').trim();
+}
 /**
  * Reads the shop's public products.json. No Shopify admin access needed.
  *
@@ -95,4 +107,5 @@ async function fetchProducts(shopUrl) {
   return out;
 }
 
-module.exports = { fetchProducts, normaliseProduct, plainText };
+module.exports = {
+  cleanTitle, fetchProducts, normaliseProduct, plainText };

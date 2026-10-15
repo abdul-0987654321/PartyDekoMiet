@@ -483,3 +483,73 @@ describe('client answers of 15 Oct', () => {
     assert.match(src, /Wie du sie bezahlst, sagen wir dir mit der Bestaetigung/);
   });
 });
+
+describe('test of 15 Oct 18:02: "more options" repeated the same sets', () => {
+  const { search } = require('../src/catalog/search');
+  const { cleanTitle } = require('../src/catalog/shopify');
+  const { runTool } = require('../src/agent/tools');
+  const P = (handle, title, extra = {}) => ({
+    id: handle, handle, title, tags: [], productType: '', description: '', available: true,
+    url: `https://partydekomiet.ch/products/${handle}`, ...extra,
+  });
+  const CATALOG = [
+    P('kindergeburtstag-einhorn', 'KinderGeburtstag  Einhorn deko  whats 0786353632 Zurich'),
+    P('einhorn-rosa', 'Einhorn Set Rosa'),
+    P('einhorn-blau', 'Einhorn Deko Blau Silber'),
+    P('tischdecke-blue-blatter', 'Tischdecke Blue Blatter'),
+    P('teddy', 'Teddy Party dekoration mit Montage inclusive', { description: 'blau und weiss' }),
+  ];
+  const JID = '41790000777@s.whatsapp.net';
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+  });
+
+  test('"Einhorn, blue": unicorn sets only, the blue one first, no tablecloth', () => {
+    const hits = search(CATALOG, { query: 'Einhorn', color: 'blue' });
+    assert.ok(hits.every((p) => /einhorn/i.test(p.title)), hits.map((p) => p.title).join(' | '));
+    assert.strictEqual(hits[0].handle, 'einhorn-blau');
+  });
+
+  test('only a colour asked: colour matches are still found', () => {
+    assert.ok(search(CATALOG, { query: 'blau' }).length > 0);
+  });
+
+  test('phone numbers are taken out of titles shown to customers', () => {
+    assert.strictEqual(cleanTitle(CATALOG[0].title), 'KinderGeburtstag Einhorn deko');
+  });
+
+  test('"more": sets already sent in the chat are left out', async () => {
+    const catalog = {
+      search: async (args) => search(CATALOG, args).map((p) => ({ id: p.handle, title: p.title, url: p.url })),
+    };
+    // the first set was already sent as a card
+    db.put('chat', { id: 'c1', at: new Date().toISOString(), jid: JID, direction: 'out',
+      image: 'https://cdn/x.jpg', text: `*Einhorn*\nCHF 350\n${CATALOG[0].url}` });
+    const res = await runTool('search_products', { query: 'Einhorn' }, { catalog, chatId: JID });
+    assert.ok(!res.products.some((p) => p.url === CATALOG[0].url));
+    assert.strictEqual(res.already_shown, 1);
+  });
+
+  test('nothing new left: say so instead of repeating', async () => {
+    const catalog = { search: async () => [{ id: 'a', title: 'A', url: 'https://s/a' }] };
+    db.put('chat', { id: 'c2', at: new Date().toISOString(), jid: JID, direction: 'out', image: 'i', text: 'x https://s/a' });
+    const res = await runTool('search_products', { query: 'x' }, { catalog, chatId: JID });
+    assert.strictEqual(res.count, 0);
+    assert.match(res.note, /schon gezeigt/);
+  });
+
+  test('after the cards, the empty "Here are more options:" line is dropped', async () => {
+    const { sendListedProducts } = require('../src/agent/agent');
+    const products = [{ id: 'a', title: 'Einhorn Set Rosa', url: 'https://s/a' }];
+    const text = 'Here are more options:\n\n- *Einhorn Set Rosa*: CHF 1 https://s/a\n\nLet me know if any of these catch your eye!';
+    const out = await sendListedProducts(
+      text,
+      [{ name: 'search_products', result: { ok: true, products } }],
+      { catalog: { byId: async () => products[0] }, messenger: { sendProduct: async () => {} } },
+      JID
+    );
+    assert.strictEqual(out.text, 'Let me know if any of these catch your eye!');
+  });
+});

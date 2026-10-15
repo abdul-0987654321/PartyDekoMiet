@@ -14,6 +14,25 @@
  *   notify    { owner(text, meta) }
  */
 
+/** Shop links of the product cards already sent in this chat (from the chat log). */
+function shownInChat(chatId) {
+  const shown = new Set();
+  if (!chatId) return shown;
+  try {
+    const db = require('../../store/db');
+    const since = Date.now() - 14 * 86400000;
+    for (const m of db.all('chat')) {
+      if (m.jid !== chatId || m.direction !== 'out' || !m.image) continue;
+      if (m.at && new Date(m.at).getTime() < since) continue;
+      const url = String(m.text || '').match(/https?:\/\/\S+/);
+      if (url) shown.add(url[0]);
+    }
+  } catch {
+    /* no storage (tests, test page): nothing counts as shown */
+  }
+  return shown;
+}
+
 const UNAVAILABLE = (what) => ({
   ok: false,
   error: `${what} ist noch nicht angebunden. Sag dem Kunden, dass du das gerade nicht pruefen kannst, und gib den Fall weiter.`,
@@ -35,10 +54,25 @@ const DEFS = [
       required: ['query'],
       additionalProperties: false,
     },
-    handler: async (args, { catalog }) => {
+    handler: async (args, { catalog, chatId }) => {
       if (!catalog) return UNAVAILABLE('Der Produktkatalog');
-      const results = await catalog.search(args);
-      return { ok: true, count: results.length, products: results };
+      // "Do you have more?" must bring new sets, not the same top three again.
+      // Sets already sent in this chat are left out, unless that is all there is.
+      const limit = args.limit || 5;
+      const shown = shownInChat(chatId);
+      const results = await catalog.search({ ...args, limit: limit + shown.size });
+      const fresh = results.filter((p) => !shown.has(p.url));
+      const repeat = results.length - fresh.length;
+      if (!fresh.length && results.length) {
+        return {
+          ok: true, count: 0, products: [], already_shown: repeat,
+          note: 'Alle passenden Sets wurden in diesem Chat schon gezeigt. Sag das ehrlich, schicke sie nicht nochmals, und frag nach einem anderen Motto oder einer anderen Farbe.',
+        };
+      }
+      return {
+        ok: true, count: Math.min(fresh.length, limit), products: fresh.slice(0, limit),
+        ...(repeat ? { already_shown: repeat, note: 'Bereits gezeigte Sets sind weggelassen.' } : {}),
+      };
     },
   },
   {
@@ -156,4 +190,4 @@ async function runTool(name, args, services) {
   }
 }
 
-module.exports = { DEFS, toolSchemas, runTool };
+module.exports = { DEFS, toolSchemas, runTool, shownInChat };

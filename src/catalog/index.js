@@ -11,7 +11,7 @@
 const log = require('../log');
 const db = require('../store/db');
 const settings = require('../settings');
-const { fetchProducts } = require('./shopify');
+const { fetchProducts, cleanTitle } = require('./shopify');
 const { search: searchProducts } = require('./search');
 
 const STATE_KEY = 'catalog';
@@ -110,7 +110,7 @@ async function search(args) {
   const hits = searchProducts(products, args);
   return hits.map((p) => ({
     id: p.handle || p.id,
-    title: p.title,
+    title: cleanTitle(p.title),
     price: p.priceLabel,
     available_in_shop: p.available,
     url: p.url,

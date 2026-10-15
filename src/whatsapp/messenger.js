@@ -10,6 +10,7 @@
 const log = require('../log');
 const settings = require('../settings');
 const db = require('../store/db');
+const { cleanTitle } = require('../catalog/shopify');
 
 /** Downloads a picture ourselves, for when WhatsApp cannot fetch the URL itself. */
 async function fetchImage(url, fetchImpl = globalThis.fetch) {
@@ -44,7 +45,7 @@ function createMessenger({ client, fetchImpl }) {
   function caption(product, note) {
     const deposit = settings.get('depositChf');
     return [
-      `*${product.title}*`,
+      `*${cleanTitle(product.title)}*`,
       product.priceLabel ? `${product.priceLabel} + CHF ${deposit}.- Kaution` : null,
       note || null,
       product.url,

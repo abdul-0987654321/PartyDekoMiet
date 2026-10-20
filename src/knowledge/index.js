@@ -17,27 +17,36 @@ const fromFiles = require('./from-files');
 
 let cached = null;
 
-/** @param {{source?:string, sheetLoader?:function}} opts */
+/**
+ * @param {{source?:string, sheetLoader?:function, dir?:string}} opts `dir` is the
+ *   knowledge folder to read ('knowledge-studio' for the Studio); passed straight
+ *   through to from-files.js. Two businesses in this one process each call load()
+ *   with their own `dir` and keep the returned pack themselves - `get()` below
+ *   only remembers the one loaded most recently, so it is not used for that.
+ */
 async function load(opts = {}) {
   const source = opts.source || process.env.KNOWLEDGE_SOURCE || 'files';
+  let pack;
 
   if (source === 'sheet') {
     if (!opts.sheetLoader) throw new Error('KNOWLEDGE_SOURCE=sheet requires a sheet loader');
-    const pack = await opts.sheetLoader();
+    const sheetPack = await opts.sheetLoader();
     // Files stay the fallback: if the owner empties a cell, we do not lose the rules.
-    const base = fromFiles.load();
-    cached = { ...base, ...pack, source: 'sheet' };
+    const base = fromFiles.load({ dir: opts.dir });
+    pack = { ...base, ...sheetPack, source: 'sheet' };
   } else {
-    cached = fromFiles.load();
+    pack = fromFiles.load({ dir: opts.dir });
   }
 
+  cached = pack;
   log.info(
-    `Knowledge loaded from ${cached.source}: ${cached.faq.length} FAQ entries, ` +
-      `business "${cached.business.name}"`
+    `Knowledge loaded from ${pack.source}: ${pack.faq.length} FAQ entries, ` +
+      `business "${pack.business.name}"`
   );
-  return cached;
+  return pack;
 }
 
+/** @deprecated kept for backward compatibility; with two businesses in one process, use load()'s return value instead. */
 function get() {
   if (!cached) throw new Error('Knowledge not loaded yet - call load() during startup');
   return cached;

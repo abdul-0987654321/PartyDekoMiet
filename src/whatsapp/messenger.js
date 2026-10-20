@@ -30,6 +30,7 @@ function recordProduct(chatId, text, image) {
   try {
     db.put('chat', {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      business: 'party',
       at: new Date().toISOString(),
       jid: chatId,
       direction: 'out',

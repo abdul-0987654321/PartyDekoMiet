@@ -93,6 +93,7 @@ function createBookings({ catalog, calendar, notify }) {
 
     const booking = {
       id: newId(),
+      business: 'party',
       status: 'PENDING',
       jid,
       phone: require('./contacts').phoneOf(jid) || '',
@@ -130,6 +131,7 @@ function createBookings({ catalog, calendar, notify }) {
     db.put('customers', {
       ...(customer || { createdAt: new Date().toISOString() }),
       jid,
+      business: 'party',
       phone: booking.phone,
       name: booking.customerName,
       occasion: booking.occasion,

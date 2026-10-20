@@ -4,7 +4,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(__dirname, '..', '..', 'knowledge');
+// KNOWLEDGE_DIR lets a second bot process (e.g. the Studio) point at its own
+// folder - "knowledge-studio" instead of "knowledge" - without copying this
+// loader. Defaults to the original PartyDekoMiet folder.
+const ROOT = path.join(__dirname, '..', '..', process.env.KNOWLEDGE_DIR || 'knowledge');
 
 function readText(name) {
   return fs.readFileSync(path.join(ROOT, name), 'utf8').trim();

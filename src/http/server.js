@@ -226,6 +226,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     await whatsapp.sendText(jid, text);
     db.put('chat', {
       id: `${Date.now()}-dash`,
+      business: 'party',
       at: new Date().toISOString(),
       jid,
       direction: 'out',

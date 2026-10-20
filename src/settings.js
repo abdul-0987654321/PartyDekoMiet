@@ -267,6 +267,80 @@ const SCHEMA = [
     },
   },
 
+  // ── Studio (massage studio, second board on this dashboard) ────────────────
+  {
+    key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '',
+    placeholder: '41791234567',
+    label: { de: 'WhatsApp des Inhabers (Studio)', en: 'Owner WhatsApp number (Studio)' },
+    help: {
+      de: 'Identifiziert den Inhaber fuer Befehle auf der Studio-Nummer.',
+      en: 'Identifies the owner for commands on the Studio number.',
+    },
+  },
+  {
+    key: 'studioAlertNumbers', group: 'studio', type: 'string', default: '',
+    placeholder: '41791234567, 923001234567',
+    label: { de: 'Nummern für Benachrichtigungen (Studio)', en: 'Numbers for alerts (Studio)' },
+    help: {
+      de: 'Wer Terminanfragen und Uebergaben fuer das Studio bekommt. Mehrere Nummern mit Komma trennen. Leer = die Inhaber-Nummer oben.',
+      en: 'Who receives appointment requests and handovers for the Studio. Several numbers separated by commas. Empty = the owner number above.',
+    },
+  },
+  {
+    key: 'studioCalendarId', group: 'studio', type: 'string', default: '',
+    placeholder: 'xxxx@group.calendar.google.com',
+    label: { de: 'Kalender-ID (Studio)', en: 'Calendar ID (Studio)' },
+    help: {
+      de: 'Eigener Kalender fuer das Studio, getrennt vom PartyDekoMiet-Kalender.',
+      en: 'Its own calendar for the Studio, separate from the PartyDekoMiet calendar.',
+    },
+  },
+  {
+    key: 'studioMinNoticeHours', group: 'studio', type: 'number', default: 1, min: 0, max: 168,
+    label: { de: 'Mindestvorlauf für Termine (Std.)', en: 'Minimum notice for appointments (hours)' },
+    help: {
+      de: 'Ein Termin kann nicht kuerzer vorher gebucht werden.',
+      en: 'An appointment cannot be booked with less notice than this.',
+    },
+  },
+  {
+    key: 'studioBufferMin', group: 'studio', type: 'number', default: 15, min: 0, max: 180,
+    label: { de: 'Pufferzeit zwischen Terminen (Min.)', en: 'Buffer time between appointments (minutes)' },
+    help: {
+      de: 'Zeit zum Wechseln, bevor derselbe Ort/dieselbe Person den naechsten Termin annehmen kann.',
+      en: 'Time to change over before the same location/person can take the next appointment.',
+    },
+  },
+  {
+    key: 'studioPaymentMode', group: 'studio', type: 'enum', default: 'onsite',
+    options: ['onsite', 'advance'],
+    optionLabels: {
+      onsite: { de: 'Vor Ort', en: 'On site' },
+      advance: { de: 'Im Voraus', en: 'In advance' },
+    },
+    label: { de: 'Zahlung (Studio)', en: 'Payment (Studio)' },
+  },
+  {
+    key: 'studioCancellationRule', group: 'studio', type: 'string', default: '',
+    label: { de: 'Stornierungsregel (Studio)', en: 'Cancellation rule (Studio)' },
+    help: {
+      de: 'Z.B. "Bis 2 Stunden vorher kostenlos stornierbar". Leer = der Bot nennt keine Regel.',
+      en: 'E.g. "Free cancellation up to 2 hours before". Empty = the bot names no rule.',
+    },
+  },
+  {
+    key: 'studioConfirmationExample', advanced: true, group: 'studio', type: 'string', default: '',
+    label: { de: 'Beispiel-Bestätigung (Studio)', en: 'Example confirmation message (Studio)' },
+    help: {
+      de: 'Ein Beispiel, wie das Team normalerweise einen Termin bestaetigt. Der Bot uebernimmt diesen Ton.',
+      en: 'An example of how the team normally confirms an appointment. The bot matches this tone.',
+    },
+  },
+  {
+    key: 'studioBlockedKeywords', advanced: true, group: 'studio', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub',
+    label: { de: 'Stichwörter für Sperrtage (Studio)', en: 'Keywords for blocked days (Studio)' },
+  },
+
   // ── Dashboard ────────────────────────────────────────────────────────────
   {
     key: 'dashboardLanguage', group: 'dashboard', type: 'enum', default: 'de', options: ['de', 'en'],

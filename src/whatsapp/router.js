@@ -389,7 +389,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
         const fileId = await db.putFile(`referenz-${Date.now()}.jpg`, 'image/jpeg', buffer);
         const customer = db.get('customers', jid);
         db.put('customers', {
-          ...(customer || { jid, createdAt: new Date().toISOString() }),
+          ...(customer || { jid, business: 'party', createdAt: new Date().toISOString() }),
           jid,
           phone: jid.split('@')[0],
           referencePhotoFileId: fileId,
@@ -529,7 +529,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
   function remember(jid, direction, text) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    db.put('chat', { id, at: new Date().toISOString(), jid, direction, text: String(text).slice(0, 4000) });
+    db.put('chat', { id, business: 'party', at: new Date().toISOString(), jid, direction, text: String(text).slice(0, 4000) });
   }
 
   function recentHistory(jid) {

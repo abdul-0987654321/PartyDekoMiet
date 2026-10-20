@@ -30,6 +30,13 @@ const CHUNK_SEP = '__';
  * `_json`. A `raw` table stores an opaque string in `value` instead (used for the
  * Baileys session and for internal bot state).
  */
+/**
+ * `business` tags which board a row belongs to: 'party' (PartyDekoMiet) or
+ * 'studio' (the massage studio). Both bots write into the same Google Sheet,
+ * so every row that can exist for either business carries this tag; the
+ * dashboard filters by it, and a row with no tag is treated as 'party' for
+ * backward compatibility with data written before this field existed.
+ */
 const TABLES = {
   session: { key: 'key', raw: true },
   state: { key: 'key', raw: true },
@@ -37,6 +44,7 @@ const TABLES = {
     key: 'jid',
     view: (c) => ({
       jid: c.jid,
+      business: c.business || 'party',
       phone: c.phone,
       name: c.name,
       pushName: c.pushName,
@@ -53,6 +61,7 @@ const TABLES = {
     key: 'id',
     view: (b) => ({
       id: b.id,
+      business: b.business || 'party',
       status: b.status, // PENDING | CONFIRMED | CANCELLED
       jid: b.jid,
       phone: b.phone,
@@ -74,7 +83,78 @@ const TABLES = {
   },
   chat: {
     key: 'id',
-    view: (m) => ({ id: m.id, at: m.at, jid: m.jid, direction: m.direction, text: m.text, image: m.image || '' }),
+    view: (m) => ({
+      id: m.id,
+      business: m.business || 'party',
+      at: m.at,
+      jid: m.jid,
+      direction: m.direction,
+      text: m.text,
+      image: m.image || '',
+    }),
+  },
+  // ── Studio (massage studio): editable from the dashboard, no redeploy needed ──
+  professionals: {
+    key: 'id',
+    view: (p) => ({
+      id: p.id,
+      active: p.active !== false,
+      name: p.name,
+      age: p.age || '',
+      languages: Array.isArray(p.languages) ? p.languages.join(', ') : p.languages || '',
+      locationId: p.locationId || '',
+      photoFileId: p.photoFileId || '',
+      workingHours: p.workingHours || '', // free text per day, owner-edited
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }),
+  },
+  services: {
+    key: 'id',
+    view: (s) => ({
+      id: s.id,
+      professionalId: s.professionalId || '', // empty = offered by every professional
+      active: s.active !== false,
+      name: s.name,
+      durationMin: s.durationMin || '',
+      priceChf: s.priceChf || '',
+      notes: s.notes || '', // e.g. what a package includes; never invented by the bot
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+    }),
+  },
+  locations: {
+    key: 'id',
+    view: (l) => ({
+      id: l.id,
+      active: l.active !== false,
+      name: l.name,
+      address: l.address || '',
+      createdAt: l.createdAt,
+      updatedAt: l.updatedAt,
+    }),
+  },
+  appointments: {
+    key: 'id',
+    view: (a) => ({
+      id: a.id,
+      status: a.status, // PENDING | CONFIRMED | CANCELLED
+      jid: a.jid,
+      phone: a.phone,
+      customerName: a.customerName,
+      professionalId: a.professionalId,
+      professionalName: a.professionalName,
+      serviceId: a.serviceId,
+      serviceName: a.serviceName,
+      priceChf: a.priceChf,
+      date: a.date, // YYYY-MM-DD
+      startTime: a.startTime, // HH:MM, local (Europe/Zurich)
+      endTime: a.endTime,
+      calendarEventId: a.calendarEventId,
+      sourcePortal: a.sourcePortal || '', // which ad/portal the lead came from, if known
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+    }),
   },
 };
 

@@ -1,0 +1,17 @@
+{
+  "name": "Studio",
+  "currency": "CHF",
+
+  "whatWeDo": "Studio mit mehreren Standorten und mehreren Professionals. Services, Preise, Adressen und Arbeitszeiten liegen NICHT in dieser Datei - sie werden im Dashboard gepflegt (Professionals / Services / Locations) und vom Bot live gelesen, nie aus dem Gedaechtnis des Modells.",
+
+  "_note": "Dieses business.json haelt nur studioweite Fakten, die zu keiner einzelnen Person oder keinem einzelnen Standort gehoeren. Alles Personen-/Standort-/Preisbezogene kommt aus den Dashboard-Tabellen (professionals, services, locations) ueber die Agent-Tools.",
+
+  "notOffered": [
+    "Intime Extras ausserhalb der offiziellen Preisliste",
+    "Unterschiedliche Darstellung je nach Plattform/Portal"
+  ],
+
+  "contact": {
+    "handoffPhone": null
+  }
+}

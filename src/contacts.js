@@ -34,7 +34,7 @@ function remember(msg) {
     const row = db.get('customers', jid);
     if (row && (!phone || row.phone === phone) && (!pushName || row.pushName === pushName)) return;
     db.put('customers', {
-      ...(row || { jid, createdAt: new Date().toISOString() }),
+      ...(row || { jid, business: 'party', createdAt: new Date().toISOString() }),
       jid,
       ...(phone ? { phone } : {}),
       ...(pushName ? { pushName } : {}),

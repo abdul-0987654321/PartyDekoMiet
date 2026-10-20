@@ -10,7 +10,7 @@
 
 const log = require('../log');
 const { buildSystemPrompt } = require('./prompt');
-const { toolSchemas, runTool } = require('./tools');
+const partyTools = require('./tools');
 const { resolveLanguage, scoreText } = require('./language');
 const settings = require('../settings');
 
@@ -107,9 +107,13 @@ function safeSetting() {
  * @param {object} deps.openai    OpenAI client (or any object with chat.completions.create)
  * @param {object} deps.knowledge knowledge pack
  * @param {object} deps.guards    from createGuards()
+ * @param {object} [deps.tools]   tool registry with {toolSchemas, runTool} - defaults to the
+ *                                Party catalog/booking tools, so existing callers are unaffected.
+ *                                Studio passes require('./tools/studio') here instead.
  * @param {object} [deps.config]
  */
-function createAgent({ openai, knowledge, guards, config = {} }) {
+function createAgent({ openai, knowledge, guards, tools = partyTools, config = {} }) {
+  const { toolSchemas, runTool } = tools;
   const model = config.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const maxSteps = Number(config.maxSteps || process.env.AGENT_MAX_STEPS || 6);
   const maxRetries = Number(config.maxRetries || process.env.OPENAI_MAX_RETRIES || 2);

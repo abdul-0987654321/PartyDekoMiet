@@ -175,17 +175,27 @@ function upsert_(table, key, rows) {
   }
 }
 
+/**
+ * Blanks out matching rows instead of deleting them. Google Sheets refuses a
+ * deleteRow() call that would remove every remaining non-frozen row ("Sorry,
+ * it is not possible to delete all non-frozen rows") - this happens for real
+ * whenever the WhatsApp session is fully cleared (logout / new session), which
+ * deletes every row in the session sheet in one call. Clearing content instead
+ * of deleting rows sidesteps that limit entirely; load_() already treats a row
+ * whose cells are all empty as deleted, so behaviour is unchanged for callers.
+ */
 function remove_(table, key, keys) {
   var sh = sheet_(table);
   var headers = headers_(sh);
   var keyCol = headers.indexOf(key);
   var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
   if (keyCol === -1 || lastRow < 2) return;
   var wanted = {};
   keys.forEach(function (k) { wanted[String(k)] = true; });
   var values = sh.getRange(2, keyCol + 1, lastRow - 1, 1).getDisplayValues();
-  for (var i = values.length - 1; i >= 0; i--) {
-    if (wanted[values[i][0]]) sh.deleteRow(i + 2);
+  for (var i = 0; i < values.length; i++) {
+    if (wanted[values[i][0]]) sh.getRange(i + 2, 1, 1, lastCol).clearContent();
   }
 }
 

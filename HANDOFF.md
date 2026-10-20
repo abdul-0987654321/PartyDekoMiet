@@ -280,6 +280,32 @@ enforces it in code specifically so it can't quietly drift back.
    `professionals`/`services`/`locations` are reachable from the dashboard -
    their data is in this Fiverr chat already, just needs entering.
 
+### Unrelated bug found and fixed while testing the deploy (2026-10-20)
+
+Live logs showed WhatsApp stuck in a reconnect loop: `Apps Script error: Sorry,
+it is not possible to delete all non-frozen rows`, repeating every few seconds.
+Not caused by this session's changes (`apps-script/Code.gs` and
+`whatsapp/auth-state.js` were last touched 15 Oct) - it surfaced now because
+`clearSession()` fully wipes the `session` sheet row by row whenever WhatsApp
+reports a logged-out/invalid session, and Google Sheets refuses a `deleteRow()`
+that would remove every remaining non-frozen row. Fixed in `Code.gs`'s
+`remove_()`: blank the row's content instead of deleting it - `load_()` already
+treats an all-empty row as not there, so nothing else changes.
+
+**This fix lives in Google Apps Script, not in this repo's deploy path.**
+Pushing to GitHub does nothing for it. It must be pasted into the Apps Script
+editor by hand: open the Sheet → Extensions → Apps Script → replace `Code.gs`'s
+contents with the new version from this repo → Save → **Deploy → Manage
+deployments → edit (pencil) → Version: New version → Deploy** (keeps the same
+URL, per `docs/GOOGLE_SHEET_SETUP.md`). Until that's done, WhatsApp cannot stay
+connected on this client's Sheet.
+
+Known trade-off of the fix, not urgent: blanked rows are never removed, so a
+table that adds and removes many rows (the `session` table especially, as
+WhatsApp keys rotate) grows blank rows over time instead of shrinking. Not a
+problem at this volume; worth a periodic compaction pass if the Sheet ever
+gets large and slow.
+
 ### Why the data layer came first
 
 Everything the client doesn't have yet - working hours, final prices, the

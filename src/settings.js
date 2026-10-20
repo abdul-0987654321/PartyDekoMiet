@@ -40,7 +40,7 @@ const SCHEMA = [
     // Without this, turning Party off from its status page would silence
     // Studio too (and vice versa) - the two numbers must be controllable
     // separately, same reasoning as studioOwnerWhatsapp/studioCalendarId.
-    key: 'studioBotEnabled', group: 'studio', type: 'boolean', default: true, hidden: true,
+    key: 'studioBotEnabled', group: 'studio', type: 'boolean', default: true, hidden: true, env: 'STUDIO_BOT_ENABLED',
     label: { de: 'Studio-Bot aktiv', en: 'Studio bot active' },
   },
   {
@@ -277,7 +277,7 @@ const SCHEMA = [
 
   // ── Studio (massage studio, second board on this dashboard) ────────────────
   {
-    key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '',
+    key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '', env: 'STUDIO_OWNER_WHATSAPP',
     placeholder: '41791234567',
     label: { de: 'WhatsApp des Inhabers (Studio)', en: 'Owner WhatsApp number (Studio)' },
     help: {
@@ -286,7 +286,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioAlertNumbers', group: 'studio', type: 'string', default: '',
+    key: 'studioAlertNumbers', group: 'studio', type: 'string', default: '', env: 'STUDIO_ALERT_NUMBERS',
     placeholder: '41791234567, 923001234567',
     label: { de: 'Nummern für Benachrichtigungen (Studio)', en: 'Numbers for alerts (Studio)' },
     help: {
@@ -295,7 +295,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioCalendarId', group: 'studio', type: 'string', default: '',
+    key: 'studioCalendarId', group: 'studio', type: 'string', default: '', env: 'STUDIO_CALENDAR_ID',
     placeholder: 'xxxx@group.calendar.google.com',
     label: { de: 'Kalender-ID (Studio)', en: 'Calendar ID (Studio)' },
     help: {
@@ -304,7 +304,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioMinNoticeHours', group: 'studio', type: 'number', default: 1, min: 0, max: 168,
+    key: 'studioMinNoticeHours', group: 'studio', type: 'number', default: 1, min: 0, max: 168, env: 'STUDIO_MIN_NOTICE_HOURS',
     label: { de: 'Mindestvorlauf für Termine (Std.)', en: 'Minimum notice for appointments (hours)' },
     help: {
       de: 'Ein Termin kann nicht kuerzer vorher gebucht werden.',
@@ -312,7 +312,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioBufferMin', group: 'studio', type: 'number', default: 15, min: 0, max: 180,
+    key: 'studioBufferMin', group: 'studio', type: 'number', default: 15, min: 0, max: 180, env: 'STUDIO_BUFFER_MIN',
     label: { de: 'Pufferzeit zwischen Terminen (Min.)', en: 'Buffer time between appointments (minutes)' },
     help: {
       de: 'Zeit zum Wechseln, bevor derselbe Ort/dieselbe Person den naechsten Termin annehmen kann.',
@@ -320,7 +320,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioPaymentMode', group: 'studio', type: 'enum', default: 'onsite',
+    key: 'studioPaymentMode', group: 'studio', type: 'enum', default: 'onsite', env: 'STUDIO_PAYMENT_MODE',
     options: ['onsite', 'advance'],
     optionLabels: {
       onsite: { de: 'Vor Ort', en: 'On site' },
@@ -329,7 +329,7 @@ const SCHEMA = [
     label: { de: 'Zahlung (Studio)', en: 'Payment (Studio)' },
   },
   {
-    key: 'studioCancellationRule', group: 'studio', type: 'string', default: '',
+    key: 'studioCancellationRule', group: 'studio', type: 'string', default: '', env: 'STUDIO_CANCELLATION_RULE',
     label: { de: 'Stornierungsregel (Studio)', en: 'Cancellation rule (Studio)' },
     help: {
       de: 'Z.B. "Bis 2 Stunden vorher kostenlos stornierbar". Leer = der Bot nennt keine Regel.',
@@ -337,7 +337,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioConfirmationExample', advanced: true, group: 'studio', type: 'string', default: '',
+    key: 'studioConfirmationExample', advanced: true, group: 'studio', type: 'string', default: '', env: 'STUDIO_CONFIRMATION_EXAMPLE',
     label: { de: 'Beispiel-Bestätigung (Studio)', en: 'Example confirmation message (Studio)' },
     help: {
       de: 'Ein Beispiel, wie das Team normalerweise einen Termin bestaetigt. Der Bot uebernimmt diesen Ton.',
@@ -345,7 +345,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioBlockedKeywords', advanced: true, group: 'studio', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub',
+    key: 'studioBlockedKeywords', advanced: true, group: 'studio', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub', env: 'STUDIO_BLOCKED_KEYWORDS',
     label: { de: 'Stichwörter für Sperrtage (Studio)', en: 'Keywords for blocked days (Studio)' },
   },
 

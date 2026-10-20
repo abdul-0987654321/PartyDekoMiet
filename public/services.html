@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Services – Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="intro"></p>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+  <div class="actions inline" style="margin-bottom:16px">
+    <button class="primary" id="addbtn"></button>
+  </div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/services');
+$('h1').textContent = t('nav_services');
+$('intro').textContent = t('s_intro');
+$('loading').textContent = t('loading');
+$('addbtn').textContent = '+ ' + t('add');
+
+let rows = [];
+let professionals = [];
+let editingId = null;
+
+async function refresh() {
+  const [s, p] = await Promise.all([api('/api/studio/services'), api('/api/studio/professionals')]);
+  rows = s.services || [];
+  professionals = p.professionals || [];
+  render();
+}
+
+function profName(id) {
+  const p = professionals.find((x) => x.id === id);
+  return p ? p.name : '';
+}
+
+function render() {
+  if (!rows.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_services')}</p></div>`; return; }
+  $('wrap').innerHTML = `<div class="bk-list">${rows.map((s) => `
+    <div class="bk ${s.active ? 'CONFIRMED' : 'CANCELLED'}">
+      <div class="top">
+        ${pill(s.active ? t('active') : t('inactive'), s.active ? 'ok' : 'warn')}
+        <span class="muted">${esc(s.id)}</span>
+      </div>
+      <div class="set">${esc(s.name)}</div>
+      <div class="dates">
+        <div><small>${t('s_duration')}</small><b>${esc(s.durationMin || '–')}</b></div>
+        <div><small>${t('s_price')}</small><b>${s.priceChf ? 'CHF ' + esc(s.priceChf) : '–'}</b></div>
+      </div>
+      <div class="who">
+        ${t('s_for')}: ${esc(s.professionalId ? profName(s.professionalId) : t('s_for_all'))}
+        ${s.notes ? `<br><span class="muted">${esc(s.notes)}</span>` : ''}
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick="startEdit('${esc(s.id)}')">${t('edit')}</button>
+        <button class="ghost" onclick="remove('${esc(s.id)}')">${t('delete')}</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function formHtml(s) {
+  return `
+    <div class="field"><label>${t('s_name')}</label><input type="text" id="f_name" value="${esc(s?.name || '')}"></div>
+    <div class="field"><label>${t('s_for')}</label>
+      <select id="f_professionalId"><option value="">${t('s_for_all')}</option>${professionals.map((p) =>
+        `<option value="${esc(p.id)}" ${p.id === s?.professionalId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>${t('s_duration')}</label><input type="number" id="f_durationMin" value="${esc(s?.durationMin || '')}" min="1" max="480"></div>
+    <div class="field"><label>${t('s_price')}</label><input type="number" id="f_priceChf" value="${esc(s?.priceChf || '')}" min="0" step="0.05"></div>
+    <div class="field"><label>${t('s_notes')}</label><input type="text" id="f_notes" value="${esc(s?.notes || '')}"></div>
+    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${s?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
+    <div class="actions inline">
+      <button class="primary" id="f_save">${t('save')}</button>
+      <button class="ghost" id="f_cancel">${t('reset')}</button>
+      <span id="f_msg" class="muted"></span>
+    </div>`;
+}
+
+function openForm(s) {
+  editingId = s?.id || null;
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = formHtml(s);
+  $('f_cancel').onclick = closeForm;
+  $('f_save').onclick = save;
+}
+function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
+
+$('addbtn').onclick = () => openForm(null);
+function startEdit(id) { openForm(rows.find((s) => s.id === id)); }
+
+async function save() {
+  $('f_msg').textContent = t('saving');
+  const patch = {
+    name: $('f_name').value.trim(),
+    professionalId: $('f_professionalId').value,
+    durationMin: $('f_durationMin').value ? Number($('f_durationMin').value) : '',
+    priceChf: $('f_priceChf').value ? Number($('f_priceChf').value) : '',
+    notes: $('f_notes').value,
+    active: $('f_active').checked,
+  };
+  const res = editingId
+    ? await api(`/api/studio/services/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
+    : await api('/api/studio/services', { method: 'POST', body: patch });
+  if (!res.ok) { $('f_msg').textContent = ''; $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+  $('alerts').innerHTML = '';
+  closeForm();
+  refresh();
+}
+
+async function remove(id) {
+  if (!confirm(t('delete_confirm'))) return;
+  await api(`/api/studio/services/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  refresh();
+}
+
+refresh();
+</script>
+</body></html>

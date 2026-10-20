@@ -3,11 +3,11 @@
 Everything a new session (or a new developer) needs to continue without asking.
 Read this first, then `README.md`.
 
-Last updated 2026-10-20. Added: the Studio bot's data layer - shared DB tagged
-by business, professionals/services/locations directory, Studio settings group,
-time-slot availability, Studio guards, Studio knowledge folder. The Studio bot
-does **not** reply on WhatsApp yet - see "Studio: what's built vs what's left"
-below before doing anything else on it.
+Last updated 2026-10-20. The Studio bot is now fully built and live in the
+dashboard: its own WhatsApp number, agent, guards, calendar, appointments, and
+a Party/Studio switch with Professionals/Services/Locations pages. What's left
+is data entry (the roster, the calendar ID, the phone number), not code - see
+section 8.
 
 ---
 
@@ -221,64 +221,70 @@ is not configured yet.
    field waiting for this.
 2. **Nordic languages** (`no` / `sv` / `da`) for the gallery. The structure
    already supports it; it is a translation job in `knowledge/`.
-3. **The Studio bot: finish it.** See section 8 below - the data layer is done
-   and tested, the WhatsApp-facing half is not.
+3. **The Studio bot: fill in the data.** See section 8 below - everything is
+   built and tested; what's left is entering the roster, calendar ID and
+   WhatsApp number from the dashboard, not writing more code.
 
 ---
 
-## 8. Studio: what's built vs what's left (2026-10-20)
+## 8. Studio: complete and live in the dashboard (2026-10-20)
 
 One dashboard, one database, two businesses (`party` / `studio`), two
-WhatsApp numbers - that's the agreed shape. The client (deusnocontroles) sent
-3 professionals (Gabriela, Sofia, Lula) and their own written scope: the bot is
-a **receptionist**, never one of the professionals, bound to the official
-price list, nothing sexual beyond it, no different presentation per platform.
-That scope was refused once in an earlier, unacceptable form and accepted in
-its current, written-down form - do not relitigate it; `guards-studio.js`
-enforces it in code specifically so it can't quietly drift back.
+WhatsApp numbers - that's the agreed shape, and it's now fully built. The
+client (deusnocontroles) sent 3 professionals (Gabriela, Sofia, Lula) and
+their own written scope: the bot is a **receptionist**, never one of the
+professionals, bound to the official price list, nothing sexual beyond it,
+no different presentation per platform. That scope was refused once in an
+earlier, unacceptable form and accepted in its current, written-down form -
+do not relitigate it; `guards-studio.js` enforces it in code specifically so
+it can't quietly drift back.
 
-### Built and tested (293/293 tests pass, `npm test`)
+### Built and tested (337/337 tests pass, `npm test`)
 
 | Piece | File | What it does |
 |---|---|---|
-| Shared DB, tagged | `src/store/db.js` | `customers`/`bookings`/`chat` now carry `business: 'party'\|'studio'`, so one Google Sheet serves both bots without mixing data. Current write sites all still tag `'party'` - the Studio side only exists as new, empty tables so far. |
-| Studio directory | `src/studio/directory.js` | CRUD for `professionals`, `services`, `locations` - all dashboard-editable, nothing hardcoded. `profileFor(id)` returns everything the agent needs about one professional (her record + her services + her location) in one call - this is what "always check her profile first" reads from. |
-| Studio settings | `src/settings.js` (`studio*` keys) | Owner/alert numbers, calendar ID, min notice, buffer minutes, payment mode, cancellation rule, example confirmation message, blocked-day keywords - same dashboard-editable pattern as the party settings, kept in their own group. |
-| Time-slot availability | `src/calendar/slots.js` | `checkSlot()` - is an HH:MM-HH:MM slot free for one professional on one date? Deliberately **not** a reuse of `availability.js` (date-window logic); appointments need hour-level overlap, buffer-after-appointment, and minimum-notice, none of which the rental-window module does. Caught and fixed a real timezone bug while testing (naive `new Date()` parsing used the server's UTC offset instead of Europe/Zurich for the minimum-notice check - would have silently refused or allowed the wrong slots). |
-| Studio guards | `src/agent/guards-studio.js` | Code-level, not prompt-level: blocks the bot speaking as the professional herself, offering/negotiating sexual extras, quoting a price that isn't an active service's own price, or presenting an appointment as confirmed before the owner has it. Same per-sentence / negation-aware / FAQ-whitelist pattern as `guards.js`. |
-| Studio knowledge | `knowledge-studio/` | `persona.md` (receptionist tone), `rules.md` (the hard limits, matching the client's written scope), `business.json` (studio-wide facts only - nothing per-person or per-price, that's all in the DB), `faq.json` (empty, fill in as the client answers). `from-files.js` now reads `KNOWLEDGE_DIR` so this folder loads without touching the PartyDekoMiet one. |
+| Shared DB, tagged | `src/store/db.js` | `customers`/`bookings`/`chat` carry `business: 'party'\|'studio'`, so one Google Sheet serves both bots without mixing data. |
+| Studio directory | `src/studio/directory.js` | CRUD for `professionals`, `services`, `locations` - all dashboard-editable, nothing hardcoded. `profileFor(id)` returns everything the agent needs about one professional in one call. |
+| Studio settings | `src/settings.js` (`studio*` keys, plus `studioBotEnabled`) | Owner/alert numbers, calendar ID, min notice, buffer minutes, payment mode, cancellation rule, example confirmation, blocked-day keywords, and its own on/off switch - independent from Party's, so turning one bot off never silences the other. |
+| Time-slot availability | `src/calendar/slots.js` | `checkSlot()` - hour-level overlap, buffer-after-appointment and minimum-notice, timezone-correct (`wallTimeToUtc`, fixed a real UTC-vs-Europe/Zurich bug caught while testing). |
+| Studio appointments | `src/appointments.js`, `src/calendar/studio-service.js` | Mirrors `bookings.js`: `create`/`list`/`setStatus`, always PENDING, calendar is the source of truth. |
+| Studio agent tools | `src/agent/tools/studio.js` | Professional/service lookups, slot checks, appointment requests, handoff - never answers from memory, always reads the directory/calendar at reply time. |
+| Studio guards | `src/agent/guards-studio.js` | Code-level: blocks the bot speaking as the professional herself, offering/negotiating sexual extras, quoting an invented price, or confirming an appointment early. |
+| Studio knowledge | `knowledge-studio/` | `persona.md`, `rules.md`, `business.json`, `faq.json`. `from-files.js` takes `dir`/`KNOWLEDGE_DIR` so this loads independently of `knowledge/`, in the same process. |
+| **Second WhatsApp connection** | `src/whatsapp/client.js` (factory), `src/whatsapp/auth-state.js` (namespaced session keys), `index.js` (`bootStudio()`) | Two independent Baileys sockets, one process. Studio boots right after Party and is fully try/catch'd so a Studio problem (missing calendar ID, no owner number yet) can never take Party down. Smoke-tested: both reconnect loops run side by side, shut down cleanly together. |
+| **Owner commands & notifications per business** | `src/whatsapp/router.js` (`BUSINESS_SETTINGS` map), `src/notify/owner.js` | `/on`, `/off`, `/status`, pause-state, the chat/customer business tag, and which settings key is read (`studioOwnerWhatsapp`, `studioCalendarId`, `studioBotEnabled`) are all business-aware. `notify/owner.js` has `appointmentRequest()` alongside `bookingRequest()`. |
+| **Dashboard: Party/Studio switch + directory pages** | `public/app.js` (`BIZ`, `renderNav`, `withBiz()`), `src/http/server.js` (`pick(req)`) | A switch in the nav changes which business's status/chats/bookings/WhatsApp the whole dashboard shows - every API call under `/api/status`, `/api/whatsapp*`, `/api/chats*`, `/api/bookings*`, `/api/test/chat` auto-carries `?biz=studio`. New pages `professionals.html`, `services.html`, `locations.html` (full CRUD, photo upload for professionals via `/api/studio/professionals/:id/photo` + `/api/studio/photo/:fileId`). `bookings.html` renders either booking or appointment fields depending on `BIZ`. `settings.html` shows the Studio's own settings group when Studio is selected. |
 
-### Not built yet - this is the real remaining work
+Verified end-to-end in this session: booted the whole app with a memory
+backend (no real Sheet/OpenAI/calendar configured) and confirmed both bots
+boot independently, `/api/status?biz=studio` returns Studio's own state
+without leaking Party's, `/api/studio/professionals` works, and a clean
+shutdown saves both. See `test/server-studio.test.js` for the automated
+version of that check.
 
-1. **A second WhatsApp connection.** `src/whatsapp/client.js` and `index.js`
-   are wired for exactly one Baileys connection. The agreed shape (one
-   process, two numbers, shared DB, one dashboard) needs this parameterised -
-   two connections, each tagging its own `business`, both feeding one router
-   and one agent configured per business (which `knowledge-*` folder, which
-   guards, which settings group). This is the biggest remaining piece and the
-   one most likely to have surprises; don't underestimate it.
-2. **Studio agent tools.** `src/agent/tools/index.js` only has PartyDekoMiet's
-   tools (search_products, check_availability, create_booking, ...). The
-   Studio needs its own set: `get_professional_profile` (→
-   `directory.profileFor`), `list_professionals`, `check_slot` (→
-   `slots.checkSlot`), `create_appointment` (writes the `appointments` table +
-   a calendar event, always PENDING - mirrors `bookings.js`'s
-   `create`/`setStatus` pattern exactly, including "never write CONFIRMED
-   itself").
-3. **Dashboard: business switch + Professionals/Services/Locations pages.**
-   Nothing in `public/` or `src/http/server.js` knows about `business` or the
-   new tables yet. Needs: a Party/Studio switch in the dashboard shell that
-   filters chats/bookings/status by `business`; new pages to add/edit
-   professionals (with photo upload - `db.putFile` already supports this),
-   services and locations; booking/appointment lists already have a working
-   pattern to copy from `bookings.html`.
-4. **Owner commands and notifications**, duplicated per business
-   (`src/whatsapp/router.js` owner commands, `src/notify/messages.js`) - these
-   currently assume PartyDekoMiet's wording and the single `ownerWhatsapp`
-   setting.
-5. **Pre-fill the 3 known professionals** (Gabriela/Sofia/Lula) once
-   `professionals`/`services`/`locations` are reachable from the dashboard -
-   their data is in this Fiverr chat already, just needs entering.
+### What's left - all data entry, not code
+
+1. **Pre-fill Gabriela/Sofia/Lula.** The dashboard can take this now:
+   open the Studio side → Locations (add the studio's address(es)) →
+   Professionals (add each one, with photo, languages, working hours) →
+   Services (add each one's services with duration and price). Nothing
+   else needs to change in the code for this.
+2. **Studio's own WhatsApp number.** Dashboard → switch to Studio → WhatsApp
+   → scan the QR (or pair by number), same flow as Party's.
+3. **Studio's calendar.** Dashboard → Studio settings → paste the Studio's
+   Google Calendar ID (share that calendar with the same service account
+   email Party's Calendar status row already shows).
+4. **Studio's owner/alert numbers**, cancellation rule, payment mode,
+   minimum notice, buffer time - all in Dashboard → Studio settings, same
+   place as the calendar ID above.
+5. **FAQ**, once the client answers specific questions - add entries to
+   `knowledge-studio/faq.json` (or wire `KNOWLEDGE_SOURCE=sheet` for it the
+   same way Party could be, if the client should edit these without a
+   developer - not done, not asked for yet).
+
+None of 1-4 need a push or a redeploy. They're exactly the kind of gap this
+was built to let the client fill in himself (see "Why the data layer came
+first" below).
 
 ### Unrelated bug found and fixed while testing the deploy (2026-10-20)
 

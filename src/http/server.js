@@ -28,7 +28,15 @@ const { matchesOtherBusiness } = require('../whatsapp/router');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
-function createServer({ config, state, whatsapp = null, settings = null, runtime = {}, catalog = null }) {
+/**
+ * Both bots live in one dashboard: the nav has a Party/Studio switch, and
+ * every page that depends on which business is selected sends `?biz=studio`
+ * on its API calls (the frontend's `api()` helper appends it automatically -
+ * see public/app.js). Everything below picks the matching state/runtime/
+ * WhatsApp client for that one query param; nothing else in the app knows
+ * two businesses exist.
+ */
+function createServer({ config, state, whatsapp = null, settings = null, runtime = {}, catalog = null, studio = null }) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
@@ -41,6 +49,16 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
     });
   };
+
+  const isStudio = (req) => String(req.query?.biz || req.body?.biz || '') === 'studio';
+
+  /** The state/runtime/whatsapp/business for whichever side `?biz=` asked for. */
+  function pick(req) {
+    if (isStudio(req) && studio) {
+      return { biz: 'studio', state: studio.state, runtime: studio.runtime, whatsapp: studio.whatsapp };
+    }
+    return { biz: 'party', state, runtime, whatsapp };
+  }
 
   // ---- Health: open, and carries nothing secret. ----
   app.get('/health', (req, res) => {
@@ -76,37 +94,45 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   app.get('/bookings', page('bookings.html'));
   app.get('/chats', page('chats.html'));
   app.get('/test', page('test.html'));
+  app.get('/professionals', page('professionals.html'));
+  app.get('/services', page('services.html'));
+  app.get('/locations', page('locations.html'));
 
   app.get('/api/status', (req, res) => {
+    const { biz, state: st, runtime: rt, whatsapp: wa } = pick(req);
     const s = settings ? settings.all() : {};
+    const isStudio = biz === 'studio';
     res.json({
       ok: true,
-      ready: state.ready,
-      startedAt: state.startedAt,
+      biz,
+      ready: st.ready,
+      startedAt: st.startedAt,
       uptimeSeconds: Math.round(process.uptime()),
-      storage: db.status(),
-      storageError: state.storageError,
+      storage: db.status(), // one shared Google Sheet for both businesses
+      storageError: state.storageError, // the Sheet connection itself, from Party's boot
       storageWarning: state.storageWarning,
-      calendarError: state.calendarError,
-      bootError: state.bootError,
-      knowledge: state.knowledge,
-      catalog: catalog ? catalog.status() : null,
-      ai: runtime.router ? runtime.router.aiHealth() : null,
-      skipped: runtime.router ? runtime.router.skipped() : null,
-      whatsapp: whatsapp ? whatsapp.getStatus() : { status: 'not-wired' },
-      pausedChats: runtime.router ? runtime.router.listPaused() : [],
+      calendarError: st.calendarError,
+      bootError: st.bootError,
+      knowledge: st.knowledge,
+      catalog: isStudio ? null : (catalog ? catalog.status() : null), // Studio has no Shopify catalog
+      ai: rt.router ? rt.router.aiHealth() : null,
+      skipped: rt.router ? rt.router.skipped() : null,
+      whatsapp: wa ? wa.getStatus() : { status: 'not-wired' },
+      pausedChats: rt.router ? rt.router.listPaused() : [],
       lang: s.dashboardLanguage || 'de',
       config: {
         model: config.openai?.model,
         hasOpenAiKey: Boolean(config.openai?.apiKey),
         hasServiceAccount: Boolean(config.calendar?.serviceAccountJsonB64),
         hasSheet: Boolean(config.storage?.webhookUrl && config.storage?.secret),
-        calendarConfigured: Boolean(s.calendarId),
-        serviceAccountEmail: runtime.calendar?.serviceAccountEmail || null,
-        botEnabled: s.botEnabled,
+        calendarConfigured: Boolean(isStudio ? s.studioCalendarId : s.calendarId),
+        serviceAccountEmail: rt.calendar?.serviceAccountEmail || null,
+        botEnabled: isStudio ? s.studioBotEnabled : s.botEnabled,
         botLanguage: s.botLanguage,
         // The owner's number is personal data: only ever show the last four digits.
-        ownerNumber: s.ownerWhatsapp ? `…${String(s.ownerWhatsapp).slice(-4)}` : null,
+        ownerNumber: (isStudio ? s.studioOwnerWhatsapp : s.ownerWhatsapp)
+          ? `…${String(isStudio ? s.studioOwnerWhatsapp : s.ownerWhatsapp).slice(-4)}`
+          : null,
       },
     });
   });
@@ -133,56 +159,65 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
 
   // ---- WhatsApp ----
   app.get('/api/whatsapp', (req, res) => {
-    if (!whatsapp) return res.json({ ok: true, status: 'not-wired' });
-    res.json({ ok: true, ...whatsapp.getStatus() });
+    const { whatsapp: wa } = pick(req);
+    if (!wa) return res.json({ ok: true, status: 'not-wired' });
+    res.json({ ok: true, ...wa.getStatus() });
   });
 
   app.post('/api/whatsapp/connect', safe(async (req, res) => {
-    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
-    res.json(await whatsapp.start());
+    const { whatsapp: wa } = pick(req);
+    if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(await wa.start());
   }));
 
   app.post('/api/whatsapp/relink', safe(async (req, res) => {
-    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
-    res.json(await whatsapp.logoutAndRelink());
+    const { whatsapp: wa } = pick(req);
+    if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(await wa.logoutAndRelink());
   }));
 
   app.post('/api/whatsapp/pause', safe(async (req, res) => {
-    if (!runtime.router) return res.status(503).json({ ok: false, error: 'router not ready' });
+    const { runtime: rt } = pick(req);
+    if (!rt.router) return res.status(503).json({ ok: false, error: 'router not ready' });
     const jid = String(req.body?.jid || '');
     if (!jid) return res.status(400).json({ ok: false, error: 'jid required' });
-    runtime.router.pause(jid, Number(req.body?.hours) || settings.get('takeoverPauseHours'), 'dashboard');
-    res.json({ ok: true, paused: runtime.router.listPaused() });
+    rt.router.pause(jid, Number(req.body?.hours) || settings.get('takeoverPauseHours'), 'dashboard');
+    res.json({ ok: true, paused: rt.router.listPaused() });
   }));
 
   app.post('/api/whatsapp/resume', safe(async (req, res) => {
-    if (!runtime.router) return res.status(503).json({ ok: false, error: 'router not ready' });
-    runtime.router.resume(String(req.body?.jid || ''));
-    res.json({ ok: true, paused: runtime.router.listPaused() });
+    const { runtime: rt } = pick(req);
+    if (!rt.router) return res.status(503).json({ ok: false, error: 'router not ready' });
+    rt.router.resume(String(req.body?.jid || ''));
+    res.json({ ok: true, paused: rt.router.listPaused() });
   }));
 
   app.post('/api/whatsapp/pair', safe(async (req, res) => {
-    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
-    res.json(await whatsapp.startPairing(String(req.body?.number || '')));
+    const { whatsapp: wa } = pick(req);
+    if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(await wa.startPairing(String(req.body?.number || '')));
   }));
 
   app.post('/api/whatsapp/pair/cancel', safe(async (req, res) => {
-    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
-    res.json(whatsapp.cancelPairing());
+    const { whatsapp: wa } = pick(req);
+    if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    res.json(wa.cancelPairing());
   }));
 
   // ---- Chats ----
   // The owner reads conversations here and can step in. Sending from the
   // dashboard also pauses the bot in that chat, so the two never talk at once.
   app.get('/api/chats', (req, res) => {
+    const { biz, runtime: rt } = pick(req);
     const byJid = new Map();
     for (const m of db.all('chat')) {
+      if ((m.business || 'party') !== biz) continue;
       const prev = byJid.get(m.jid);
       if (!prev || String(m.at) > String(prev.at)) byJid.set(m.jid, m);
       const entry = byJid.get(m.jid);
       entry.count = (entry.count || 0) + 1;
     }
-    const paused = new Set((runtime.router ? runtime.router.listPaused() : []).map((p) => p.jid));
+    const paused = new Set((rt.router ? rt.router.listPaused() : []).map((p) => p.jid));
     const chats = [...byJid.entries()]
       .map(([jid, last]) => {
         const customer = db.get('customers', jid);
@@ -202,39 +237,41 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   });
 
   app.get('/api/chats/:jid', (req, res) => {
+    const { biz, runtime: rt } = pick(req);
     const jid = String(req.params.jid);
     const messages = db
       .all('chat')
-      .filter((m) => m.jid === jid)
+      .filter((m) => m.jid === jid && (m.business || 'party') === biz)
       .sort((a, b) => String(a.at).localeCompare(String(b.at)))
       .slice(-300);
     const customer = db.get('customers', jid) || null;
-    const paused = (runtime.router ? runtime.router.listPaused() : []).find((p) => p.jid === jid) || null;
+    const paused = (rt.router ? rt.router.listPaused() : []).find((p) => p.jid === jid) || null;
     res.json({ ok: true, jid, phone: require('../contacts').phoneOf(jid), customer, paused, messages });
   });
 
   app.post('/api/chats/:jid/send', safe(async (req, res) => {
-    if (!whatsapp) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
+    const { biz, runtime: rt, whatsapp: wa } = pick(req);
+    if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });
     const jid = String(req.params.jid);
     const text = String(req.body?.text || '').trim();
     if (!text) return res.status(400).json({ ok: false, error: 'text required' });
-    if (!whatsapp.isConnected()) {
+    if (!wa.isConnected()) {
       // Not a server fault: the phone is simply not linked right now.
       return res.status(503).json({ ok: false, error: 'WhatsApp ist nicht verbunden.' });
     }
 
-    await whatsapp.sendText(jid, text);
+    await wa.sendText(jid, text);
     db.put('chat', {
       id: `${Date.now()}-dash`,
-      business: 'party',
+      business: biz,
       at: new Date().toISOString(),
       jid,
       direction: 'out',
       text,
     });
     // The owner is handling this chat now, so the bot steps aside.
-    if (runtime.router) {
-      runtime.router.pause(jid, settings ? settings.get('takeoverPauseHours') : 12, 'sent from dashboard');
+    if (rt.router) {
+      rt.router.pause(jid, settings ? settings.get('takeoverPauseHours') : 12, 'sent from dashboard');
     }
     await db.flush();
     res.json({ ok: true });
@@ -247,13 +284,14 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   const testSessions = new Map(); // id -> [{role, content}]
 
   app.post('/api/test/chat', safe(async (req, res) => {
-    if (!runtime.agent) {
+    const { biz, runtime: rt } = pick(req);
+    if (!rt.agent) {
       return res.status(503).json({
         ok: false,
         error: 'Kein Agent aktiv - OPENAI_API_KEY fehlt.',
       });
     }
-    const id = String(req.body?.session || 'default');
+    const id = `${biz}:${String(req.body?.session || 'default')}`;
     if (req.body?.reset) {
       testSessions.delete(id);
       return res.json({ ok: true, reset: true });
@@ -265,8 +303,10 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     const history = testSessions.get(id) || [];
 
     // The out-of-scope check lives in the router, so mirror it here or the test
-    // chat would behave differently from the real one.
-    const otherBusiness = matchesOtherBusiness(message, settings ? settings.get('otherBusinessKeywords') : '');
+    // chat would behave differently from the real one. Studio has its own
+    // WhatsApp number, so the "other business" handoff is a Party-only concept.
+    const otherBusiness = biz === 'party'
+      && matchesOtherBusiness(message, settings ? settings.get('otherBusinessKeywords') : '');
     if (otherBusiness) {
       const lang = /\b(the|and|is|how|can|hello|hi|you|do|your)\b/i.test(message) ? 'en' : 'de';
       const text = settings.get(lang === 'en' ? 'otherBusinessReplyEn' : 'otherBusinessReplyDe');
@@ -275,10 +315,10 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       return res.json({ ok: true, text, handoff: true, otherBusiness: true, toolCalls: [], violations: [] });
     }
 
-    const out = await runtime.agent.reply({
+    const out = await rt.agent.reply({
       history: [...history],
       message,
-      services: { ...runtime.services, messenger: null }, // no real sending from the test chat
+      services: { ...rt.services, messenger: null }, // no real sending from the test chat
       chatId: `test:${id}`,
     });
 
@@ -301,18 +341,111 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     });
   }));
 
-  // ---- Bookings ----
+  // ---- Bookings (Party) / Appointments (Studio) ----
   app.get('/api/bookings', (req, res) => {
-    const rows = runtime.bookings ? runtime.bookings.list({ status: req.query.status || null }) : [];
+    const { biz, runtime: rt } = pick(req);
+    if (biz === 'studio') {
+      const rows = rt.appointments ? rt.appointments.list({ status: req.query.status || null }) : [];
+      return res.json({ ok: true, appointments: rows });
+    }
+    const rows = rt.bookings ? rt.bookings.list({ status: req.query.status || null }) : [];
     res.json({ ok: true, bookings: rows });
   });
 
   app.post('/api/bookings/:id/status', safe(async (req, res) => {
-    if (!runtime.bookings) return res.status(503).json({ ok: false, error: 'bookings not ready' });
-    const result = await runtime.bookings.setStatus(String(req.params.id), String(req.body?.status || ''));
+    const { biz, runtime: rt } = pick(req);
+    const svc = biz === 'studio' ? rt.appointments : rt.bookings;
+    if (!svc) return res.status(503).json({ ok: false, error: `${biz === 'studio' ? 'appointments' : 'bookings'} not ready` });
+    const result = await svc.setStatus(String(req.params.id), String(req.body?.status || ''));
     if (!result.ok) return res.status(400).json(result);
     res.json(result);
   }));
+
+  // ---- Studio directory: professionals / services / locations ----
+  // All dashboard-editable, nothing hardcoded (HANDOFF.md §8). Every write goes
+  // through src/studio/directory.js's own validation, so the API layer here is
+  // thin on purpose.
+  if (studio?.directory) {
+    const dir = studio.directory;
+
+    app.get('/api/studio/professionals', (req, res) => {
+      res.json({ ok: true, professionals: dir.listProfessionals() });
+    });
+    app.post('/api/studio/professionals', safe(async (req, res) => {
+      const result = await dir.createProfessional(req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.patch('/api/studio/professionals/:id', safe(async (req, res) => {
+      const result = await dir.updateProfessional(String(req.params.id), req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.delete('/api/studio/professionals/:id', safe(async (req, res) => {
+      const result = await dir.removeProfessional(String(req.params.id));
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+
+    app.get('/api/studio/services', (req, res) => {
+      res.json({ ok: true, services: dir.listServices() });
+    });
+    app.post('/api/studio/services', safe(async (req, res) => {
+      const result = await dir.createService(req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.patch('/api/studio/services/:id', safe(async (req, res) => {
+      const result = await dir.updateService(String(req.params.id), req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.delete('/api/studio/services/:id', safe(async (req, res) => {
+      const result = await dir.removeService(String(req.params.id));
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+
+    app.get('/api/studio/locations', (req, res) => {
+      res.json({ ok: true, locations: dir.listLocations() });
+    });
+    app.post('/api/studio/locations', safe(async (req, res) => {
+      const result = await dir.createLocation(req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.patch('/api/studio/locations/:id', safe(async (req, res) => {
+      const result = await dir.updateLocation(String(req.params.id), req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+    app.delete('/api/studio/locations/:id', safe(async (req, res) => {
+      const result = await dir.removeLocation(String(req.params.id));
+      if (!result.ok) return res.status(400).json(result);
+      res.json(result);
+    }));
+
+    // A professional's photo: uploaded as base64 JSON (consistent with how
+    // reference photos already travel through this app - see backend-sheets.js
+    // putFile/getFile), stored the same private way, then just its file id is
+    // kept on the professional record.
+    app.post('/api/studio/professionals/:id/photo', safe(async (req, res) => {
+      const professional = dir.getProfessional(String(req.params.id));
+      if (!professional) return res.status(404).json({ ok: false, error: 'professional not found' });
+      const { name, mimeType, base64 } = req.body || {};
+      if (!base64) return res.status(400).json({ ok: false, error: 'base64 required' });
+      const id = await db.putFile(name || 'foto.jpg', mimeType || 'image/jpeg', Buffer.from(base64, 'base64'));
+      const result = await dir.updateProfessional(professional.id, { photoFileId: id });
+      res.json({ ok: true, photoFileId: id, professional: result.professional });
+    }));
+
+    app.get('/api/studio/photo/:fileId', safe(async (req, res) => {
+      const file = await db.getFile(String(req.params.fileId));
+      res.set('Content-Type', file.mimeType || 'image/jpeg');
+      res.set('Cache-Control', 'private, max-age=3600');
+      res.send(file.buffer);
+    }));
+  }
 
   // ---- Catalog ----
   app.post('/api/catalog/refresh', safe(async (req, res) => {

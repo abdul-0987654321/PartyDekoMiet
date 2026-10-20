@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Professionals – Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="intro"></p>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+  <div class="actions inline" style="margin-bottom:16px">
+    <button class="primary" id="addbtn"></button>
+  </div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/professionals');
+$('h1').textContent = t('nav_professionals');
+$('intro').textContent = t('p_intro');
+$('loading').textContent = t('loading');
+$('addbtn').textContent = '+ ' + t('add');
+
+let rows = [];
+let locations = [];
+let editingId = null;
+
+async function refresh() {
+  const [p, l] = await Promise.all([api('/api/studio/professionals'), api('/api/studio/locations')]);
+  rows = p.professionals || [];
+  locations = l.locations || [];
+  render();
+}
+
+function locationName(id) {
+  const l = locations.find((x) => x.id === id);
+  return l ? l.name : '';
+}
+
+function render() {
+  if (!rows.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_professionals')}</p></div>`; return; }
+  $('wrap').innerHTML = `<div class="bk-list">${rows.map((p) => `
+    <div class="bk ${p.active ? 'CONFIRMED' : 'CANCELLED'}">
+      <div class="top">
+        ${pill(p.active ? t('active') : t('inactive'), p.active ? 'ok' : 'warn')}
+        <span class="muted">${esc(p.id)}</span>
+      </div>
+      ${p.photoFileId ? `<img src="/api/studio/photo/${esc(p.photoFileId)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">` : ''}
+      <div class="set">${esc(p.name)}${p.age ? ` · ${esc(p.age)}` : ''}</div>
+      <div class="who">
+        ${t('p_lang_short')}: ${esc((Array.isArray(p.languages) ? p.languages.join(', ') : p.languages) || t('p_none_lang'))}<br>
+        ${p.locationId ? esc(locationName(p.locationId)) + '<br>' : ''}
+        <span class="muted">${esc(p.workingHours || t('p_none_hours'))}</span>
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick="startEdit('${esc(p.id)}')">${t('edit')}</button>
+        <button class="ghost" onclick="remove('${esc(p.id)}')">${t('delete')}</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function formHtml(p) {
+  const langs = Array.isArray(p?.languages) ? p.languages.join(', ') : (p?.languages || '');
+  return `
+    <div class="field"><label>${t('name')}</label><input type="text" id="f_name" value="${esc(p?.name || '')}"></div>
+    <div class="field"><label>${t('p_age')}</label><input type="number" id="f_age" value="${esc(p?.age || '')}" min="18" max="99"></div>
+    <div class="field"><label>${t('p_languages')}</label><input type="text" id="f_languages" value="${esc(langs)}"></div>
+    <div class="field"><label>${t('p_location')}</label>
+      <select id="f_locationId"><option value="">–</option>${locations.map((l) =>
+        `<option value="${esc(l.id)}" ${l.id === p?.locationId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>${t('p_hours')}</label><input type="text" id="f_workingHours" value="${esc(p?.workingHours || '')}" placeholder="Mo-Fr 10-18"></div>
+    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${p?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
+    <div class="field"><label>${t('photo')}</label>
+      <input type="file" id="f_photo" accept="image/*">
+      ${p?.photoFileId ? `<div style="margin-top:8px"><img src="/api/studio/photo/${esc(p.photoFileId)}" style="max-height:100px;border-radius:8px"></div>` : ''}
+    </div>
+    <div class="actions inline">
+      <button class="primary" id="f_save">${t('save')}</button>
+      <button class="ghost" id="f_cancel">${t('reset')}</button>
+      <span id="f_msg" class="muted"></span>
+    </div>`;
+}
+
+function openForm(p) {
+  editingId = p?.id || null;
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = formHtml(p);
+  $('f_cancel').onclick = closeForm;
+  $('f_save').onclick = save;
+}
+function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
+
+$('addbtn').onclick = () => openForm(null);
+function startEdit(id) { openForm(rows.find((p) => p.id === id)); }
+
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function save() {
+  $('f_msg').textContent = t('saving');
+  const patch = {
+    name: $('f_name').value.trim(),
+    age: $('f_age').value ? Number($('f_age').value) : '',
+    languages: $('f_languages').value,
+    locationId: $('f_locationId').value,
+    workingHours: $('f_workingHours').value,
+    active: $('f_active').checked,
+  };
+  const res = editingId
+    ? await api(`/api/studio/professionals/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
+    : await api('/api/studio/professionals', { method: 'POST', body: patch });
+  if (!res.ok) { $('f_msg').textContent = ''; $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+
+  const id = res.professional.id;
+  const file = $('f_photo').files[0];
+  if (file) {
+    const base64 = await fileToBase64(file);
+    await api(`/api/studio/professionals/${encodeURIComponent(id)}/photo`, { method: 'POST', body: { name: file.name, mimeType: file.type, base64 } });
+  }
+  $('alerts').innerHTML = '';
+  closeForm();
+  refresh();
+}
+
+async function remove(id) {
+  if (!confirm(t('delete_confirm'))) return;
+  await api(`/api/studio/professionals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  refresh();
+}
+
+refresh();
+</script>
+</body></html>

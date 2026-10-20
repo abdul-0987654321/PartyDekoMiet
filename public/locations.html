@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Standorte – Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="intro"></p>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+  <div class="actions inline" style="margin-bottom:16px">
+    <button class="primary" id="addbtn"></button>
+  </div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/locations');
+$('h1').textContent = t('nav_locations');
+$('intro').textContent = t('l_intro');
+$('loading').textContent = t('loading');
+$('addbtn').textContent = '+ ' + t('add');
+
+let rows = [];
+let editingId = null;
+
+async function refresh() {
+  rows = (await api('/api/studio/locations')).locations || [];
+  render();
+}
+
+function render() {
+  if (!rows.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_locations')}</p></div>`; return; }
+  $('wrap').innerHTML = `<div class="bk-list">${rows.map((l) => `
+    <div class="bk ${l.active ? 'CONFIRMED' : 'CANCELLED'}">
+      <div class="top">
+        ${pill(l.active ? t('active') : t('inactive'), l.active ? 'ok' : 'warn')}
+        <span class="muted">${esc(l.id)}</span>
+      </div>
+      <div class="set">${esc(l.name)}</div>
+      <div class="who">${esc(l.address || '–')}</div>
+      <div class="acts">
+        <button class="ghost" onclick="startEdit('${esc(l.id)}')">${t('edit')}</button>
+        <button class="ghost" onclick="remove('${esc(l.id)}')">${t('delete')}</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function formHtml(l) {
+  return `
+    <div class="field"><label>${t('l_name')}</label><input type="text" id="f_name" value="${esc(l?.name || '')}"></div>
+    <div class="field"><label>${t('l_address')}</label><input type="text" id="f_address" value="${esc(l?.address || '')}"></div>
+    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${l?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
+    <div class="actions inline">
+      <button class="primary" id="f_save">${t('save')}</button>
+      <button class="ghost" id="f_cancel">${t('reset')}</button>
+      <span id="f_msg" class="muted"></span>
+    </div>`;
+}
+
+function openForm(l) {
+  editingId = l?.id || null;
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = formHtml(l);
+  $('f_cancel').onclick = closeForm;
+  $('f_save').onclick = save;
+}
+function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
+
+$('addbtn').onclick = () => openForm(null);
+function startEdit(id) { openForm(rows.find((l) => l.id === id)); }
+
+async function save() {
+  $('f_msg').textContent = t('saving');
+  const patch = { name: $('f_name').value.trim(), address: $('f_address').value, active: $('f_active').checked };
+  const res = editingId
+    ? await api(`/api/studio/locations/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
+    : await api('/api/studio/locations', { method: 'POST', body: patch });
+  if (!res.ok) { $('f_msg').textContent = ''; $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+  $('alerts').innerHTML = '';
+  closeForm();
+  refresh();
+}
+
+async function remove(id) {
+  if (!confirm(t('delete_confirm'))) return;
+  await api(`/api/studio/locations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  refresh();
+}
+
+refresh();
+</script>
+</body></html>

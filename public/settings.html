@@ -20,7 +20,12 @@ $('h1').textContent = t('nav_settings');
 $('intro').textContent = t('settings_intro');
 $('loading').textContent = t('loading');
 
-const GROUPS = ['bot','contacts','business','shop','calendar','dashboard'];
+// Each business sees only the settings relevant to it; 'bot'/'dashboard' are
+// shared layout groups shown either way (the bot's name there still makes
+// sense read as "this number's bot").
+const GROUPS = BIZ === 'studio'
+  ? ['bot', 'studio', 'dashboard']
+  : ['bot', 'contacts', 'business', 'shop', 'calendar', 'dashboard'];
 let schema = [];
 
 function fieldHtml(s) {

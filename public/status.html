@@ -75,7 +75,8 @@ $('toggle').onchange = async (e) => {
   const want = e.target.checked;
   e.target.disabled = true;
   try {
-    const res = await api('/api/settings', { method:'POST', body:{ botEnabled: want } });
+    const key = BIZ === 'studio' ? 'studioBotEnabled' : 'botEnabled';
+    const res = await api('/api/settings', { method:'POST', body:{ [key]: want } });
     if (!res.ok) e.target.checked = !want;
   } catch { e.target.checked = !want; }
   finally { saving = false; await refresh(); }

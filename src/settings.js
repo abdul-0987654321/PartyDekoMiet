@@ -36,6 +36,14 @@ const SCHEMA = [
     label: { de: 'Bot aktiv', en: 'Bot active' },
   },
   {
+    // The Studio's own on/off switch, independent from botEnabled above.
+    // Without this, turning Party off from its status page would silence
+    // Studio too (and vice versa) - the two numbers must be controllable
+    // separately, same reasoning as studioOwnerWhatsapp/studioCalendarId.
+    key: 'studioBotEnabled', group: 'studio', type: 'boolean', default: true, hidden: true,
+    label: { de: 'Studio-Bot aktiv', en: 'Studio bot active' },
+  },
+  {
     key: 'botLanguage', group: 'bot', type: 'enum', default: 'dashboard',
     options: ['dashboard', 'auto', 'de', 'en'],
     optionLabels: {

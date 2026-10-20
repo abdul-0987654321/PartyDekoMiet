@@ -143,7 +143,11 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
   const pendingReplies = new Map(); // ownerJid -> { target, message, heard, langName, at }
 
   /** Maps a shared settings key to its Studio-specific name when needed. */
-  const BUSINESS_SETTINGS = { ownerWhatsapp: 'studioOwnerWhatsapp', calendarId: 'studioCalendarId' };
+  const BUSINESS_SETTINGS = {
+    ownerWhatsapp: 'studioOwnerWhatsapp',
+    calendarId: 'studioCalendarId',
+    botEnabled: 'studioBotEnabled',
+  };
   const setting = (key) => settings.get(business === 'studio' && BUSINESS_SETTINGS[key] ? BUSINESS_SETTINGS[key] : key);
 
   const isOwner = (jid) => {
@@ -213,18 +217,18 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
         return `Bot wieder aktiv fuer ${arg}.`;
       }
       case '/off': {
-        await settings.update({ botEnabled: false });
-        return 'Bot ist global AUS. Mit /on wieder einschalten.';
+        await settings.update({ [business === 'studio' ? 'studioBotEnabled' : 'botEnabled']: false });
+        return 'Bot ist AUS. Mit /on wieder einschalten.';
       }
       case '/on': {
-        await settings.update({ botEnabled: true });
-        return 'Bot ist global AN.';
+        await settings.update({ [business === 'studio' ? 'studioBotEnabled' : 'botEnabled']: true });
+        return 'Bot ist AN.';
       }
       case '/status': {
         const paused = Object.entries(state).filter(([, v]) => v.pausedUntil > Date.now());
         const cat = services.catalog?.status?.();
         return [
-          `Bot: ${settings.get('botEnabled') ? 'AN' : 'AUS'}`,
+          `Bot: ${setting('botEnabled') ? 'AN' : 'AUS'}`,
           `WhatsApp: ${client.getStatus().status}`,
           `Katalog: ${cat ? `${cat.count} Produkte` : 'nicht geladen'}`,
           `Kalender: ${setting('calendarId') ? 'eingerichtet' : 'fehlt'}`,
@@ -363,7 +367,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     // nothing but a log line, which from the outside is indistinguishable from
     // the bot being broken. Every one of them now records the message, is
     // visible on the dashboard, and tells the owner a customer is waiting.
-    if (!settings.get('botEnabled')) return skip(jid, text, 'bot_off');
+    if (!setting('botEnabled')) return skip(jid, text, 'bot_off');
     if (isPaused(jid)) return skip(jid, text, 'paused');
     if (!underRateLimit(jid)) return skip(jid, text, 'rate_limit');
     if (!agent) return skip(jid, text, 'no_agent');

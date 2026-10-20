@@ -15,8 +15,9 @@
 <script src="/app.js"></script>
 <script>
 renderNav('/bookings');
-$('h1').textContent = t('nav_bookings');
-$('intro').textContent = t('b_intro');
+const isStudio = BIZ === 'studio';
+$('h1').textContent = isStudio ? t('nav_appointments') : t('nav_bookings');
+$('intro').textContent = isStudio ? t('appt_intro') : t('b_intro');
 $('loading').textContent = t('loading');
 
 let rows = [];
@@ -38,22 +39,43 @@ function renderFilters() {
 }
 const matches = (b, f) => f === 'all' || (f === 'open' ? b.status === 'PENDING' : b.status === f);
 
+/** Party shows a 2-night rental window; Studio shows a single date + time. */
+function datesBlock(b) {
+  if (isStudio) {
+    return `<div class="dates">
+        <div><small>${t('a_date')}</small><b>${esc(day(b.date))}</b></div>
+        <div><small>${t('a_time')}</small><b>${esc(b.startTime || '')}${b.endTime ? '–' + esc(b.endTime) : ''}</b></div>
+      </div>`;
+  }
+  return `<div class="dates">
+      <div><small>${t('b_pickup')}</small><b>${esc(day(b.pickupDate))}</b></div>
+      <div><small>${t('b_return')}</small><b>${esc(day(b.returnDate))}</b></div>
+    </div>`;
+}
+
+/** Party shows the rented set with a shop link; Studio shows who/what was booked. */
+function subjectBlock(b) {
+  if (isStudio) {
+    return `<div class="set">${esc(b.professionalName || '')} · ${esc(b.serviceName || '')}
+      ${b.priceChf ? `<div class="muted">CHF ${esc(b.priceChf)}</div>` : ''}</div>`;
+  }
+  return `<div class="set">${b.productUrl ? `<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)} ↗</a>` : esc(b.productTitle)}
+    ${b.priceChf ? `<div class="muted">CHF ${esc(b.priceChf)}</div>` : ''}</div>`;
+}
+
 function render() {
   renderFilters();
   const list = rows.filter((b) => matches(b, filter));
-  if (!list.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_bookings')}</p></div>`; return; }
+  const emptyMsg = isStudio ? t('no_appointments') : t('no_bookings');
+  if (!list.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${emptyMsg}</p></div>`; return; }
   $('wrap').innerHTML = `<div class="bk-list">${list.map((b) => `
     <div class="bk ${esc(b.status)}">
       <div class="top">
         ${pill(t(STATUS_TXT[b.status]) || b.status, b.status === 'CONFIRMED' ? 'ok' : b.status === 'CANCELLED' ? 'err' : 'warn')}
         <span class="muted">${esc(b.id)} · ${esc(fmtDate(b.createdAt))}</span>
       </div>
-      <div class="set">${b.productUrl ? `<a href="${esc(b.productUrl)}" target="_blank" rel="noopener">${esc(b.productTitle)} ↗</a>` : esc(b.productTitle)}
-        ${b.priceChf ? `<div class="muted">CHF ${esc(b.priceChf)}</div>` : ''}</div>
-      <div class="dates">
-        <div><small>${t('b_pickup')}</small><b>${esc(day(b.pickupDate))}</b></div>
-        <div><small>${t('b_return')}</small><b>${esc(day(b.returnDate))}</b></div>
-      </div>
+      ${subjectBlock(b)}
+      ${datesBlock(b)}
       <div class="who">${esc(b.customerName || '–')}
         ${b.phone ? `<br><a href="/chats#${esc(b.phone)}">${esc(b.phone)} · ${t('b_open_chat')}</a>` : ''}</div>
       <div class="acts">${actions(b)}</div>
@@ -62,7 +84,7 @@ function render() {
 
 async function refresh() {
   const d = await api('/api/bookings');
-  rows = d.bookings || [];
+  rows = (isStudio ? d.appointments : d.bookings) || [];
   render();
 }
 

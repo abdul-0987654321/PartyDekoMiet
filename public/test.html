@@ -42,7 +42,15 @@ $('send').textContent = t('chat_send');
 $('reset').textContent = t('test_reset');
 $('msg').placeholder = t('chat_ph');
 
-const PRESETS = [
+const PRESETS = BIZ === 'studio' ? [
+  ['Hallo', 'Hallo, wer bist du?'],
+  ['Services', 'Was bietet Gabriela an?'],
+  ['Sprache', 'Spricht Sofia Deutsch?'],
+  ['Termin', 'Ist morgen um 14 Uhr noch ein Termin frei?'],
+  ['Preis', 'Was kostet eine Ganzkoerpermassage?'],
+  ['Grenze', 'Bietet ihr auch Extras ausserhalb der Preisliste an?'],
+  ['English', 'Hi, can I book an appointment for tomorrow at 2pm?'],
+] : [
   ['FAQ', 'Wo kann ich die Deko abholen?'],
   ['Lieferung', 'Könnt ihr die Deko zu uns nach Hause liefern?'],
   ['Suche', 'Hallo! Ich suche Deko für einen Einhorn-Geburtstag, meine Tochter wird 5'],

@@ -19,7 +19,7 @@ const T = {
     ready: 'bereit', starting: 'startet…', connected: 'verbunden', set: 'gesetzt', missing: 'fehlt',
     not_wired: 'noch nicht angebunden', not_configured: 'noch nicht eingerichtet', error: 'Fehler',
     g_bot: 'Bot-Verhalten', g_contacts: 'Kontakte', g_business: 'Geschäftsregeln', g_shop: 'Shop',
-    g_calendar: 'Kalender', g_dashboard: 'Dashboard',
+    g_calendar: 'Kalender', g_studio: 'Studio', g_dashboard: 'Dashboard',
     src_env: 'aus .env', src_dashboard: 'hier geändert', src_default: 'Standard',
     settings_intro: 'Änderungen gelten sofort, ohne neuen Deploy. Secrets (API-Schlüssel) bleiben bewusst in den Render-Umgebungsvariablen.',
     qr_title: 'WhatsApp verbinden', qr_scan: 'QR-Code mit WhatsApp scannen: Einstellungen → Verknüpfte Geräte → Gerät verknüpfen.',
@@ -70,6 +70,24 @@ const T = {
     b_s_pending: 'Offen', b_s_confirmed: 'Bestätigt', b_s_cancelled: 'Storniert',
     b_open_chat: 'Chat öffnen',
     s_adv: 'Erweitert', s_unsaved: 'Ungespeicherte Änderungen',
+
+    biz_party: 'PartyDeko', biz_studio: 'Studio',
+    nav_appointments: 'Termine', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Standorte',
+    add: 'Hinzufügen', edit: 'Bearbeiten', delete: 'Löschen', delete_confirm: 'Wirklich löschen?',
+    active: 'Aktiv', inactive: 'Inaktiv', name: 'Name', photo: 'Foto', upload_photo: 'Foto hochladen',
+    p_age: 'Alter', p_languages: 'Sprachen (Komma-getrennt)', p_lang_short: 'Sprachen', p_hours: 'Arbeitszeiten', p_location: 'Standort',
+    p_none_lang: 'keine', p_none_hours: 'noch nicht eingetragen', p_intro: 'Professionals - vom Team selbst gepflegt. Nichts hier ist im Code fest eingetragen.',
+    no_professionals: 'Noch keine Professionals angelegt.',
+    s_name: 'Service', s_for: 'Für', s_for_all: 'Alle Professionals', s_duration: 'Dauer (Min.)', s_price: 'Preis (CHF)', s_notes: 'Hinweise',
+    s_intro: 'Services und Preise - das Einzige, was der Bot je nennen darf.',
+    no_services: 'Noch keine Services angelegt.',
+    l_name: 'Standort', l_address: 'Adresse',
+    l_intro: 'Standorte der Professionals.',
+    no_locations: 'Noch keine Standorte angelegt.',
+    appt_intro: 'Neue Anfragen sind offen, bis das Team sie bestätigt.',
+    a_professional: 'Professional', a_service: 'Service', a_date: 'Datum', a_time: 'Zeit',
+    no_appointments: 'Noch keine Terminanfragen.',
+    save_err: 'Konnte nicht gespeichert werden',
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
@@ -83,7 +101,7 @@ const T = {
     ready: 'ready', starting: 'starting…', connected: 'connected', set: 'set', missing: 'missing',
     not_wired: 'not wired yet', not_configured: 'not set up yet', error: 'error',
     g_bot: 'Bot behaviour', g_contacts: 'Contacts', g_business: 'Business rules', g_shop: 'Shop',
-    g_calendar: 'Calendar', g_dashboard: 'Dashboard',
+    g_calendar: 'Calendar', g_studio: 'Studio', g_dashboard: 'Dashboard',
     src_env: 'from .env', src_dashboard: 'changed here', src_default: 'default',
     settings_intro: 'Changes apply immediately, with no redeploy. Secrets (API keys) deliberately stay in the Render environment variables.',
     qr_title: 'Connect WhatsApp', qr_scan: 'Scan the QR code with WhatsApp: Settings → Linked devices → Link a device.',
@@ -134,10 +152,42 @@ const T = {
     b_s_pending: 'Open', b_s_confirmed: 'Confirmed', b_s_cancelled: 'Cancelled',
     b_open_chat: 'open chat',
     s_adv: 'Advanced', s_unsaved: 'Unsaved changes',
+
+    biz_party: 'PartyDeko', biz_studio: 'Studio',
+    nav_appointments: 'Appointments', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Locations',
+    add: 'Add', edit: 'Edit', delete: 'Delete', delete_confirm: 'Really delete this?',
+    active: 'Active', inactive: 'Inactive', name: 'Name', photo: 'Photo', upload_photo: 'Upload photo',
+    p_age: 'Age', p_languages: 'Languages (comma-separated)', p_lang_short: 'Languages', p_hours: 'Working hours', p_location: 'Location',
+    p_none_lang: 'none', p_none_hours: 'not entered yet', p_intro: 'Professionals - maintained by the team themselves. Nothing here is hardcoded.',
+    no_professionals: 'No professionals yet.',
+    s_name: 'Service', s_for: 'For', s_for_all: 'Every professional', s_duration: 'Duration (min)', s_price: 'Price (CHF)', s_notes: 'Notes',
+    s_intro: 'Services and prices - the only things the bot may ever name.',
+    no_services: 'No services yet.',
+    l_name: 'Location', l_address: 'Address',
+    l_intro: 'The professionals\' locations.',
+    no_locations: 'No locations yet.',
+    appt_intro: 'New requests stay open until the team confirms them.',
+    a_professional: 'Professional', a_service: 'Service', a_date: 'Date', a_time: 'Time',
+    no_appointments: 'No appointment requests yet.',
+    save_err: 'Could not save',
   },
 };
 
 let LANG = localStorage.getItem('dashLang') || 'de';
+
+/**
+ * One dashboard, two businesses. The selected one is a per-browser choice
+ * (like the language), never sent anywhere until a page's own script reads
+ * it - this file only needs to carry it through every API call and draw the
+ * switch, so every page's logic stays oblivious to the other business.
+ */
+let BIZ = localStorage.getItem('dashBiz') || 'party';
+function setBiz(biz) {
+  if (biz === BIZ) return;
+  BIZ = biz;
+  localStorage.setItem('dashBiz', biz);
+  location.reload();
+}
 
 /**
  * Saves the chosen language on the server too, so the dashboard opens in the
@@ -171,23 +221,44 @@ function setLang(lang) {
  * Renders the shell: a sidebar on desktop, a bottom tab bar on phones.
  * The page's own markup goes inside <div id="content">.
  */
-function renderNav(active) {
-  const links = [
+const NAV_LINKS = {
+  party: [
     ['/', 'nav_status', '◉'],
     ['/chats', 'nav_chats', '💬'],
     ['/bookings', 'nav_bookings', '🗓'],
     ['/whatsapp', 'nav_whatsapp', '🔗'],
+    ['/test', 'nav_test', '▶'],
     ['/settings', 'nav_settings', '⚙'],
-  ];
+  ],
+  studio: [
+    ['/', 'nav_status', '◉'],
+    ['/chats', 'nav_chats', '💬'],
+    ['/bookings', 'nav_appointments', '🗓'],
+    ['/whatsapp', 'nav_whatsapp', '🔗'],
+    ['/professionals', 'nav_professionals', '👤'],
+    ['/services', 'nav_services', '📋'],
+    ['/locations', 'nav_locations', '📍'],
+    ['/test', 'nav_test', '▶'],
+    ['/settings', 'nav_settings', '⚙'],
+  ],
+};
+
+function renderNav(active) {
+  const links = NAV_LINKS[BIZ] || NAV_LINKS.party;
   const langBtns = `<span class="langswitch">
       <button class="${LANG === 'de' ? 'on' : ''}" onclick="setLang('de')">DE</button>
       <button class="${LANG === 'en' ? 'on' : ''}" onclick="setLang('en')">EN</button>
+    </span>`;
+  const bizBtns = `<span class="langswitch bizswitch">
+      <button class="${BIZ === 'party' ? 'on' : ''}" onclick="setBiz('party')">${t('biz_party')}</button>
+      <button class="${BIZ === 'studio' ? 'on' : ''}" onclick="setBiz('studio')">${t('biz_studio')}</button>
     </span>`;
 
   const side = document.createElement('aside');
   side.className = 'side';
   side.innerHTML = `
-    <div class="brand">PartyDekoMiet<small>WhatsApp Assistant</small></div>
+    <div class="brand">${BIZ === 'studio' ? 'Studio' : 'PartyDekoMiet'}<small>WhatsApp Assistant</small></div>
+    ${bizBtns}
     ${links.map(([href, key, ic]) =>
       `<a href="${href}" class="${href === active ? 'on' : ''}"><span class="ic">${ic}</span>${t(key)}</a>`).join('')}
     <div class="grow"></div>
@@ -201,10 +272,11 @@ function renderNav(active) {
   const shell = document.querySelector('.shell');
   shell.insertBefore(side, shell.firstChild);
 
-  // Phones hide the sidebar foot, so the language switch moves to a top bar.
+  // Phones hide the sidebar foot, so the language and business switches move
+  // to a top bar.
   const bar = document.createElement('div');
   bar.className = 'mobile-bar';
-  bar.innerHTML = `<span class="t">${t(links.find(([h]) => h === active)?.[1] || 'nav_status')}</span>${langBtns}
+  bar.innerHTML = `<span class="t">${t(links.find(([h]) => h === active)?.[1] || 'nav_status')}</span>${bizBtns}${langBtns}
     <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">${t('logout')}</button></form>`;
   const content = document.getElementById('content');
   content.insertBefore(bar, content.firstChild);
@@ -233,8 +305,21 @@ async function syncLangFromServer() {
 }
 syncLangFromServer();
 
+/**
+ * Business-aware API paths get `?biz=studio` added automatically (or `&biz=`
+ * if the path already has a query string), so every page's own script just
+ * calls api('/api/status') and never has to know BIZ exists. Paths that are
+ * not business-specific (settings, catalog) simply ignore the extra param.
+ */
+const BIZ_AWARE_PREFIXES = ['/api/status', '/api/whatsapp', '/api/chats', '/api/bookings', '/api/test/chat'];
+function withBiz(path) {
+  if (BIZ === 'party') return path; // party is the default on every endpoint - no param needed
+  if (!BIZ_AWARE_PREFIXES.some((p) => path.startsWith(p))) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'biz=' + BIZ;
+}
+
 async function api(path, options) {
-  const res = await fetch(path, {
+  const res = await fetch(withBiz(path), {
     headers: { 'Content-Type': 'application/json' },
     ...options,
     body: options?.body ? JSON.stringify(options.body) : undefined,

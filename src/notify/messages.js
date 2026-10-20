@@ -41,6 +41,13 @@ const T = {
     photoYes: 'ja',
     bookingFooter: 'Status [PENDING]. Nach Zahlungseingang im Kalender auf [CONFIRMED] aendern.',
 
+    appointmentTitle: 'NEUE TERMINANFRAGE',
+    appointmentFields: {
+      customer: 'Kunde', whatsapp: 'WhatsApp', professional: 'Professional', service: 'Leistung',
+      price: 'Preis', date: 'Datum', time: 'Zeit', source: 'Quelle', calendar: 'Kalender',
+    },
+    appointmentFooter: 'Status [PENDING]. Nach Bestaetigung im Kalender auf [CONFIRMED] aendern.',
+
     customerWaiting: (reason, jid, text) =>
       `KUNDE WARTET\n\n${reason}\n\nChat: ${short(jid)}\nNachricht: ${cut(text) || '[Bild]'}`,
     skipReasons: {
@@ -98,6 +105,13 @@ const T = {
     },
     photoYes: 'yes',
     bookingFooter: 'Status [PENDING]. Once the payment arrives, change it to [CONFIRMED] in the calendar.',
+
+    appointmentTitle: 'NEW APPOINTMENT REQUEST',
+    appointmentFields: {
+      customer: 'Customer', whatsapp: 'WhatsApp', professional: 'Professional', service: 'Service',
+      price: 'Price', date: 'Date', time: 'Time', source: 'Source', calendar: 'Calendar',
+    },
+    appointmentFooter: 'Status [PENDING]. Once confirmed, change it to [CONFIRMED] in the calendar.',
 
     customerWaiting: (reason, jid, text) =>
       `CUSTOMER IS WAITING\n\n${reason}\n\nChat: ${short(jid)}\nMessage: ${cut(text) || '[image]'}`,

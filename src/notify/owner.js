@@ -11,14 +11,23 @@ const log = require('../log');
 const settings = require('../settings');
 const { m } = require('./messages');
 
-function createNotifier({ client }) {
+/**
+ * @param {object} deps
+ * @param {object} deps.client
+ * @param {'party'|'studio'} [deps.business] defaults to 'party' - existing callers
+ *   are unaffected. Only changes which settings keys recipients() reads from.
+ */
+function createNotifier({ client, business = 'party' }) {
   /**
    * Who gets alerts. The dedicated alert list wins; when it is empty the owner
-   * number is used, so a fresh install still notifies someone.
+   * number is used, so a fresh install still notifies someone. Studio reads its
+   * own studioAlertNumbers/studioOwnerWhatsapp settings instead.
    */
   function recipients() {
-    const raw = String(settings.get('alertNumbers') || '').trim();
-    const list = (raw || String(settings.get('ownerWhatsapp') || ''))
+    const alertKey = business === 'studio' ? 'studioAlertNumbers' : 'alertNumbers';
+    const ownerKey = business === 'studio' ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
+    const raw = String(settings.get(alertKey) || '').trim();
+    const list = (raw || String(settings.get(ownerKey) || ''))
       .split(',')
       .map((n) => n.replace(/[^0-9]/g, ''))
       .filter((n) => n.length >= 8);
@@ -100,7 +109,32 @@ function createNotifier({ client }) {
     return owner(lines.join('\n'), { kind: 'booking_request', bookingId: booking.id });
   }
 
-  return { owner, bookingRequest, recipients };
+  /** The message the owner gets for a new Studio appointment request. */
+  async function appointmentRequest(appt, extra = {}) {
+    const t = m();
+    const f = t.appointmentFields;
+    const pad = (label) => `${label}:`.padEnd(13);
+    const lines = [
+      t.appointmentTitle,
+      '',
+      `${pad(f.customer)}${appt.customerName}`,
+      `${pad(f.whatsapp)}${appt.phone}`,
+      `${pad(f.professional)}${appt.professionalName}`,
+      `${pad(f.service)}${appt.serviceName}`,
+      appt.priceChf ? `${pad(f.price)}CHF ${appt.priceChf}` : null,
+      `${pad(f.date)}${appt.date}`,
+      `${pad(f.time)}${appt.startTime}${appt.endTime ? `-${appt.endTime}` : ''}`,
+      appt.sourcePortal ? `${pad(f.source)}${appt.sourcePortal}` : null,
+      '',
+      extra.calendarLink ? `${f.calendar}: ${extra.calendarLink}` : null,
+      '',
+      t.appointmentFooter,
+    ].filter((l) => l !== null);
+
+    return owner(lines.join('\n'), { kind: 'appointment_request', appointmentId: appt.id });
+  }
+
+  return { owner, bookingRequest, appointmentRequest, recipients };
 }
 
 module.exports = { createNotifier };

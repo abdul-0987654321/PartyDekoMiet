@@ -20,18 +20,26 @@ const settings = require('../settings');
 const { m } = require('../notify/messages');
 const contacts = require('../contacts');
 
-const STATE_KEY = 'chatstate'; // { [jid]: { pausedUntil, reason, count:[ts,...] } }
+/**
+ * Both bots share the `state` table/sheet, so each needs its own pause-state key
+ * or Studio's paused chats would overwrite Party's (they also share no chat jids,
+ * but the key itself would still collide). Party keeps the original, unprefixed
+ * key for backward compatibility with state already on the sheet.
+ */
+function stateKey(business) {
+  return business === 'studio' ? 'chatstate:studio' : 'chatstate';
+}
 
-function loadState() {
+function loadState(business) {
   try {
-    const row = db.get('state', STATE_KEY);
+    const row = db.get('state', stateKey(business));
     return row?.value ? JSON.parse(row.value) : {};
   } catch {
     return {};
   }
 }
-function saveState(state) {
-  db.put('state', { key: STATE_KEY, value: JSON.stringify(state) });
+function saveState(state, business) {
+  db.put('state', { key: stateKey(business), value: JSON.stringify(state) });
 }
 
 const digits = (s) => String(s || '').replace(/[^0-9]/g, '');
@@ -122,12 +130,24 @@ function matchesOtherBusiness(text, keywordsRaw) {
   return keywords.some((k) => haystack.includes(` ${k} `) || haystack.includes(k));
 }
 
-function createRouter({ client, agent, services, notify, knowledge, voice = null }) {
+/**
+ * @param {'party'|'studio'} [business] defaults to 'party' - existing callers are
+ *   unaffected. Only the pieces that would otherwise collide between two bots on
+ *   the same shared sheet (pause-state key, chat/customer business tag, and the
+ *   owner-number / calendar settings) are parameterized; everything else
+ *   (botEnabled, takeoverPauseHours, maxMsgsPerChatPerHour, ownerVoicePreview,
+ *   otherBusinessKeywords/Reply) stays shared/global on purpose.
+ */
+function createRouter({ client, agent, services, notify, knowledge, voice = null, business = 'party' }) {
   let state = {};
   const pendingReplies = new Map(); // ownerJid -> { target, message, heard, langName, at }
 
+  /** Maps a shared settings key to its Studio-specific name when needed. */
+  const BUSINESS_SETTINGS = { ownerWhatsapp: 'studioOwnerWhatsapp', calendarId: 'studioCalendarId' };
+  const setting = (key) => settings.get(business === 'studio' && BUSINESS_SETTINGS[key] ? BUSINESS_SETTINGS[key] : key);
+
   const isOwner = (jid) => {
-    const owner = digits(settings.get('ownerWhatsapp'));
+    const owner = digits(setting('ownerWhatsapp'));
     return Boolean(owner) && digits(jid).startsWith(owner);
   };
 
@@ -140,7 +160,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
   function pause(jid, hours, reason) {
     state[jid] = { ...(state[jid] || {}), pausedUntil: Date.now() + hours * 3600 * 1000, reason };
-    saveState(state);
+    saveState(state, business);
     log.info(`Bot paused for ${jid} for ${hours}h (${reason})`);
   }
 
@@ -148,7 +168,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     if (state[jid]) {
       delete state[jid].pausedUntil;
       delete state[jid].reason;
-      saveState(state);
+      saveState(state, business);
     }
     log.info(`Bot resumed for ${jid}`);
   }
@@ -170,7 +190,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     entry.count = (entry.count || []).filter((t) => t > cutoff);
     if (entry.count.length >= max) return false;
     entry.count.push(Date.now());
-    saveState(state);
+    saveState(state, business);
     return true;
   }
 
@@ -207,7 +227,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
           `Bot: ${settings.get('botEnabled') ? 'AN' : 'AUS'}`,
           `WhatsApp: ${client.getStatus().status}`,
           `Katalog: ${cat ? `${cat.count} Produkte` : 'nicht geladen'}`,
-          `Kalender: ${settings.get('calendarId') ? 'eingerichtet' : 'fehlt'}`,
+          `Kalender: ${setting('calendarId') ? 'eingerichtet' : 'fehlt'}`,
           `Pausierte Chats: ${paused.length}`,
           ...paused.map(([j, v]) => `  ${j.split('@')[0]} bis ${new Date(v.pausedUntil).toLocaleString('de-CH')}`),
         ].join('\n');
@@ -389,7 +409,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
         const fileId = await db.putFile(`referenz-${Date.now()}.jpg`, 'image/jpeg', buffer);
         const customer = db.get('customers', jid);
         db.put('customers', {
-          ...(customer || { jid, business: 'party', createdAt: new Date().toISOString() }),
+          ...(customer || { jid, business, createdAt: new Date().toISOString() }),
           jid,
           phone: jid.split('@')[0],
           referencePhotoFileId: fileId,
@@ -529,7 +549,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
   function remember(jid, direction, text) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    db.put('chat', { id, business: 'party', at: new Date().toISOString(), jid, direction, text: String(text).slice(0, 4000) });
+    db.put('chat', { id, business, at: new Date().toISOString(), jid, direction, text: String(text).slice(0, 4000) });
   }
 
   function recentHistory(jid) {
@@ -546,7 +566,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     aiHealth: () => ({ ...aiHealth }),
     skipped: () => ({ ...skipped, notifiedAt: undefined }),
     init() {
-      state = loadState();
+      state = loadState(business);
       log.info(`Router ready (${Object.keys(state).length} known chats)`);
     },
     isPaused,

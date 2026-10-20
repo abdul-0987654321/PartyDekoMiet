@@ -85,3 +85,31 @@ describe('sending', () => {
     assert.match(sent[0].text, /Anna/);
   });
 });
+
+describe('the Studio notifier reads its own settings, not Party\'s', () => {
+  test('recipients() uses studioAlertNumbers / studioOwnerWhatsapp, never the Party ones', async () => {
+    await settings.update({
+      ownerWhatsapp: '41791111111', alertNumbers: '41792222222',
+      studioOwnerWhatsapp: '41793333333', studioAlertNumbers: '',
+    });
+    const n = createNotifier({ client, business: 'studio' });
+    assert.deepStrictEqual(n.recipients(), ['41793333333']);
+  });
+
+  test('an appointment request reaches every configured Studio number', async () => {
+    await settings.update({ studioAlertNumbers: '41793333333, 41794444444' });
+    await createNotifier({ client, business: 'studio' }).appointmentRequest({
+      id: 'A1', customerName: 'Anna', phone: '41790000000',
+      professionalName: 'Gabriela', serviceName: 'Massage 60min',
+      date: '2026-06-05', startTime: '14:00', endTime: '15:00',
+    });
+    assert.strictEqual(sent.length, 2);
+    assert.match(sent[0].text, /NEUE TERMINANFRAGE/);
+    assert.match(sent[0].text, /Gabriela/);
+  });
+
+  test('defaulting business leaves Party behaviour unchanged', async () => {
+    await settings.update({ ownerWhatsapp: '41791111111', alertNumbers: '' });
+    assert.deepStrictEqual(createNotifier({ client }).recipients(), ['41791111111']);
+  });
+});

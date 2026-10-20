@@ -27,6 +27,34 @@ const GROUPS = BIZ === 'studio'
   ? ['bot', 'studio', 'dashboard']
   : ['bot', 'contacts', 'business', 'shop', 'calendar', 'dashboard'];
 let schema = [];
+let serviceAccountEmail = null;
+
+/**
+ * The calendar field alone is not enough to connect a calendar: the client
+ * also has to SHARE that calendar with this address first, in Google
+ * Calendar itself, and that address lives in a JSON key file, not anywhere
+ * in this dashboard otherwise. Studio reuses the exact same address as
+ * Party (one shared Google service account, see HANDOFF.md) - only the
+ * calendar itself, and its ID pasted into the field below, differ.
+ */
+function calendarHint() {
+  if (!serviceAccountEmail) {
+    return `<p class="banner warn">${esc(t('cal_not_ready'))}</p>`;
+  }
+  return `<div class="card" style="margin-bottom:14px">
+    <p style="margin:0 0 8px"><b>${esc(t('cal_hint'))}</b></p>
+    <div class="inline">
+      <code id="sa_email" style="background:var(--bg);padding:6px 10px;border-radius:8px;font-size:13px;word-break:break-all">${esc(serviceAccountEmail)}</code>
+      <button class="ghost" type="button" onclick="copyEmail()">${esc(t('copy'))}</button>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:10px 0 0">${esc(t('cal_steps'))}</p>
+  </div>`;
+}
+function copyEmail() {
+  navigator.clipboard?.writeText(serviceAccountEmail);
+  const btn = document.activeElement;
+  if (btn) { const old = btn.textContent; btn.textContent = t('copied'); setTimeout(() => { btn.textContent = old; }, 1500); }
+}
 
 function fieldHtml(s) {
   const label = s.label[LANG] || s.label.de;
@@ -51,7 +79,10 @@ function render() {
   $('form').innerHTML = groups.map(g => {
     const all = schema.filter(s => s.group === g);
     const main = all.filter(s => !s.advanced), adv = all.filter(s => s.advanced);
-    return `<section class="group" id="g_${g}"><h2>${t('g_'+g)}</h2><div class="card">
+    const hint = (g === 'calendar' || g === 'studio') ? calendarHint() : '';
+    return `<section class="group" id="g_${g}"><h2>${t('g_'+g)}</h2>
+      ${hint}
+      <div class="card">
       ${main.map(fieldHtml).join('')}
       ${adv.length ? `<details class="adv"><summary>${esc(t('s_adv'))} (${adv.length})</summary>${adv.map(fieldHtml).join('')}</details>` : ''}
     </div></section>`;
@@ -89,7 +120,12 @@ async function save() {
   if (dash && !localStorage.getItem('dashLang')) setLang(dash.value);
 }
 
-async function load() { schema = (await api('/api/settings')).settings || []; render(); }
+async function load() {
+  const [s, st] = await Promise.all([api('/api/settings'), api('/api/status')]);
+  schema = s.settings || [];
+  serviceAccountEmail = st.config?.serviceAccountEmail || null;
+  render();
+}
 load();
 </script>
 </body></html>

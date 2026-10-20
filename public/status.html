@@ -32,7 +32,7 @@
   <div class="card">
     <div class="row"><span id="l_wa"></span><span id="wa">…</span></div>
     <div class="row"><span id="l_storage"></span><span id="storage">…</span></div>
-    <div class="row"><span id="l_catalog"></span><span id="catalog">…</span></div>
+    <div class="row" id="catalogrow"><span id="l_catalog"></span><span id="catalog">…</span></div>
     <div class="row"><span id="l_calendar"></span><span id="calendar">…</span></div>
     <div class="row"><span id="l_key"></span><span id="key">…</span></div>
     <div class="row"><span id="l_ai">AI</span><span id="ai">…</span></div>
@@ -136,9 +136,13 @@ async function refresh() {
     ? (d.storage.lastFlushError ? pill(d.storage.backend+' – '+t('error'),'err')
       : pill(d.storage.backend === 'memory' ? 'memory ⚠' : d.storage.backend, d.storage.backend === 'memory' ? 'warn' : 'ok'))
     : pill(t('missing'),'err');
-  $('catalog').innerHTML = d.catalog && d.catalog.count
-    ? pill(`${d.catalog.count} ${t('products')}`,'ok')
-    : pill(d.catalog && d.catalog.lastError ? t('error') : t('loading'),'warn');
+  // Studio has no Shopify shop, so there is nothing to show here at all.
+  $('catalogrow').hidden = (d.biz === 'studio');
+  if (d.biz !== 'studio') {
+    $('catalog').innerHTML = d.catalog && d.catalog.count
+      ? pill(`${d.catalog.count} ${t('products')}`,'ok')
+      : pill(d.catalog && d.catalog.lastError ? t('error') : t('loading'),'warn');
+  }
   $('calendar').innerHTML = d.config.calendarConfigured && !d.calendarError
     ? pill(t('connected'),'ok') : pill(t('not_configured'),'warn');
   $('key').innerHTML = d.config.hasOpenAiKey ? pill(t('set'),'ok') : pill(t('missing'),'err');

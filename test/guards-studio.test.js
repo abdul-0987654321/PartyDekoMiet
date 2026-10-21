@@ -85,3 +85,44 @@ describe('enforce(): a violation is replaced, never sent as-is', () => {
     assert.deepStrictEqual(g2.check('Ein Termin ist bestaetigt, sobald das Team ihn bestaetigt hat.'), []);
   });
 });
+
+describe('the allowed price list is read at reply time, not at boot', () => {
+  // Live failure: the owner added a service in the dashboard after the bot had
+  // started. list_services read it correctly, the model quoted it correctly,
+  // and the guard - still holding the list captured at boot - blocked the reply
+  // as INVENTED_PRICE. The dashboard is editable while the bot runs, so a
+  // snapshot is always one edit away from being wrong.
+  const LINE = 'We offer a service called "Home," which lasts for 10 minutes and costs CHF 100.';
+
+  test('a price added after construction is accepted', () => {
+    let prices = [];
+    const g = createStudioGuards({ allowedPrices: () => prices });
+    assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, true, 'unknown price must be blocked');
+
+    prices = [100]; // the owner saves the service in the dashboard
+    assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, false, 'it is a real price now');
+  });
+
+  test('a price removed after construction stops being accepted', () => {
+    let prices = [100];
+    const g = createStudioGuards({ allowedPrices: () => prices });
+    assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, false);
+
+    prices = []; // the owner deactivates it
+    assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, true);
+  });
+
+  test('a plain array still works, so existing callers are unaffected', () => {
+    assert.strictEqual(createStudioGuards({ allowedPrices: [100] }).enforce(LINE, { lang: 'en' }).blocked, false);
+    assert.strictEqual(createStudioGuards({ allowedPrices: [120] }).enforce(LINE, { lang: 'en' }).blocked, true);
+  });
+
+  test('a directory that throws blocks the price, it does not open the gate', () => {
+    const g = createStudioGuards({
+      allowedPrices: () => {
+        throw new Error('Sheet unreachable');
+      },
+    });
+    assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, true);
+  });
+});

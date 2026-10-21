@@ -93,7 +93,13 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
   for (const answer of faqAnswers) {
     for (const s of sentences(answer)) allowed.add(normalise(s));
   }
-  const ctx = { allowedPrices };
+  // Read at check time, not at construction. The whole point of the dashboard
+  // is that the owner edits services while the bot is running; a list captured
+  // at boot makes every service added since then an "invented price", and the
+  // bot's own correct answer - read straight out of the directory by
+  // list_services - gets blocked. That happened live: the agent quoted CHF 100
+  // from the directory and the guard, still holding boot's empty list, killed it.
+  const readPrices = typeof allowedPrices === 'function' ? allowedPrices : () => allowedPrices;
 
   function autofix(text) {
     let out = String(text).replace(/ß/g, 'ss');
@@ -104,6 +110,15 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
 
   function check(text) {
     const found = [];
+    let prices;
+    try {
+      prices = readPrices() || [];
+    } catch (err) {
+      // A directory that cannot be read must not open the gate: with no known
+      // prices, every price is unknown, which is what an empty list means.
+      prices = [];
+    }
+    const ctx = { allowedPrices: prices };
     for (const sentence of sentences(autofix(text))) {
       if (allowed.has(normalise(sentence))) continue;
       const probe = fold(sentence);

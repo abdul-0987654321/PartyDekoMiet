@@ -200,10 +200,14 @@ async function bootStudio() {
     studioState.knowledge = { source: knowledge.source, faqEntries: knowledge.faq.length };
 
     if (config.openai.apiKey) {
-      const activePrices = directory
-        .listServices({ activeOnly: true })
-        .map((s) => Number(s.priceChf))
-        .filter((n) => Number.isFinite(n) && n > 0);
+      // A function, not a list: the owner adds and edits services in the
+      // dashboard while the bot runs, and a list read once at boot makes every
+      // later service an "invented price".
+      const activePrices = () =>
+        directory
+          .listServices({ activeOnly: true })
+          .map((s) => Number(s.priceChf))
+          .filter((n) => Number.isFinite(n) && n > 0);
       const guards = createStudioGuards({
         faqAnswers: knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
         allowedPrices: activePrices,
@@ -212,7 +216,10 @@ async function bootStudio() {
       const OpenAI = require('openai');
       const openai = new OpenAI({ apiKey: config.openai.apiKey });
       studioRuntime.agent = createAgent({ openai, knowledge, guards, tools: studioTools, config: config.openai });
-      log.info(`[studio] Agent ready (${activePrices.length} active service price(s) allowed)`);
+      log.info(
+        `[studio] Agent ready (${activePrices().length} active service price(s) right now, ` +
+          're-read from the dashboard on every reply)'
+      );
     } else {
       log.warn('[studio] OPENAI_API_KEY is not set - the Studio bot cannot answer customers.');
     }

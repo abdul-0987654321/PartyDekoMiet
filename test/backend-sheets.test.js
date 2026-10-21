@@ -106,6 +106,9 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
           text: async () => '',
         };
       }
+      if (step.status404) {
+        return { status: 404, headers: { get: () => null }, text: async () => '<!DOCTYPE html><html>' };
+      }
       return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify(step.body) };
     };
     return calls;
@@ -175,6 +178,22 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
       assert.doesNotMatch(err.message, /user_content_key=k/, 'the key must not reach the log');
       return true;
     });
+  });
+
+  test('an expired result URL is named as such, and retried with a fresh POST', async () => {
+    // Seen live: Google expires the one-shot result URL and answers 404 with a
+    // page of HTML, which surfaced as "returned non-JSON" plus 200 characters
+    // of Google markup - unreadable, and it looks like a config error.
+    const calls = scriptFetch([
+      { to: ECHO },
+      { status404: true },
+      { to: ECHO },
+      { body: DATA },
+    ]);
+    const data = await sheets().load(TABLES);
+
+    assert.deepStrictEqual(data.customers, []);
+    assert.strictEqual(calls[2].method, 'POST', 'the retry must POST again, not re-GET the dead URL');
   });
 
   test('a normal 200 still goes straight through', async () => {

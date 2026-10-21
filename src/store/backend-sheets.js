@@ -83,6 +83,16 @@ function createSheetsBackend({ url, secret }) {
     // The echo URL: GET is correct here, the script has already run.
     const echo = await fetch(next, { redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS) });
     trace.push(`GET ${redact(next)} -> ${echo.status}`);
+    // Google hands out a one-shot URL for the result and expires it quickly. A
+    // 404 here means the result is gone, not that anything is misconfigured -
+    // and it carries a page of Google HTML that buries the real message. The
+    // POST has to be made again to get a fresh one, which the retry loop does.
+    if (echo.status === 404) {
+      throw new Error(
+        "Apps Script's one-time result URL had already expired (HTTP 404). " +
+          'This is a Google-side timeout, not a configuration problem - retrying with a fresh POST.'
+      );
+    }
     return { status: echo.status, text: await echo.text(), trace };
   }
 

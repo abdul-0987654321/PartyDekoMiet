@@ -18,6 +18,7 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
   const client = createCalendarClient({
     serviceAccountJsonB64,
     getCalendarId: () => settings.get('studioCalendarId'),
+    settingName: 'STUDIO_CALENDAR_ID (dashboard: Studio settings -> Kalender-ID)',
   });
   if (!client) return null;
 

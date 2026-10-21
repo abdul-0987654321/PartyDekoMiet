@@ -66,7 +66,7 @@ function readServiceAccount(raw) {
   return json;
 }
 
-function createCalendarClient({ serviceAccountJsonB64, getCalendarId }) {
+function createCalendarClient({ serviceAccountJsonB64, getCalendarId, settingName = 'GOOGLE_CALENDAR_ID' }) {
   const key = readServiceAccount(serviceAccountJsonB64);
   if (!key) return null;
 
@@ -96,14 +96,20 @@ function createCalendarClient({ serviceAccountJsonB64, getCalendarId }) {
       } catch {
         /* keep the raw text */
       }
+      // Name the setting this client actually reads, and quote the id it tried.
+      // The two businesses have separate calendars, so a message hardcoded to
+      // GOOGLE_CALENDAR_ID sends whoever is debugging the Studio to the wrong
+      // setting - and a 404 is just as often a typo in the id as a missing share.
       if (res.status === 404) {
         throw new Error(
-          `Calendar not found. Check GOOGLE_CALENDAR_ID and that the calendar is shared with ${key.client_email} with "Make changes to events".`
+          `Calendar "${getCalendarId()}" not found. Check ${settingName}, and that this calendar ` +
+            `is shared with ${key.client_email} with "Make changes to events".`
         );
       }
       if (res.status === 403) {
         throw new Error(
-          `Calendar access denied. Share the calendar with ${key.client_email} and give it "Make changes to events". (${detail})`
+          `Calendar "${getCalendarId()}" access denied. Share it with ${key.client_email} and give it ` +
+            `"Make changes to events". (${detail})`
         );
       }
       throw new Error(`Calendar API ${res.status}: ${detail}`);

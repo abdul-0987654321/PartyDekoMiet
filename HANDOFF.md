@@ -3,8 +3,8 @@
 Everything a new session (or a new developer) needs to continue without asking.
 Read this first, then `README.md`.
 
-Last updated 2026-10-22. The WhatsApp 405 login failure is diagnosed and
-fixed (see section 8). The Studio bot is fully built and live in the
+Last updated 2026-10-22. Two live bugs fixed: the WhatsApp 405 login failure
+(no QR ever appeared) and a crash on every Studio message. See section 8. The Studio bot is fully built and live in the
 dashboard: its own WhatsApp number, agent, guards, calendar, appointments, and
 a Party/Studio switch with Professionals/Services/Locations pages. What's left
 is data entry (the roster, the calendar ID, the phone number), not code - see
@@ -286,6 +286,41 @@ version of that check.
 None of 1-4 need a push or a redeploy. They're exactly the kind of gap this
 was built to let the client fill in himself (see "Why the data layer came
 first" below).
+
+### Studio bot threw on every message - fixed (2026-10-22)
+
+Found right after the 405 fix let the QR through: the first real Studio message
+answered "Sorry, I am having a technical problem right now." Log line:
+
+    AI call failed for ...@lid: Cannot read properties of undefined (reading 'address')
+
+**Cause.** `src/agent/prompt.js` was written for the rental shop and read
+`b.pickup.address` unconditionally. The Studio's `business.json` has no `pickup`
+object at all - by design, its addresses live in the dashboard `locations` table.
+So the prompt threw before the model was ever called, on every message.
+`business.money.depositChf` in the request-flow section was the same bug again.
+
+Worse than the crash: even once it stopped throwing, the Studio was being handed
+PartyDekoMiet's tool list (`search_products`, `send_product`) and the decoration
+booking flow, for tools it does not have.
+
+**Fix.** Every block in `renderBusiness()` is now conditional, and the tools +
+request flow moved out of `prompt.js` into each business's own knowledge folder:
+
+| File | Belongs to |
+|---|---|
+| `knowledge/workflow.md` | rental: search_products, send_product, check_availability, create_booking_request |
+| `knowledge-studio/workflow.md` | studio: list_professionals, get_professional_profile, check_appointment_slot, create_appointment_request |
+
+`from-files.js` loads `workflow.md` when present; `{{depositChf}}` is the one
+value substituted from business.json. Party's generated prompt was verified
+byte-identical before and after this refactor.
+
+`test/prompt-businesses.test.js` (11 tests) builds BOTH prompts for real and
+asserts neither leaks the other's tools - that is the regression guard, since
+this class of bug only shows up at runtime on the business that lacks a field.
+
+---
 
 ### The 405 that blocked both numbers - root cause found (2026-10-22)
 

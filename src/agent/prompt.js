@@ -15,29 +15,73 @@ function renderFaq(faq) {
     .join('\n\n');
 }
 
+/**
+ * Renders the business facts for the system prompt.
+ *
+ * Every block is optional, because this file serves BOTH bots: the rental shop
+ * has pickup/rental/deposit facts, the Studio has none of them (its services,
+ * prices, addresses and hours live in the dashboard tables and reach the model
+ * through the agent tools instead). Reading `b.pickup.address` unconditionally
+ * threw "Cannot read properties of undefined" on every single Studio message.
+ */
 function renderBusiness(b) {
-  const lines = [
-    `Name: ${b.name} (${b.website})`,
+  const blocks = [];
+
+  blocks.push([
+    `Name: ${b.name}${b.website ? ` (${b.website})` : ''}`,
     `Angebot: ${b.whatWeDo}`,
-    `Katalog: ${b.catalogUrl}`,
-    '',
-    `Abholung: ausschliesslich Selbstabholung, ${b.pickup.address} (${b.pickup.addressDetail}).`,
-    `Abholzeitpunkt: ${
-      b.pickup.hours
-        ? `moegliche Zeiten ${b.pickup.hours}; der genaue Zeitpunkt wird vorab vereinbart.`
-        : 'wird immer vorab vereinbart. Nenne keine festen Zeiten, du kennst die Oeffnungszeiten nicht.'
-    }`,
-    `Fahrzeug: ${b.pickup.vehicleNote}`,
-    b.showroom ? `Showroom/Atelier: ${b.showroom.address}. ${b.showroom.note}` : null,
-    '',
-    `Mietdauer: ${b.rental.daysLabel} (${b.rental.days} Tage).`,
-    `Kaution: CHF ${b.money.depositChf}.- , zurueck nach ${b.money.depositRefundCondition}.`,
-    `Verspaetung: CHF ${b.money.lateFeeChfPerStartedDay}.- pro angefangenem Tag.`,
-    `Zahlung: ${b.money.paymentNote}`,
-    '',
-    `Nicht im Angebot: ${b.notOffered.join(', ')}.`,
-  ];
-  return lines.filter((l) => l !== null).join('\n');
+    b.catalogUrl ? `Katalog: ${b.catalogUrl}` : null,
+  ]);
+
+  const place = [];
+  if (b.pickup) {
+    place.push(
+      `Abholung: ausschliesslich Selbstabholung, ${b.pickup.address}` +
+        `${b.pickup.addressDetail ? ` (${b.pickup.addressDetail})` : ''}.`,
+      `Abholzeitpunkt: ${
+        b.pickup.hours
+          ? `moegliche Zeiten ${b.pickup.hours}; der genaue Zeitpunkt wird vorab vereinbart.`
+          : 'wird immer vorab vereinbart. Nenne keine festen Zeiten, du kennst die Oeffnungszeiten nicht.'
+      }`
+    );
+    if (b.pickup.vehicleNote) place.push(`Fahrzeug: ${b.pickup.vehicleNote}`);
+  }
+  if (b.showroom) place.push(`Showroom/Atelier: ${b.showroom.address}. ${b.showroom.note}`);
+  blocks.push(place);
+
+  const terms = [];
+  if (b.rental) terms.push(`Mietdauer: ${b.rental.daysLabel} (${b.rental.days} Tage).`);
+  if (b.money) {
+    const m = b.money;
+    if (m.depositChf !== undefined) {
+      terms.push(`Kaution: CHF ${m.depositChf}.- , zurueck nach ${m.depositRefundCondition}.`);
+    }
+    if (m.lateFeeChfPerStartedDay !== undefined) {
+      terms.push(`Verspaetung: CHF ${m.lateFeeChfPerStartedDay}.- pro angefangenem Tag.`);
+    }
+    if (m.paymentNote) terms.push(`Zahlung: ${m.paymentNote}`);
+  }
+  blocks.push(terms);
+
+  blocks.push([
+    b.notOffered?.length ? `Nicht im Angebot: ${b.notOffered.join(', ')}.` : null,
+  ]);
+
+  // Drop empty blocks, then separate the surviving ones with a blank line.
+  return blocks
+    .map((lines) => lines.filter((l) => l !== null && l !== undefined))
+    .filter((lines) => lines.length)
+    .map((lines) => lines.join('\n'))
+    .join('\n\n');
+}
+
+/**
+ * The tools and request flow, from the business's own knowledge folder.
+ * `{{depositChf}}` is the one value the text needs from business.json.
+ */
+function renderWorkflow(workflow, business) {
+  if (!workflow) return '';
+  return workflow.replace(/\{\{depositChf\}\}/g, business?.money?.depositChf ?? '');
 }
 
 /**
@@ -50,7 +94,7 @@ function renderBusiness(b) {
  * @returns {string}
  */
 function buildSystemPrompt(knowledge, ctx = {}) {
-  const { business, faq, rules, persona, damagePrices } = knowledge;
+  const { business, faq, rules, persona, damagePrices, workflow } = knowledge;
   const today = ctx.today || new Date().toISOString().slice(0, 10);
   // The language is decided outside the model and stated here as an instruction.
   // Leaving it to the model meant it re-decided every turn and drifted back to
@@ -82,33 +126,7 @@ handoff_to_human weiter.
 
 ${damagePrices}` : ''}
 
-# Werkzeuge
-Du hast Werkzeuge. Benutze sie, statt zu raten:
-- search_products: wenn der Kunde ein Thema, eine Farbe oder ein Set sucht. Nie Produkte
-  aus dem Gedaechtnis nennen, nie Preise erfinden.
-- send_product: schickt Bild, Name, Preis und Link. Hoechstens 3 Produkte pro Nachricht.
-  Produkte zeigst du IMMER mit send_product, nie als Textliste mit Links - der Kunde
-  soll die Bilder sehen. Danach schreibst du nur noch einen kurzen Satz oder eine Frage.
-- check_availability: immer bevor du etwas ueber freie Daten sagst. Nie aus dem Bauch.
-  Nenne dem Kunden genau das return_date aus dem Ergebnis als Rueckgabetag - es
-  beruecksichtigt Ruhetage (z.B. Abholung Freitag, Rueckgabe Montag), rechne es nicht selbst.
-- create_booking_request: erst wenn Produkt, Datum und Name des Kunden bekannt sind.
-- handoff_to_human: bei Schaden, Storno, Aenderung, Ausnahme, Verlaengerung oder wenn du
-  unsicher bist. Lieber einmal zu oft als einmal zu wenig.
-
-Wenn ein Werkzeug fehlschlaegt oder nichts findet, sage das ehrlich und kurz. Erfinde nichts.
-
-Eine Nachricht, die mit 🎤 beginnt, war eine Sprachnachricht und wurde automatisch
-abgeschrieben. Beantworte sie normal als Text. Ist sie unklar, frag kurz nach.
-
-# Ablauf einer Anfrage
-1. Anlass, Motto/Farben, Alter des Geburtstagskinds und Partydatum erfragen (max. 2 Fragen pro Nachricht).
-2. Passende Sets mit search_products suchen und mit send_product zeigen.
-3. Mit check_availability den 3-Tage-Zeitraum pruefen.
-4. Wenn frei: create_booking_request, dann den Shop-Link schicken und um die Zahlung
-   im Shop bitten (Mietpreis + CHF ${business.money.depositChf}.- Kaution).
-5. Klar sagen: die Anfrage ist weitergegeben, verbindlich wird sie erst nach Pruefung
-   und Zahlungseingang. Nie "bestaetigt" sagen.`;
+${renderWorkflow(workflow, business)}`;
 }
 
-module.exports = { buildSystemPrompt, renderBusiness, renderFaq };
+module.exports = { buildSystemPrompt, renderBusiness, renderFaq, renderWorkflow };

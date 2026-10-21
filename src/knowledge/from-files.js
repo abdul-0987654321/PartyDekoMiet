@@ -33,6 +33,10 @@ function load({ dir } = {}) {
     faq: faq.entries,
     rules: readText(root, 'rules.md'),
     persona: readText(root, 'persona.md'),
+    // Optional: the tools + request flow for THIS business. Each bot has its own
+    // (the rental shop and the Studio share no tools at all), so it lives in the
+    // knowledge folder rather than being hardcoded in prompt.js.
+    workflow: fs.existsSync(path.join(root, 'workflow.md')) ? readText(root, 'workflow.md') : '',
     // Optional: the owner's official damage / loss price list.
     damagePrices: fs.existsSync(path.join(root, 'damage-prices.md')) ? readText(root, 'damage-prices.md') : '',
   };

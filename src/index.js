@@ -229,6 +229,7 @@ async function bootStudio() {
       const guards = createStudioGuards({
         faqAnswers: () => liveKnowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
         allowedPrices: activePrices,
+        priceMode: () => settings.get('studioPriceGuard'),
       });
 
       const OpenAI = require('openai');

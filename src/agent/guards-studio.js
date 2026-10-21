@@ -88,7 +88,13 @@ function invalidPriceRule(sentence, ctx) {
  * @param {string[]} [opts.faqAnswers]     verbatim client answers - always allowed
  * @param {number[]} [opts.allowedPrices]  every active service's priceChf, across all professionals
  */
-function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
+/**
+ * @param {object} opts
+ * @param {function|string} [opts.priceMode] 'warn' (default) or 'block'; a
+ *   function is read per reply, so the dashboard switch takes effect at once.
+ */
+function createStudioGuards({ faqAnswers = [], allowedPrices = [], priceMode = 'warn' } = {}) {
+  const readPriceMode = typeof priceMode === 'function' ? priceMode : () => priceMode;
   // Both the whitelist and the price list are read per check, never captured
   // here: the owner edits FAQ answers and services in the dashboard while the
   // bot is running, and a snapshot taken at construction blocks whatever was
@@ -166,14 +172,27 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
     en: 'Let me check that with the team - I am forwarding your question.',
   };
 
+  /**
+   * INVENTED_PRICE is the one rule the client never asked for - it is an
+   * engineering safeguard against the bot quoting a price nobody set. The
+   * owner decides whether that holds a reply back or only gets noted, because
+   * while the service list is still being filled in it blocks correct answers
+   * too. The other three rules are what the client agreed to in writing on
+   * 17-18 Oct and are not negotiable from here.
+   */
+  const warnOnly = (v) => v.code === 'INVENTED_PRICE' && readPriceMode() !== 'block';
+
   function enforce(text, { lang = 'de' } = {}) {
     const original = String(text ?? '');
     const fixed = autofix(original);
     const violations = check(fixed);
-    if (violations.length) {
-      return { text: FALLBACK[lang] || FALLBACK.de, violations, blocked: true, sharpSFixed: fixed !== original };
+    const blocking = violations.filter((v) => !warnOnly(v));
+    if (blocking.length) {
+      return { text: FALLBACK[lang] || FALLBACK.de, violations, blocked: true, warned: [], sharpSFixed: fixed !== original };
     }
-    return { text: fixed, violations: [], blocked: false, sharpSFixed: fixed !== original };
+    // Everything that was found is warn-only: the reply goes out, and the log
+    // still records what tripped, so a genuinely invented price is visible.
+    return { text: fixed, violations: [], warned: violations, blocked: false, sharpSFixed: fixed !== original };
   }
 
   return { check, enforce, autofix };

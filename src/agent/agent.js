@@ -219,6 +219,15 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
         );
         handoff = true;
       }
+      // Noted but not held back - the reply is going out, so this has to be
+      // findable afterwards rather than silently dropped.
+      if (guarded.warned?.length) {
+        log.warn(
+          `Guard noted (reply sent anyway): ${guarded.warned.map((v) => v.code).join(', ')} | ` +
+            guarded.warned.map((v) => `"${v.sentence}"`).join(' ') +
+            ` | ${guarded.warned.map((v) => v.hint).join(' / ')}`
+        );
+      }
       return { ...guarded, toolCalls, handoff, lang };
     }
 

@@ -295,6 +295,25 @@ const SCHEMA = [
     },
   },
   {
+    key: 'studioPriceGuard', group: 'studio', type: 'enum', default: 'warn', env: 'STUDIO_PRICE_GUARD',
+    options: ['warn', 'block'],
+    optionLabels: {
+      warn: {
+        de: 'Durchlassen und im Log vermerken',
+        en: 'Let it through and note it in the log',
+      },
+      block: {
+        de: 'Antwort zurueckhalten und an das Team uebergeben',
+        en: 'Hold the reply back and hand over to the team',
+      },
+    },
+    label: { de: 'Preise ausserhalb der Liste (Studio)', en: 'Prices outside the list (Studio)' },
+    help: {
+      de: 'Was passiert, wenn der Bot einen Preis nennt, der zu keinem aktiven Service gehoert. "Zurueckhalten" ist sicherer, blockiert aber auch richtige Antworten, solange die Serviceliste unvollstaendig ist.',
+      en: 'What happens when the bot names a price that belongs to no active service. "Hold back" is safer, but it also blocks correct answers while the service list is incomplete.',
+    },
+  },
+  {
     key: 'studioCalendarId', group: 'studio', type: 'string', default: '', env: 'STUDIO_CALENDAR_ID',
     placeholder: 'xxxx@group.calendar.google.com',
     label: { de: 'Kalender-ID (Studio)', en: 'Calendar ID (Studio)' },

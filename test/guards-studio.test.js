@@ -96,7 +96,7 @@ describe('the allowed price list is read at reply time, not at boot', () => {
 
   test('a price added after construction is accepted', () => {
     let prices = [];
-    const g = createStudioGuards({ allowedPrices: () => prices });
+    const g = createStudioGuards({ allowedPrices: () => prices, priceMode: 'block' });
     assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, true, 'unknown price must be blocked');
 
     prices = [100]; // the owner saves the service in the dashboard
@@ -105,7 +105,7 @@ describe('the allowed price list is read at reply time, not at boot', () => {
 
   test('a price removed after construction stops being accepted', () => {
     let prices = [100];
-    const g = createStudioGuards({ allowedPrices: () => prices });
+    const g = createStudioGuards({ allowedPrices: () => prices, priceMode: 'block' });
     assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, false);
 
     prices = []; // the owner deactivates it
@@ -113,16 +113,73 @@ describe('the allowed price list is read at reply time, not at boot', () => {
   });
 
   test('a plain array still works, so existing callers are unaffected', () => {
-    assert.strictEqual(createStudioGuards({ allowedPrices: [100] }).enforce(LINE, { lang: 'en' }).blocked, false);
-    assert.strictEqual(createStudioGuards({ allowedPrices: [120] }).enforce(LINE, { lang: 'en' }).blocked, true);
+    assert.strictEqual(createStudioGuards({ allowedPrices: [100], priceMode: 'block' }).enforce(LINE, { lang: 'en' }).blocked, false);
+    assert.strictEqual(createStudioGuards({ allowedPrices: [120], priceMode: 'block' }).enforce(LINE, { lang: 'en' }).blocked, true);
   });
 
   test('a directory that throws blocks the price, it does not open the gate', () => {
     const g = createStudioGuards({
+      priceMode: 'block',
       allowedPrices: () => {
         throw new Error('Sheet unreachable');
       },
     });
     assert.strictEqual(g.enforce(LINE, { lang: 'en' }).blocked, true);
+  });
+});
+
+describe('the price rule is the owner\'s call; the agreed rules are not', () => {
+  // INVENTED_PRICE is an engineering safeguard, not something the client asked
+  // for, and while the service list is incomplete it blocks correct answers.
+  // The owner chooses warn or block. The three rules the client agreed to in
+  // writing on 17-18 Oct always block, whatever this is set to.
+  const PRICE_LINE = 'We offer a service called "Home," which lasts for 10 minutes and costs 100 CHF.';
+  const EXTRA_LINE = 'We can offer intimate options as well.';
+  const AS_HER_LINE = 'Ich bin Gabriela, 28 Jahre alt.';
+
+  test('warn (the default): the reply goes out and the violation is reported', () => {
+    const g = createStudioGuards({ allowedPrices: [] });
+    const res = g.enforce(PRICE_LINE, { lang: 'en' });
+    assert.strictEqual(res.blocked, false);
+    assert.strictEqual(res.text, PRICE_LINE, 'the customer gets the real answer');
+    assert.deepStrictEqual(res.warned.map((v) => v.code), ['INVENTED_PRICE']);
+    assert.match(res.warned[0].hint, /no active service has a price/);
+  });
+
+  test('block: the reply is held back, as before', () => {
+    const g = createStudioGuards({ allowedPrices: [], priceMode: 'block' });
+    const res = g.enforce(PRICE_LINE, { lang: 'en' });
+    assert.strictEqual(res.blocked, true);
+    assert.notStrictEqual(res.text, PRICE_LINE);
+  });
+
+  test('the mode is read per reply, so the dashboard switch is immediate', () => {
+    let mode = 'warn';
+    const g = createStudioGuards({ allowedPrices: [], priceMode: () => mode });
+    assert.strictEqual(g.enforce(PRICE_LINE, { lang: 'en' }).blocked, false);
+    mode = 'block';
+    assert.strictEqual(g.enforce(PRICE_LINE, { lang: 'en' }).blocked, true);
+  });
+
+  test('a real price is neither blocked nor warned about', () => {
+    const g = createStudioGuards({ allowedPrices: [100] });
+    const res = g.enforce(PRICE_LINE, { lang: 'en' });
+    assert.strictEqual(res.blocked, false);
+    assert.deepStrictEqual(res.warned, []);
+  });
+
+  for (const [name, line] of [['sexual extras', EXTRA_LINE], ['speaking as the professional', AS_HER_LINE]]) {
+    test(`${name} is still blocked in warn mode`, () => {
+      const g = createStudioGuards({ allowedPrices: [], priceMode: 'warn' });
+      const res = g.enforce(line, { lang: line === EXTRA_LINE ? 'en' : 'de' });
+      assert.strictEqual(res.blocked, true, 'this one is not the owner\'s to switch off');
+    });
+  }
+
+  test('a blocking rule wins even when a price warning is present too', () => {
+    const g = createStudioGuards({ allowedPrices: [], priceMode: 'warn' });
+    const res = g.enforce(`${PRICE_LINE} ${EXTRA_LINE}`, { lang: 'en' });
+    assert.strictEqual(res.blocked, true);
+    assert.ok(res.violations.some((v) => v.code === 'SEXUAL_EXTRA_OFFERED'));
   });
 });

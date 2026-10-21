@@ -20,7 +20,6 @@
 const {
   default: makeWASocket,
   DisconnectReason,
-  Browsers,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   downloadMediaMessage,
@@ -69,6 +68,40 @@ function createWhatsAppClient(business = 'party') {
   // owner clicking "Connect"/"Re-link" by hand), automatic retries stop and the
   // dashboard asks for a manual retry instead.
   const MAX_AUTO_RECONNECTS = 10;
+
+  /**
+   * WhatsApp's servers have been rejecting fresh device registrations with code
+   * 405 across the whole Baileys ecosystem since at least Feb 2026 - not specific
+   * to this bot, this fork, or this host (see WhiskeySockets/Baileys#2370).
+   * fetchLatestBaileysVersion() is implicated: it can hand back a protocol
+   * version WhatsApp no longer accepts. The most-reported workaround is pinning
+   * a known-good version instead of asking WhatsApp what "latest" is. An env
+   * var lets that pin be updated later without a code change, if this one stops
+   * working as WhatsApp keeps moving the target.
+   */
+  const PINNED_WA_VERSION = (() => {
+    const raw = process.env.WHATSAPP_VERSION;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === 3) return parsed;
+      } catch {
+        /* fall through to the default below */
+      }
+    }
+    return [2, 3000, 1033893291];
+  })();
+
+  /** Alternates strategy by attempt, so both are tried within the retry budget. */
+  async function resolveVersion() {
+    if (runtime.reconnectAttempts % 2 === 1) return PINNED_WA_VERSION;
+    try {
+      const { version } = await fetchLatestBaileysVersion();
+      return version;
+    } catch {
+      return PINNED_WA_VERSION;
+    }
+  }
   const typingDelay = () => {
     const min = Number(settings.get('typingMinMs')) || 0;
     const max = Math.max(min, Number(settings.get('typingMaxMs')) || min);
@@ -233,18 +266,16 @@ function createWhatsAppClient(business = 'party') {
     try {
       detachSocket();
       const { state, saveCreds } = useSheetAuthState(business);
-      let version;
-      try {
-        ({ version } = await fetchLatestBaileysVersion());
-      } catch {
-        version = undefined; // fall back to the library's built-in version
-      }
-      log.info(`${logTag}Starting WhatsApp connection (${hasSession(business) ? 'stored session' : 'new session, QR needed'})`);
+      const version = await resolveVersion();
+      log.info(
+        `${logTag}Starting WhatsApp connection (${hasSession(business) ? 'stored session' : 'new session, QR needed'}, ` +
+          `protocol ${version ? version.join('.') : 'library default'})`
+      );
       const sock = makeWASocket({
         ...(version ? { version } : {}),
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, baileysLogger) },
         logger: baileysLogger,
-        browser: Browsers.macOS('Chrome'),
+        browser: ['PartyDekoMiet', 'Chrome', '120.0.0'],
         markOnlineOnConnect: false,
         syncFullHistory: false,
         shouldSyncHistoryMessage: () => false,

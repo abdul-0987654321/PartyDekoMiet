@@ -322,6 +322,35 @@ this class of bug only shows up at runtime on the business that lacks a field.
 
 ---
 
+### Boot loop: "Google Sheet not reachable" (2026-10-22)
+
+After the deploy, boot looped on:
+
+    Google Sheet not reachable: Cannot convert undefined or null to object
+
+That message was wrong twice over: the Sheet WAS reachable (it answered), and
+the error names a JS type error rather than the cause. What actually happened:
+'load' answered `{ok:true}` with no `data`, so `Object.entries(undefined)` threw
+three frames later in `db.init()`.
+
+**Root cause: the deployed Apps Script is older than this app.** Deploying this
+repo does NOT update Code.gs - it lives in the client's Google account and has
+to be pasted into the Apps Script editor by hand. The Studio work added four
+tables (professionals, services, locations, appointments) that an older
+deployment does not serve.
+
+**Fixed in `src/store/backend-sheets.js`:** `load()` now validates the answer
+and fails with the cause and the fix in the message, naming any table that came
+back empty. `state.storageError` says "storage failed" rather than "not
+reachable". `test/backend-sheets.test.js` covers it.
+
+**If this appears again, the fix is in Google, not in this repo:**
+open the Sheet - Extensions - Apps Script - paste the current
+`apps-script/Code.gs` - Deploy - Manage deployments - Edit (pencil) - Deploy.
+Editing the code alone is not enough; the deployment has to be updated too.
+
+---
+
 ### The 405 that blocked both numbers - root cause found (2026-10-22)
 
 Symptom: neither number could log in. The dashboard showed no QR code at all,

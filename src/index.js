@@ -80,7 +80,7 @@ async function connectStorage() {
       state.storageError = null;
       return;
     } catch (err) {
-      state.storageError = `Google Sheet not reachable: ${err.message}`;
+      state.storageError = `Google Sheet storage failed: ${err.message}`;
       log.error(`${state.storageError} (attempt ${attempt}, retrying in 15s)`);
       await new Promise((r) => setTimeout(r, 15000));
     }

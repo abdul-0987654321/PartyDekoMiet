@@ -17,18 +17,29 @@
  * up by calling `createWhatsAppClient('studio')` for a second, independent instance.
  */
 
+const baileys = require('@itsliaaa/baileys');
+
 const {
   default: makeWASocket,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   downloadMediaMessage,
-} = require('@itsliaaa/baileys');
+} = baileys;
+
 const QRCode = require('qrcode');
 const pino = require('pino');
 const log = require('../log');
 const settings = require('../settings');
 const { useSheetAuthState, clearSession, hasSession } = require('./auth-state');
+const { resolveWaVersion } = require('./wa-version');
+
+// Reads the build web.whatsapp.com is actually serving, instead of the Baileys
+// repo's hardcoded list - see wa-version.js for why that matters. Resolved
+// defensively so an older fork without the export still loads; resolveWaVersion()
+// simply skips a missing fetcher.
+const fetchLatestWaWebVersion =
+  baileys.fetchLatestWaWebVersion || baileys.default?.fetchLatestWaWebVersion || null;
 
 const baileysLogger = pino({ level: 'silent' });
 
@@ -70,38 +81,21 @@ function createWhatsAppClient(business = 'party') {
   const MAX_AUTO_RECONNECTS = 10;
 
   /**
-   * WhatsApp's servers have been rejecting fresh device registrations with code
-   * 405 across the whole Baileys ecosystem since at least Feb 2026 - not specific
-   * to this bot, this fork, or this host (see WhiskeySockets/Baileys#2370).
-   * fetchLatestBaileysVersion() is implicated: it can hand back a protocol
-   * version WhatsApp no longer accepts. The most-reported workaround is pinning
-   * a known-good version instead of asking WhatsApp what "latest" is. An env
-   * var lets that pin be updated later without a code change, if this one stops
-   * working as WhatsApp keeps moving the target.
+   * Which protocol version to announce. The whole 405 story and the ordering
+   * live in wa-version.js; this just adds the per-business log prefix.
    */
-  const PINNED_WA_VERSION = (() => {
-    const raw = process.env.WHATSAPP_VERSION;
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length === 3) return parsed;
-      } catch {
-        /* fall through to the default below */
-      }
-    }
-    return [2, 3000, 1033893291];
-  })();
-
-  /** Alternates strategy by attempt, so both are tried within the retry budget. */
   async function resolveVersion() {
-    if (runtime.reconnectAttempts % 2 === 1) return PINNED_WA_VERSION;
-    try {
-      const { version } = await fetchLatestBaileysVersion();
-      return version;
-    } catch {
-      return PINNED_WA_VERSION;
-    }
+    const { version } = await resolveWaVersion({
+      fetchWaWeb: fetchLatestWaWebVersion,
+      fetchBaileys: fetchLatestBaileysVersion,
+      log: {
+        info: (msg) => log.info(`${logTag}${msg}`),
+        warn: (msg) => log.warn(`${logTag}${msg}`),
+      },
+    });
+    return version;
   }
+
   const typingDelay = () => {
     const min = Number(settings.get('typingMinMs')) || 0;
     const max = Math.max(min, Number(settings.get('typingMaxMs')) || min);

@@ -3,7 +3,8 @@
 Everything a new session (or a new developer) needs to continue without asking.
 Read this first, then `README.md`.
 
-Last updated 2026-10-20. The Studio bot is now fully built and live in the
+Last updated 2026-10-22. The WhatsApp 405 login failure is diagnosed and
+fixed (see section 8). The Studio bot is fully built and live in the
 dashboard: its own WhatsApp number, agent, guards, calendar, appointments, and
 a Party/Studio switch with Professionals/Services/Locations pages. What's left
 is data entry (the roster, the calendar ID, the phone number), not code - see
@@ -285,6 +286,44 @@ version of that check.
 None of 1-4 need a push or a redeploy. They're exactly the kind of gap this
 was built to let the client fill in himself (see "Why the data layer came
 first" below).
+
+### The 405 that blocked both numbers - root cause found (2026-10-22)
+
+Symptom: neither number could log in. The dashboard showed no QR code at all,
+because the handshake was rejected with `405: Connection Failure` before
+WhatsApp ever issued one.
+
+**Cause.** `fetchLatestBaileysVersion()` does not ask WhatsApp anything - it
+reads a protocol version hardcoded in the Baileys repo, last changed in March
+2026. WhatsApp rejects that build. The earlier attempted workaround (pinning a
+constant, commit bd2437a) pinned `2.3000.1033893291`, which is *older* than
+`2.3000.1035194821`, the build the bug reports name as broken - so it could not
+have worked either.
+
+**Fix.** `src/whatsapp/wa-version.js` resolves the version in this order:
+
+1. `WHATSAPP_VERSION` env var, if set (escape hatch, no redeploy needed -
+   accepts `2.3000.1044015310` or `[2,3000,1044015310]`)
+2. `fetchLatestWaWebVersion()` - the build web.whatsapp.com is serving right now
+3. `fetchLatestBaileysVersion()` - but `isLatest:false` counts as a failure, not
+   an answer; that flag is exactly how the stale bundled version sneaks through
+4. `PINNED_FALLBACK` - newest version reported accepted (2026-07-28)
+
+`@itsliaaa/baileys@0.3.18-final` already exports `fetchLatestWaWebVersion`, so
+no package change was needed. 13 tests in `test/wa-version.test.js` cover the
+ordering; they inject fake fetchers, so they run without node_modules.
+
+**Not yet confirmed against real WhatsApp** - it could not be tested from a
+cloud session. The proof is clicking "Connect" on the dashboard. If it still
+fails, re-check Baileys#2679 for a newer working version number and set
+`WHATSAPP_VERSION` in Render rather than editing code.
+
+Do NOT remove `MAX_AUTO_RECONNECTS` (commit c399ec7) whatever else is tried -
+the unbounded retry loop was a real bug that made the block worse.
+
+Sources: WhiskeySockets/Baileys#2370, #2679; NousResearch/hermes-agent#99256.
+
+---
 
 ### Unrelated bug found and fixed while testing the deploy (2026-10-20)
 

@@ -212,7 +212,10 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
       if (guarded.blocked) {
         log.error(
           `Guard blocked a reply: ${guarded.violations.map((v) => v.code).join(', ')} | ` +
-            guarded.violations.map((v) => `"${v.sentence}"`).join(' ')
+            guarded.violations.map((v) => `"${v.sentence}"`).join(' ') +
+            // The hint says what the rule would have accepted. A block is only
+            // actionable if the log shows both halves of the comparison.
+            ` | ${guarded.violations.map((v) => v.hint).join(' / ')}`
         );
         handoff = true;
       }

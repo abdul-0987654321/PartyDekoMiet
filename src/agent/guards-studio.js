@@ -140,7 +140,16 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
       const probe = fold(sentence);
 
       if (invalidPriceRule(probe, ctx)) {
-        found.push({ code: 'INVENTED_PRICE', hint: 'Only an active service\'s own price may be quoted.', sentence });
+        // Say what WAS allowed. Without it the log cannot tell "the model made
+        // a price up" apart from "the directory has not been read properly" -
+        // which cost a debugging round when a real CHF 100 service was blocked.
+        found.push({
+          code: 'INVENTED_PRICE',
+          hint:
+            "Only an active service's own price may be quoted. Allowed right now: " +
+            (prices.length ? prices.map((p) => `CHF ${p}`).join(', ') : '(none - no active service has a price)'),
+          sentence,
+        });
       }
       for (const rule of RULES) {
         const hit = rule.patterns.some((p) => p.test(probe));

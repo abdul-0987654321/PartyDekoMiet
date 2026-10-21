@@ -89,9 +89,24 @@ function invalidPriceRule(sentence, ctx) {
  * @param {number[]} [opts.allowedPrices]  every active service's priceChf, across all professionals
  */
 function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
-  const allowed = new Set();
-  for (const answer of faqAnswers) {
-    for (const s of sentences(answer)) allowed.add(normalise(s));
+  // Both the whitelist and the price list are read per check, never captured
+  // here: the owner edits FAQ answers and services in the dashboard while the
+  // bot is running, and a snapshot taken at construction blocks whatever was
+  // written after it.
+  const readAnswers = typeof faqAnswers === 'function' ? faqAnswers : () => faqAnswers;
+  let whitelistKey = null;
+  let whitelist = new Set();
+  function allowedSentences() {
+    const answers = readAnswers() || [];
+    const key = answers.join('\u0000');
+    if (key !== whitelistKey) {
+      whitelistKey = key;
+      whitelist = new Set();
+      for (const answer of answers) {
+        for (const s of sentences(answer)) whitelist.add(normalise(s));
+      }
+    }
+    return whitelist;
   }
   // Read at check time, not at construction. The whole point of the dashboard
   // is that the owner edits services while the bot is running; a list captured
@@ -119,6 +134,7 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [] } = {}) {
       prices = [];
     }
     const ctx = { allowedPrices: prices };
+    const allowed = allowedSentences();
     for (const sentence of sentences(autofix(text))) {
       if (allowed.has(normalise(sentence))) continue;
       const probe = fold(sentence);

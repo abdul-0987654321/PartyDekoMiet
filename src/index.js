@@ -26,6 +26,7 @@ const { createStudioCalendarService } = require('./calendar/studio-service');
 const { createBookings } = require('./bookings');
 const { createAppointments } = require('./appointments');
 const directory = require('./studio/directory');
+const faqStore = require('./faq-store');
 const { createNotifier } = require('./notify/owner');
 const { createMessenger } = require('./whatsapp/messenger');
 const { createRouter } = require('./whatsapp/router');
@@ -96,8 +97,19 @@ async function boot() {
   const knowledge = await knowledgeLoader.load({ source: config.knowledge.source });
   state.knowledge = { source: knowledge.source, faqEntries: knowledge.faq.length };
 
+  // The pack from knowledge/ plus whatever the owner has written in the
+  // dashboard, re-read on every reply. buildSystemPrompt destructures `faq`,
+  // so the getter runs per reply and an answer saved in the dashboard is live
+  // without a restart. Dashboard entries come last, so they win on a conflict.
+  const liveKnowledge = {
+    ...knowledge,
+    get faq() {
+      return [...knowledge.faq, ...faqStore.forPrompt('party')];
+    },
+  };
+
   const guards = createGuards({
-    faqAnswers: knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
+    faqAnswers: () => liveKnowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
     depositChf: settings.get('depositChf'),
     lateFeeChf: settings.get('lateFeeChf'),
     damagePrices: knowledge.damagePrices || '',
@@ -108,7 +120,7 @@ async function boot() {
     const openai = new OpenAI({ apiKey: config.openai.apiKey });
     runtime.agent = createAgent({
       openai,
-      knowledge,
+      knowledge: liveKnowledge,
       guards,
       config: config.openai,
     });
@@ -208,14 +220,26 @@ async function bootStudio() {
           .listServices({ activeOnly: true })
           .map((s) => Number(s.priceChf))
           .filter((n) => Number.isFinite(n) && n > 0);
+      const liveKnowledge = {
+        ...knowledge,
+        get faq() {
+          return [...knowledge.faq, ...faqStore.forPrompt('studio')];
+        },
+      };
       const guards = createStudioGuards({
-        faqAnswers: knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
+        faqAnswers: () => liveKnowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
         allowedPrices: activePrices,
       });
 
       const OpenAI = require('openai');
       const openai = new OpenAI({ apiKey: config.openai.apiKey });
-      studioRuntime.agent = createAgent({ openai, knowledge, guards, tools: studioTools, config: config.openai });
+      studioRuntime.agent = createAgent({
+        openai,
+        knowledge: liveKnowledge,
+        guards,
+        tools: studioTools,
+        config: config.openai,
+      });
       log.info(
         `[studio] Agent ready (${activePrices().length} active service price(s) right now, ` +
           're-read from the dashboard on every reply)'

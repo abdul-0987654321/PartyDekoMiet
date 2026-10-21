@@ -131,10 +131,23 @@ const RULES = [
  * @param {number} opts.lateFeeChf
  */
 function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damagePrices = '' } = {}) {
-  // Whitelist every sentence of every official answer.
-  const allowed = new Set();
-  for (const answer of faqAnswers) {
-    for (const s of sentences(answer)) allowed.add(normalise(s));
+  // Whitelist every sentence of every official answer. Read per check, not
+  // captured here: FAQ answers are dashboard-editable while the bot runs, and
+  // a whitelist frozen at boot blocks an answer the owner has just written.
+  const readAnswers = typeof faqAnswers === 'function' ? faqAnswers : () => faqAnswers;
+  let whitelistKey = null;
+  let whitelist = new Set();
+  function allowedSentences() {
+    const answers = readAnswers() || [];
+    const key = answers.join('\u0000');
+    if (key !== whitelistKey) {
+      whitelistKey = key;
+      whitelist = new Set();
+      for (const answer of answers) {
+        for (const s of sentences(answer)) whitelist.add(normalise(s));
+      }
+    }
+    return whitelist;
   }
   // Amounts from the owner's official damage list may be quoted; any other
   // amount next to a damage word is still treated as invented.
@@ -159,6 +172,7 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damag
   /** @returns {{code:string,hint:string,sentence:string}[]} */
   function check(text) {
     const found = [];
+    const allowed = allowedSentences();
     for (const sentence of sentences(autofix(text))) {
       if (allowed.has(normalise(sentence))) continue; // client's own wording
       const probe = fold(sentence); // patterns are written in the folded form

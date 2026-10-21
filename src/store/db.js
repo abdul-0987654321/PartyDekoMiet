@@ -123,6 +123,23 @@ const TABLES = {
       updatedAt: s.updatedAt,
     }),
   },
+  // Owner-written question/answer pairs, per business. The knowledge/ folder
+  // holds the answers agreed at build time; this table is how the owner adds
+  // and corrects answers afterwards without anyone touching the repo. Both
+  // sources are merged into the prompt, these last so they win.
+  faq: {
+    key: 'id',
+    view: (f) => ({
+      id: f.id,
+      business: f.business || 'party',
+      active: f.active !== false,
+      question: f.question,
+      answerDe: f.answerDe || '',
+      answerEn: f.answerEn || '',
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+    }),
+  },
   locations: {
     key: 'id',
     view: (l) => ({

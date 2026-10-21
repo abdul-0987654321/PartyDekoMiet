@@ -21,7 +21,7 @@ function stubFetch(body) {
   globalThis.fetch = async () => ({ status: 200, text: async () => JSON.stringify(body) });
 }
 
-const backend = () => createSheetsBackend({ url: 'https://script.example/exec', secret: 's' });
+const backend = () => createSheetsBackend({ url: 'https://script.example/exec', secret: 's', retryBaseMs: 0 });
 
 beforeEach(() => stubFetch({ ok: true, data: {} }));
 afterEach(() => {
@@ -114,7 +114,7 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
     return calls;
   }
 
-  const sheets = () => createSheetsBackend({ url: EXEC, secret: 's' });
+  const sheets = () => createSheetsBackend({ url: EXEC, secret: 's', retryBaseMs: 0 });
 
   test('a redirect to another /exec URL is re-POSTed with the body intact', async () => {
     const calls = scriptFetch([{ to: OTHER_EXEC }, { body: DATA }]);
@@ -172,7 +172,10 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
   test('the HTTP path is recorded in the error, with the deployment id redacted', async () => {
     // Without this, a POST answered by doGet() is indistinguishable from a
     // working call: both are a 200 carrying JSON.
-    scriptFetch([{ to: ECHO }, { body: { ok: true, service: 'partydekomiet-bot-storage' } }]);
+    const doGetReply = { ok: true, service: 'partydekomiet-bot-storage' };
+    // Four attempts, two requests each: the bad answer is retried now, so the
+    // error only surfaces once every attempt has given the same thing back.
+    scriptFetch(Array.from({ length: 4 }, () => [{ to: ECHO }, { body: doGetReply }]).flat());
     await assert.rejects(() => sheets().load(TABLES), (err) => {
       assert.match(err.message, /HTTP path: POST .* -> 302 \| GET .* -> 200/);
       assert.doesNotMatch(err.message, /user_content_key=k/, 'the key must not reach the log');
@@ -194,6 +197,21 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
 
     assert.deepStrictEqual(data.customers, []);
     assert.strictEqual(calls[2].method, 'POST', 'the retry must POST again, not re-GET the dead URL');
+  });
+
+  test('a one-off doGet answer is retried, and the good answer wins', async () => {
+    // The whole point of validating inside the retry loop. Live evidence: the
+    // same POST to the same deployment returned real data at 20:41, an expired
+    // result URL at 21:01, and doGet()'s reply at 21:06. Treating the first bad
+    // answer as fatal took the boot down on a backend that was working.
+    scriptFetch([
+      { to: ECHO },
+      { body: { ok: true, service: 'partydekomiet-bot-storage' } },
+      { to: ECHO },
+      { body: DATA },
+    ]);
+    const data = await sheets().load(TABLES);
+    assert.deepStrictEqual(data, DATA.data);
   });
 
   test('a normal 200 still goes straight through', async () => {

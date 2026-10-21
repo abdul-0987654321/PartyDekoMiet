@@ -24,7 +24,12 @@ function redact(u) {
     .replace(/user_content_key=[^&]*/, 'user_content_key=***');
 }
 
-function createSheetsBackend({ url, secret }) {
+/**
+ * @param {object} opts
+ * @param {number} [opts.retryBaseMs] backoff base; 0 in tests, so the retry
+ *   paths can be exercised without 14 seconds of real waiting per case.
+ */
+function createSheetsBackend({ url, secret, retryBaseMs = 1000 }) {
   if (!url) throw new Error('SHEET_WEBHOOK_URL is not set');
   if (!secret) throw new Error('SHEET_SECRET is not set');
 
@@ -96,7 +101,16 @@ function createSheetsBackend({ url, secret }) {
     return { status: echo.status, text: await echo.text(), trace };
   }
 
-  async function call(action, payload = {}, attempts = 3) {
+  /**
+   * @param {Function} [validate] throws if the answer is unusable. It runs
+   *   INSIDE the retry loop on purpose: Google has been observed answering the
+   *   same POST three different ways within twenty minutes - correct data, an
+   *   expired result URL, and doGet()'s reply - so an answer that is ok:true
+   *   but wrong is a transient fault like any other, and asking again is the
+   *   fix. Validating after call() returned made the first bad answer fatal
+   *   and took the whole boot down with it.
+   */
+  async function call(action, payload = {}, attempts = 3, validate) {
     let lastErr;
     for (let i = 1; i <= attempts; i++) {
       try {
@@ -116,6 +130,7 @@ function createSheetsBackend({ url, secret }) {
         if (!json.ok) throw new Error(`Apps Script error: ${json.error}`);
         // Not enumerable: this must never end up written into the Sheet.
         Object.defineProperty(json, '__http', { value: path, enumerable: false });
+        if (validate) validate(json);
         return json;
       } catch (err) {
         lastErr = err;
@@ -123,7 +138,7 @@ function createSheetsBackend({ url, secret }) {
         if (/unauthorized|redirected more than/.test(err.message)) break;
         if (i < attempts) {
           log.warn(`Sheets ${action} failed (try ${i}/${attempts}): ${err.message}`);
-          await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
+          await new Promise((r) => setTimeout(r, retryBaseMs * 2 ** i));
         }
       }
     }
@@ -133,39 +148,34 @@ function createSheetsBackend({ url, secret }) {
   return {
     name: 'google-sheets',
     async load(tables) {
-      const res = await call('load', { tables });
-      // A 'load' that answers ok:true but carries no data used to surface three
-      // frames later as "Cannot convert undefined or null to object", which says
-      // nothing about the actual problem. The usual cause is an Apps Script
-      // deployment older than this code - Code.gs is NOT updated by deploying
-      // this repo, it has to be pasted into the Apps Script editor by hand.
-      if (!res.data || typeof res.data !== 'object' || Array.isArray(res.data)) {
-        // Echo the whole reply: which of the two causes below it is can only be
-        // told apart by what came back, and the log is the only place anyone
-        // gets to see it.
-        const reply = JSON.stringify(res).slice(0, 200);
-        // doGet() answers { ok:true, service:'partydekomiet-bot-storage' }. Getting
-        // that back from a POST means the request never reached doPost() at all,
-        // which is a URL / deployment-access problem, not an outdated Code.gs.
-        const cause = typeof res.service === 'string'
-          ? 'That is the doGet() reply, so the POST never reached doPost(). Check that SHEET_WEBHOOK_URL ' +
-            'is the /exec URL of the CURRENT deployment (not /dev, and not an older deployment), and that ' +
-            'the deployment is set to "Execute as: Me" and "Who has access: Anyone".'
-          : 'The deployed Code.gs is probably older than this app: open the Sheet - Extensions - ' +
-            'Apps Script, paste the current apps-script/Code.gs, and Deploy - Manage deployments - Edit - Deploy.';
-        const path = res.__http ? ` HTTP path: ${res.__http}.` : '';
-        throw new Error(
-          `Apps Script answered without a "data" object. Its reply was: ${reply}.${path} ${cause}`
-        );
-      }
-      const missing = tables.filter((t) => !Array.isArray(res.data[t]));
-      if (missing.length) {
-        throw new Error(
-          `Apps Script returned no rows for: ${missing.join(', ')}. ` +
-            'That usually means the deployed Code.gs predates these tables - re-paste apps-script/Code.gs ' +
-            'into the Apps Script editor and redeploy it.'
-        );
-      }
+      const res = await call('load', { tables }, 4, (json) => {
+        if (!json.data || typeof json.data !== 'object' || Array.isArray(json.data)) {
+          const reply = JSON.stringify(json).slice(0, 200);
+          // doGet() answers { ok:true, service:'partydekomiet-bot-storage' }.
+          // Getting that back from a POST means this particular request was not
+          // routed to doPost(). It has been seen on a deployment that answered
+          // the very same POST correctly minutes earlier, so it is reported as
+          // transient and only becomes an error once the retries are spent.
+          const cause = typeof json.service === 'string'
+            ? 'That is the doGet() reply, so this POST was not routed to doPost(). If it keeps happening ' +
+              'on every attempt, check that SHEET_WEBHOOK_URL is the /exec URL of the current deployment ' +
+              'and that it is set to "Execute as: Me" / "Who has access: Anyone".'
+            : 'The deployed Code.gs may be older than this app: open the Sheet - Extensions - Apps Script, ' +
+              'paste the current apps-script/Code.gs, and Deploy - Manage deployments - Edit - Deploy.';
+          throw new Error(
+            `Apps Script answered without a "data" object. Its reply was: ${reply}. ` +
+              `HTTP path: ${json.__http}. ${cause}`
+          );
+        }
+        const missing = tables.filter((t) => !Array.isArray(json.data[t]));
+        if (missing.length) {
+          throw new Error(
+            `Apps Script returned no rows for: ${missing.join(', ')}. ` +
+              'If that repeats, the deployed Code.gs predates these tables - re-paste apps-script/Code.gs ' +
+              'into the Apps Script editor and redeploy it.'
+          );
+        }
+      });
       return res.data;
     },
     async write(ops) {

@@ -47,6 +47,20 @@ describe('load() response validation', () => {
     });
   });
 
+  test('the doGet reply is called out as a URL problem, not a stale Code.gs', async () => {
+    // Seen live: the POST landed on doGet(), so the answer was ok:true with no
+    // data. Telling the owner to re-paste Code.gs there sends them to fix the
+    // one thing that is not broken.
+    stubFetch({ ok: true, service: 'partydekomiet-bot-storage' });
+    await assert.rejects(() => backend().load(TABLES), (err) => {
+      assert.match(err.message, /doGet/, 'must name what actually answered');
+      assert.match(err.message, /SHEET_WEBHOOK_URL/, 'must name the variable to check');
+      assert.match(err.message, /partydekomiet-bot-storage/, 'must echo the real reply');
+      assert.doesNotMatch(err.message, /paste the current apps-script/, 'wrong fix for this cause');
+      return true;
+    });
+  });
+
   test('a table missing from the answer is named', async () => {
     stubFetch({ ok: true, data: { customers: [] } });
     await assert.rejects(() => backend().load(TABLES), (err) => {

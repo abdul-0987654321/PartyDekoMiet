@@ -166,6 +166,17 @@ describe('redirects are followed by hand, keeping the POST a POST', () => {
     await assert.rejects(() => sheets().load(TABLES), /without a Location header/);
   });
 
+  test('the HTTP path is recorded in the error, with the deployment id redacted', async () => {
+    // Without this, a POST answered by doGet() is indistinguishable from a
+    // working call: both are a 200 carrying JSON.
+    scriptFetch([{ to: ECHO }, { body: { ok: true, service: 'partydekomiet-bot-storage' } }]);
+    await assert.rejects(() => sheets().load(TABLES), (err) => {
+      assert.match(err.message, /HTTP path: POST .* -> 302 \| GET .* -> 200/);
+      assert.doesNotMatch(err.message, /user_content_key=k/, 'the key must not reach the log');
+      return true;
+    });
+  });
+
   test('a normal 200 still goes straight through', async () => {
     const calls = scriptFetch([{ body: DATA }]);
     await sheets().load(TABLES);

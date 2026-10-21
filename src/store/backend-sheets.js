@@ -14,6 +14,16 @@ const isEchoUrl = (u) => /script\.googleusercontent\.com/.test(u);
 /** A web-app entry point. Google redirects here to canonicalise a URL. */
 const isExecUrl = (u) => /\/exec(\?|#|$)/.test(u);
 
+/**
+ * The deployment id in an /exec URL is a capability - anyone holding it can
+ * reach the web app - so the trace keeps the shape of the URL and drops the id.
+ */
+function redact(u) {
+  return String(u)
+    .replace(/\/s\/[^/]+\//, '/s/***/')
+    .replace(/user_content_key=[^&]*/, 'user_content_key=***');
+}
+
 function createSheetsBackend({ url, secret }) {
   if (!url) throw new Error('SHEET_WEBHOOK_URL is not set');
   if (!secret) throw new Error('SHEET_SECRET is not set');
@@ -21,6 +31,7 @@ function createSheetsBackend({ url, secret }) {
   // Updated in place when Google redirects us to the canonical /exec URL, so the
   // detour is paid once per process instead of on every single call.
   let activeUrl = url;
+  let tracedOnce = false;
 
   /**
    * POSTs the body and returns the response text, following redirects BY HAND.
@@ -35,7 +46,7 @@ function createSheetsBackend({ url, secret }) {
    * POST already ran, that URL only carries its output. A redirect to another
    * /exec URL is re-POSTed, body and all.
    */
-  async function post(body, targetUrl = activeUrl, hops = 0) {
+  async function post(body, targetUrl = activeUrl, hops = 0, trace = []) {
     const res = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -43,9 +54,14 @@ function createSheetsBackend({ url, secret }) {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+    // The trace is the only evidence available when the answer is wrong but the
+    // status is 200: a POST that is answered by doGet() looks identical to a
+    // working call from the outside. Two debugging rounds were lost to guessing
+    // at this instead of recording it.
+    trace.push(`POST ${redact(targetUrl)} -> ${res.status}`);
 
     if (res.status < 300 || res.status >= 400) {
-      return { status: res.status, text: await res.text() };
+      return { status: res.status, text: await res.text(), trace };
     }
 
     const location = res.headers.get('location');
@@ -61,12 +77,13 @@ function createSheetsBackend({ url, secret }) {
         );
         activeUrl = next;
       }
-      return post(body, next, hops + 1);
+      return post(body, next, hops + 1, trace);
     }
 
     // The echo URL: GET is correct here, the script has already run.
     const echo = await fetch(next, { redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS) });
-    return { status: echo.status, text: await echo.text() };
+    trace.push(`GET ${redact(next)} -> ${echo.status}`);
+    return { status: echo.status, text: await echo.text(), trace };
   }
 
   async function call(action, payload = {}, attempts = 3) {
@@ -74,6 +91,11 @@ function createSheetsBackend({ url, secret }) {
     for (let i = 1; i <= attempts; i++) {
       try {
         const res = await post(JSON.stringify({ secret, action, ...payload }));
+        const path = (res.trace || []).join(' | ');
+        if (!tracedOnce) {
+          tracedOnce = true;
+          log.info(`Sheets HTTP path: ${path}`);
+        }
         const text = res.text;
         let json;
         try {
@@ -82,6 +104,8 @@ function createSheetsBackend({ url, secret }) {
           throw new Error(`Apps Script returned non-JSON (HTTP ${res.status}): ${text.slice(0, 200)}`);
         }
         if (!json.ok) throw new Error(`Apps Script error: ${json.error}`);
+        // Not enumerable: this must never end up written into the Sheet.
+        Object.defineProperty(json, '__http', { value: path, enumerable: false });
         return json;
       } catch (err) {
         lastErr = err;
@@ -119,7 +143,10 @@ function createSheetsBackend({ url, secret }) {
             'the deployment is set to "Execute as: Me" and "Who has access: Anyone".'
           : 'The deployed Code.gs is probably older than this app: open the Sheet - Extensions - ' +
             'Apps Script, paste the current apps-script/Code.gs, and Deploy - Manage deployments - Edit - Deploy.';
-        throw new Error(`Apps Script answered without a "data" object. Its reply was: ${reply}. ${cause}`);
+        const path = res.__http ? ` HTTP path: ${res.__http}.` : '';
+        throw new Error(
+          `Apps Script answered without a "data" object. Its reply was: ${reply}.${path} ${cause}`
+        );
       }
       const missing = tables.filter((t) => !Array.isArray(res.data[t]));
       if (missing.length) {

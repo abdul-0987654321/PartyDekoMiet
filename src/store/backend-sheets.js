@@ -7,23 +7,74 @@
 const log = require('../log');
 
 const TIMEOUT_MS = 60000;
+const MAX_HOPS = 5;
+
+/** The redirect Apps Script uses to hand back a POST's output. */
+const isEchoUrl = (u) => /script\.googleusercontent\.com/.test(u);
+/** A web-app entry point. Google redirects here to canonicalise a URL. */
+const isExecUrl = (u) => /\/exec(\?|#|$)/.test(u);
 
 function createSheetsBackend({ url, secret }) {
   if (!url) throw new Error('SHEET_WEBHOOK_URL is not set');
   if (!secret) throw new Error('SHEET_SECRET is not set');
 
+  // Updated in place when Google redirects us to the canonical /exec URL, so the
+  // detour is paid once per process instead of on every single call.
+  let activeUrl = url;
+
+  /**
+   * POSTs the body and returns the response text, following redirects BY HAND.
+   *
+   * `redirect: 'follow'` cannot be used here. Per the fetch spec a 302 turns a
+   * POST into a GET with no body - and when Google redirects one /exec URL to
+   * another (it does this to canonicalise the URL), that GET runs doGet()
+   * instead of doPost(). The script then answers 200 ok:true with no data and
+   * nothing anywhere says a redirect happened. That was a live outage.
+   *
+   * So: a redirect to the googleusercontent echo URL is fetched with GET - the
+   * POST already ran, that URL only carries its output. A redirect to another
+   * /exec URL is re-POSTed, body and all.
+   */
+  async function post(body, targetUrl = activeUrl, hops = 0) {
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+
+    if (res.status < 300 || res.status >= 400) {
+      return { status: res.status, text: await res.text() };
+    }
+
+    const location = res.headers.get('location');
+    if (!location) throw new Error(`Apps Script redirected (HTTP ${res.status}) without a Location header`);
+    if (hops >= MAX_HOPS) throw new Error(`Apps Script redirected more than ${MAX_HOPS} times`);
+    const next = new URL(location, targetUrl).toString();
+
+    if (isExecUrl(next) && !isEchoUrl(next)) {
+      if (next !== activeUrl) {
+        log.warn(
+          `SHEET_WEBHOOK_URL redirects to a different web-app URL. Re-POSTing to it and using it ` +
+            `from now on. Set SHEET_WEBHOOK_URL to this to skip the redirect: ${next}`
+        );
+        activeUrl = next;
+      }
+      return post(body, next, hops + 1);
+    }
+
+    // The echo URL: GET is correct here, the script has already run.
+    const echo = await fetch(next, { redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS) });
+    return { status: echo.status, text: await echo.text() };
+  }
+
   async function call(action, payload = {}, attempts = 3) {
     let lastErr;
     for (let i = 1; i <= attempts; i++) {
       try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret, action, ...payload }),
-          redirect: 'follow', // Apps Script answers via a 302 to googleusercontent.com
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-        const text = await res.text();
+        const res = await post(JSON.stringify({ secret, action, ...payload }));
+        const text = res.text;
         let json;
         try {
           json = JSON.parse(text);
@@ -34,7 +85,8 @@ function createSheetsBackend({ url, secret }) {
         return json;
       } catch (err) {
         lastErr = err;
-        if (/unauthorized/.test(err.message)) break; // wrong secret: retrying won't help
+        // Neither a wrong secret nor a redirect loop fixes itself on a retry.
+        if (/unauthorized|redirected more than/.test(err.message)) break;
         if (i < attempts) {
           log.warn(`Sheets ${action} failed (try ${i}/${attempts}): ${err.message}`);
           await new Promise((r) => setTimeout(r, 1000 * 2 ** i));

@@ -84,15 +84,16 @@ async function refresh() {
 
   $('st').innerHTML = d.status === 'connected' ? pill(t('connected'),'ok')
     : d.status === 'pairing' ? pill('Pairing','warn')
-    : d.status === 'qr' ? pill('QR','warn') : pill(d.status || '–','warn');
+    : d.status === 'qr' ? pill('QR','warn')
+    : d.status === 'blocked' ? pill(t('wa_blocked'),'err') : pill(d.status || '–','warn');
   $('num').textContent = d.me?.id ? String(d.me.id).split(':')[0] : '–';
   $('since').textContent = fmtDate(d.connectedAt);
-  $('alerts').innerHTML = d.lastDisconnect?.message && !d.connected
-    ? `<p class="banner warn">${esc(d.lastDisconnect.message)}</p>` : '';
+  $('alerts').innerHTML = d.status === 'blocked' ? `<p class="banner err">${esc(t('qr_blocked'))}</p>`
+    : d.lastDisconnect?.message && !d.connected ? `<p class="banner warn">${esc(d.lastDisconnect.message)}</p>` : '';
 
   $('qrbox').innerHTML = d.qrDataUrl
     ? `<img src="${d.qrDataUrl}" alt="QR">`
-    : `<p class="muted">${d.connected ? t('qr_connected') : t('qr_wait')}</p>`;
+    : `<p class="muted">${d.connected ? t('qr_connected') : d.status === 'blocked' ? t('qr_blocked') : t('qr_wait')}</p>`;
 
   if (d.pairingCode) {
     if (tab !== 'pair') showTab('pair');

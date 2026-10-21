@@ -61,6 +61,14 @@ function createWhatsAppClient(business = 'party') {
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const CONNECT_WATCHDOG_MS = 60000;
+  // A rejected handshake (e.g. code 405) used to retry forever, capped at one try
+  // per 60s. Over a day that is 1000+ fresh-login attempts hammering WhatsApp's
+  // servers from the same IP/number, which looks like abuse and likely makes a
+  // transient block worse instead of letting it clear. After this many CONSECUTIVE
+  // failed attempts (reset by any real progress: a QR shown, a connect, or the
+  // owner clicking "Connect"/"Re-link" by hand), automatic retries stop and the
+  // dashboard asks for a manual retry instead.
+  const MAX_AUTO_RECONNECTS = 10;
   const typingDelay = () => {
     const min = Number(settings.get('typingMinMs')) || 0;
     const max = Math.max(min, Number(settings.get('typingMaxMs')) || min);
@@ -187,17 +195,38 @@ function createWhatsAppClient(business = 'party') {
 
   function scheduleReconnect(reason) {
     runtime.reconnectAttempts += 1;
+    if (runtime.reconnectAttempts > MAX_AUTO_RECONNECTS) {
+      runtime.status = 'blocked';
+      runtime.lastDisconnect = {
+        at: new Date().toISOString(),
+        code: runtime.lastDisconnect?.code ?? null,
+        message: `${reason} — ${runtime.reconnectAttempts - 1} attempts in a row rejected. Automatic retries stopped so the number doesn't get flagged further. Wait a few hours, then click "Connect" to try again.`,
+      };
+      log.error(
+        `${logTag}WhatsApp rejected ${runtime.reconnectAttempts - 1} connection attempts in a row (${reason}). ` +
+          'Stopping automatic retries - click "Connect" on the dashboard to try again after a few hours.'
+      );
+      return;
+    }
     runtime.status = 'reconnecting';
     const delay = Math.min(60000, 2000 * runtime.reconnectAttempts);
     log.warn(`${logTag}WhatsApp disconnected (${reason}). Reconnecting in ${delay / 1000}s (attempt ${runtime.reconnectAttempts})`);
     setTimeout(() => {
-      if (!runtime.stopping) void start();
+      if (!runtime.stopping) void start(true);
     }, delay).unref?.();
   }
 
-  async function start() {
+  /**
+   * @param {boolean} auto true only when called internally by the reconnect
+   * scheduler's own setTimeout. Any other caller (dashboard "Connect"/"Re-link",
+   * boot, a pairing retry, or the post-QR-scan restart WhatsApp itself asks for)
+   * means real progress or a deliberate manual attempt, so the failure counter
+   * resets - that's what lets the owner break out of a "blocked" state by hand.
+   */
+  async function start(auto = false) {
     if (runtime.starting) return { ok: false, message: 'Verbindung wird bereits aufgebaut…' };
     if (isConnected()) return { ok: true, message: 'Bereits verbunden.' };
+    if (!auto) runtime.reconnectAttempts = 0;
     runtime.starting = true;
     runtime.stopping = false;
     runtime.status = 'starting';
@@ -238,6 +267,9 @@ function createWhatsAppClient(business = 'party') {
       sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
         if (runtime.sock !== sock) return; // event from an old socket
         if (qr) {
+          // Real progress: the handshake got far enough for WhatsApp to hand us a
+          // QR, so the consecutive-failure counter no longer applies.
+          runtime.reconnectAttempts = 0;
           // The QR is always rendered, so the owner can choose either way to log in.
           try {
             runtime.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 320 });

@@ -43,6 +43,30 @@ const DEFS = [
     },
   },
   {
+    name: 'list_services',
+    description:
+      "The studio's service list: every active service with its duration and price. Use this for a general question like \"what do you offer?\" or \"what are your prices?\", where no particular professional has been named yet. These are the only services and the only prices that may ever be mentioned.",
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+    handler: async (_args, { directory }) => {
+      if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
+      const services = directory.listServices({ activeOnly: true });
+      return {
+        ok: true,
+        count: services.length,
+        services: services.map((s) => ({
+          id: s.id,
+          name: s.name,
+          durationMin: s.durationMin,
+          priceChf: s.priceChf,
+        })),
+      };
+    },
+  },
+  {
     name: 'get_professional_profile',
     description:
       'Get one professional\'s full profile: her services, prices and location. Always call this before naming a service, a price or an address - never answer those from an earlier message in this chat.',

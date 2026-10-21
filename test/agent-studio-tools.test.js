@@ -58,6 +58,24 @@ describe('studio tool registry', () => {
     assert.deepStrictEqual(res.professionals.map((p) => p.name), ['Gabriela']);
   });
 
+  test('list_services answers the studio-wide "what do you offer?" question', async () => {
+    // Live: "what's the service you provide?" was handed to a human, because
+    // the only way to reach a service was through one named professional.
+    await directory.createService({ name: 'Retired service', priceChf: 999, active: false });
+    const res = await runTool('list_services', {}, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.deepStrictEqual(res.services.map((s) => s.name), ['Massage 60min']);
+    assert.strictEqual(res.services[0].priceChf, 120);
+    assert.strictEqual(res.services[0].durationMin, 60);
+  });
+
+  test('list_services says so honestly when the directory is empty', async () => {
+    await directory.removeService(service.id);
+    const res = await runTool('list_services', {}, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.count, 0);
+  });
+
   test('get_professional_profile returns her services and location', async () => {
     const res = await runTool('get_professional_profile', { professional_id: professional.id }, { directory });
     assert.strictEqual(res.ok, true);

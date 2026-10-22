@@ -353,6 +353,23 @@ function createWhatsAppClient(business = 'party') {
             runtime.status = 'stopped';
             return;
           }
+          // A pairing code only lives as long as the socket that issued it. If
+          // that socket dies before the owner finishes typing, the code on the
+          // dashboard is already dead - and leaving it there is what made this
+          // look like "the code is always wrong". Ask for a fresh one instead.
+          if (runtime.pairingRequest && runtime.pairingCode) {
+            log.warn(
+              `${logTag}Pairing attempt ended before it completed (code ${code ?? '?'}: ${message}). ` +
+                `The code ${runtime.pairingCode} is no longer valid - requesting a new one.`
+            );
+            runtime.pairingCode = null;
+            runtime.pairingError = null;
+            if (code === DisconnectReason.loggedOut) await clearSession(business);
+            runtime.reconnectAttempts = 0;
+            setTimeout(() => void start(), 1000).unref?.();
+            return;
+          }
+
           if (code === DisconnectReason.loggedOut) {
             log.warn(`${logTag}WhatsApp session logged out (device removed). Clearing stored session — scan a new QR on the dashboard.`);
             await clearSession(business);
@@ -428,9 +445,14 @@ function createWhatsAppClient(business = 'party') {
     runtime.pairingCode = null;
     runtime.pairingError = null;
 
-    // A fresh socket is needed: a code can only be requested on an unregistered one.
+    // A fresh socket is needed: a code can only be requested on an unregistered
+    // one. Stored credentials make the new socket resume the OLD device instead,
+    // which WhatsApp then drops as logged out - so the owner sees a code that
+    // can never work. Asking for a code is always a deliberate re-link, so
+    // dropping the stored session here is what they asked for.
     runtime.stopping = true;
     detachSocket();
+    await clearSession(business);
     runtime.stopping = false;
     runtime.reconnectAttempts = 0;
 

@@ -23,6 +23,46 @@ const UNAVAILABLE = (what) => ({
 });
 
 /**
+ * Finds a record by id, or by the name the customer used.
+ *
+ * The ids are generated strings like S20261022-4F2QX. The model is told to pass
+ * one, and mostly does - but a customer says "Sofia detail", and "Sofia" is
+ * right there in the conversation, so it passes that instead. A strict id
+ * lookup then returns "not found", and the customer is told "I'm unable to
+ * retrieve the details" about a service that exists and is on screen.
+ *
+ * Refusing on a technicality is the wrong trade here: resolving the name is
+ * unambiguous whenever the name is, and when it is not, saying which ones
+ * matched is far better than a flat failure.
+ *
+ * @returns {{record: object}|{error: string}}
+ */
+function resolve(list, wanted, what) {
+  const key = String(wanted ?? '').trim();
+  if (!key) return { error: `Kein ${what} angegeben.` };
+
+  const byId = list.find((r) => r.id === key);
+  if (byId) return { record: byId };
+
+  const lower = key.toLowerCase();
+  const exact = list.filter((r) => String(r.name || '').toLowerCase() === lower);
+  if (exact.length === 1) return { record: exact[0] };
+
+  const partial = list.filter((r) => String(r.name || '').toLowerCase().includes(lower));
+  if (partial.length === 1) return { record: partial[0] };
+
+  if (exact.length > 1 || partial.length > 1) {
+    const names = (exact.length > 1 ? exact : partial).map((r) => r.name).join(', ');
+    return { error: `"${key}" passt auf mehrere: ${names}. Frag den Kunden, welche gemeint ist.` };
+  }
+  return {
+    error: list.length
+      ? `${what} "${key}" gibt es nicht. Vorhanden: ${list.map((r) => r.name).join(', ')}.`
+      : `Es ist noch kein ${what} hinterlegt.`,
+  };
+}
+
+/**
  * One shape for a service, everywhere it is returned.
  *
  * Price and duration are spelled out as strings as well as given as numbers.
@@ -96,15 +136,17 @@ const DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        professional_id: { type: 'string', description: 'id from list_professionals' },
+        professional_id: { type: 'string', description: 'id from list_professionals; her name also works' },
       },
       required: ['professional_id'],
       additionalProperties: false,
     },
     handler: async (args, { directory }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const profile = directory.profileFor(args.professional_id);
-      if (!profile) return { ok: false, error: `Professional ${args.professional_id} nicht gefunden.` };
+      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      if (hit.error) return { ok: false, error: hit.error };
+      const profile = directory.profileFor(hit.record.id);
+      if (!profile) return { ok: false, error: `Professional ${hit.record.name} nicht gefunden.` };
       return {
         ok: true,
         professional: {
@@ -126,15 +168,16 @@ const DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        service_id: { type: 'string', description: 'id from list_services' },
+        service_id: { type: 'string', description: 'id from list_services; the service name also works' },
       },
       required: ['service_id'],
       additionalProperties: false,
     },
     handler: async (args, { directory }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const service = directory.getService(args.service_id);
-      if (!service) return { ok: false, error: `Service ${args.service_id} nicht gefunden.` };
+      const hit = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service');
+      if (hit.error) return { ok: false, error: hit.error };
+      const service = hit.record;
 
       // A service either belongs to one professional or is offered by everyone.
       // The customer asked about the service, so answer for the service.
@@ -166,7 +209,7 @@ const DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        professional_id: { type: 'string', description: 'id from list_professionals' },
+        professional_id: { type: 'string', description: 'id from list_professionals; her name also works' },
         note: { type: 'string', description: 'Optional one-line caption in the customer language' },
       },
       required: ['professional_id'],
@@ -175,8 +218,9 @@ const DEFS = [
     handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
       if (!photos) return UNAVAILABLE('Der Bildversand');
-      const professional = directory.getProfessional(args.professional_id);
-      if (!professional) return { ok: false, error: `Professional ${args.professional_id} nicht gefunden.` };
+      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      if (hit.error) return { ok: false, error: hit.error };
+      const professional = hit.record;
       if (!professional.photoFileId) {
         // Not an error the customer should hear as a failure - there is simply
         // no photo on file, and inventing a description instead would be worse.
@@ -197,8 +241,8 @@ const DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        professional_id: { type: 'string', description: 'id from list_professionals' },
-        service_id: { type: 'string', description: 'id from get_professional_profile' },
+        professional_id: { type: 'string', description: 'id from list_professionals; her name also works' },
+        service_id: { type: 'string', description: 'id from get_professional_profile; the service name also works' },
         date: { type: 'string', description: 'ISO format YYYY-MM-DD' },
         start_time: { type: 'string', description: 'HH:MM, 24h' },
       },
@@ -208,10 +252,12 @@ const DEFS = [
     handler: async (args, { directory, calendar }) => {
       if (!calendar) return UNAVAILABLE('Der Kalender');
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const professional = directory.getProfessional(args.professional_id);
-      if (!professional) return { ok: false, error: `Professional ${args.professional_id} nicht gefunden.` };
-      const service = directory.getService(args.service_id);
-      if (!service) return { ok: false, error: `Service ${args.service_id} nicht gefunden.` };
+      const who = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      if (who.error) return { ok: false, error: who.error };
+      const what = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service');
+      if (what.error) return { ok: false, error: what.error };
+      const professional = who.record;
+      const service = what.record;
       return await calendar.checkSlotAvailability({
         professionalId: professional.id,
         professionalName: professional.name,

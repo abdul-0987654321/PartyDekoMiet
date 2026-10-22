@@ -321,3 +321,74 @@ describe('get_service: asking about one service by name', () => {
     assert.strictEqual((await runTool('get_service', { service_id: 'nope' }, { directory })).ok, false);
   });
 });
+
+describe('a tool call that names the record instead of its id', () => {
+  // Live, twice: "Sofia detail" -> "I'm currently unable to retrieve the
+  // details for the Sofia service". get_service existed and worked; the model
+  // passed "Sofia" where an id like S20261022-4F2QX was expected, and a strict
+  // lookup turned a record that was on screen into "not found".
+  let sofia, gabriela;
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+    gabriela = (await directory.createProfessional({ name: 'Gabriela' })).professional;
+    sofia = (await directory.createService({ name: 'Sofia', durationMin: 15, priceChf: 1000, notes: 'Ganzkoerper.' })).service;
+  });
+
+  test('get_service accepts the service name', async () => {
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.service.details, 'Ganzkoerper.');
+  });
+
+  test('the id still works, and wins over a name', async () => {
+    const res = await runTool('get_service', { service_id: sofia.id }, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.service.id, sofia.id);
+  });
+
+  test('matching is case-insensitive and tolerates a partial name', async () => {
+    assert.strictEqual((await runTool('get_service', { service_id: 'sofia' }, { directory })).ok, true);
+    assert.strictEqual((await runTool('get_service', { service_id: 'Sof' }, { directory })).ok, true);
+  });
+
+  test('get_professional_profile accepts her name', async () => {
+    const res = await runTool('get_professional_profile', { professional_id: 'Gabriela' }, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.professional.name, 'Gabriela');
+  });
+
+  test('an ambiguous name asks which one, rather than guessing', async () => {
+    await directory.createService({ name: 'Sofia Deluxe', priceChf: 2000 });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    // "Sofia" is still an exact match for exactly one of them, so that resolves...
+    assert.strictEqual(res.ok, true);
+
+    const vague = await runTool('get_service', { service_id: 'Sofi' }, { directory });
+    assert.strictEqual(vague.ok, false);
+    assert.match(vague.error, /mehrere/);
+    assert.match(vague.error, /Sofia, Sofia Deluxe/);
+  });
+
+  test('a name that really is not there lists what does exist', async () => {
+    const res = await runTool('get_service', { service_id: 'Massage' }, { directory });
+    assert.strictEqual(res.ok, false);
+    assert.match(res.error, /Vorhanden: Sofia/);
+  });
+
+  test('an empty directory says so instead of listing nothing', async () => {
+    await directory.removeService(sofia.id);
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    assert.match(res.error, /noch kein Service/i);
+  });
+
+  test('send_professional_photo resolves a name too', async () => {
+    await directory.updateProfessional(gabriela.id, { photoFileId: 'F1' });
+    const sent = [];
+    const photos = { sendProfessional: async (c, p) => sent.push(p.name) };
+    const res = await runTool('send_professional_photo', { professional_id: 'Gabriela' }, { directory, photos, chatId: 'c1' });
+    assert.strictEqual(res.ok, true);
+    assert.deepStrictEqual(sent, ['Gabriela']);
+  });
+});

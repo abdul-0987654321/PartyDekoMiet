@@ -24,6 +24,7 @@
   .lead { font-size: 11pt; color: #3a4050; }
 
   .box {
+    page-break-inside: avoid;
     background: #f4f6fa; border-left: 2.5pt solid #3b82f6;
     padding: 9pt 12pt; margin: 9pt 0 12pt; font-size: 10pt;
   }
@@ -38,7 +39,7 @@
   td:first-child { white-space: nowrap; font-weight: 600; }
 
   .steps { counter-reset: s; padding-left: 0; list-style: none; }
-  .steps li { counter-increment: s; position: relative; padding-left: 20pt; margin-bottom: 6pt; }
+  .steps li { page-break-inside: avoid; counter-increment: s; position: relative; padding-left: 20pt; margin-bottom: 6pt; }
   .steps li::before {
     content: counter(s); position: absolute; left: 0; top: 0.5pt;
     width: 14pt; height: 14pt; border-radius: 50%;
@@ -76,8 +77,9 @@
   <div><span>8</span>Termine und Buchungen</div>
   <div><span>9</span>Chats</div>
   <div><span>10</span>PartyDekoMiet im Detail</div>
-  <div><span>11</span>Was der Assistent tut – und was nicht</div>
-  <div><span>12</span>Wenn etwas nicht funktioniert</div>
+  <div><span>11</span>Einstellungen – jedes Feld erklärt</div>
+  <div><span>12</span>Was der Assistent tut – und was nicht</div>
+  <div><span>13</span>Wenn etwas nicht funktioniert</div>
 </div>
 
 <h2>1 · Das Wichtigste in Kürze</h2>
@@ -146,7 +148,7 @@ desto weniger landet bei Ihnen.</p>
   ist alles in Ordnung.
 </p>
 
-<h2 class="page-break">4 · WhatsApp verbinden</h2>
+<h2>4 · WhatsApp verbinden</h2>
 
 <p>
   Jeder Assistent braucht seine <b>eigene</b> WhatsApp-Nummer. Die Nummer muss auf
@@ -217,7 +219,7 @@ desto weniger landet bei Ihnen.</p>
   über die Umschaltung oben links.
 </div>
 
-<h2 class="page-break">6 · Studio einrichten</h2>
+<h2>6 · Studio einrichten</h2>
 
 <p class="lead">Dieses Kapitel betrifft nur das Studio. Für PartyDekoMiet siehe Kapitel 10.</p>
 
@@ -392,7 +394,112 @@ desto weniger landet bei Ihnen.</p>
   absagen tun Sie unter <span class="path">Buchungen</span>.
 </p>
 
-<h2>11 · Was der Assistent tut – und was nicht</h2>
+<h2>11 · Einstellungen – jedes Feld erklärt</h2>
+
+<p>
+  Unter <span class="path">Einstellungen</span> ändern Sie alles selbst, ohne
+  uns. <b>Änderungen gelten ab der nächsten Kundennachricht</b> – kein Neustart,
+  kein Warten. Die Felder sind in Gruppen sortiert; selten gebrauchte stehen
+  zugeklappt unter «Erweitert».
+</p>
+
+<div class="box">
+  <b>Erst umschalten, dann ändern.</b>
+  Die Gruppen <i>Studio</i> und <i>Geschäftsregeln/Shop</i> gehören zu
+  verschiedenen Betrieben. Prüfen Sie oben links, welcher gerade aktiv ist.
+</div>
+
+<h3>Bot-Verhalten (beide Betriebe)</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>Bot aktiv</td><td>Aus = niemand bekommt eine Antwort. Nachrichten werden trotzdem gespeichert.</td></tr>
+  <tr><td>Sprache des Bots</td><td><b>Automatisch</b> für den Betrieb: der Bot antwortet in der Sprache des Kunden. Die anderen Werte sind zum Testen.</td></tr>
+  <tr><td>Pause nach manueller Antwort</td><td>Antworten Sie selbst im Chat, schweigt der Bot dort so viele Stunden. Standard 12.</td></tr>
+  <tr><td>Sprachbefehl: Vorschau</td><td>Diktieren Sie eine Antwort per Sprachnachricht, zeigt der Bot sie Ihnen erst zur Bestätigung. Aus = sofort senden.</td></tr>
+  <tr><td>Max. Nachrichten pro Chat / Stunde</td><td>0 = kein Limit. Ein Limit schützt vor Endlosschleifen und vor jemandem, der absichtlich Kosten verursacht.</td></tr>
+  <tr><td>Warten bis «gelesen»<br>Tippdauer min./max.</td><td>Damit der Bot nicht in Millisekunden antwortet. Normalerweise unverändert lassen.</td></tr>
+  <tr><td>Stichwörter für andere Betriebe</td><td>Nachrichten mit diesen Wörtern beantwortet der Bot nicht, sondern gibt sie weiter. Mit Komma trennen.</td></tr>
+  <tr><td>Antwort bei anderem Betrieb</td><td>Was der Kunde in diesem Fall liest – je einmal Deutsch und Englisch.</td></tr>
+</table>
+
+<h3>Kontakte (PartyDekoMiet)</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>WhatsApp des Inhabers</td><td>Ihre Nummer. Von hier dürfen Befehle an den Bot kommen; dient auch als Rückfallnummer für Benachrichtigungen.</td></tr>
+  <tr><td>Nummern für Benachrichtigungen</td><td>Wer Anfragen und Übergaben erhält. Mehrere mit Komma. Leer = die Inhaber-Nummer.</td></tr>
+  <tr><td>Telefon für Übergaben</td><td>Optional. Wird dem Kunden genannt, wenn ein Mensch übernehmen muss.</td></tr>
+</table>
+
+<h3>Geschäftsregeln (PartyDekoMiet)</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>Mietdauer</td><td>Wie viele Tage ein Set vermietet wird. Standard 3.</td></tr>
+  <tr><td>Rückgabe = Abholung + X</td><td>Bei 3 Tagen Mietdauer ist X = 2: Abholung Freitag, Rückgabe Sonntag.</td></tr>
+  <tr><td>Ruhetage</td><td>Tage ohne Abholung und Rückgabe, z.&nbsp;B. «So». Fällt die Rückgabe darauf, verschiebt der Bot sie selbständig auf den nächsten offenen Tag.</td></tr>
+  <tr><td>Puffertage nach Rückgabe</td><td>Zeit zum Kontrollieren und Reinigen, bevor dasselbe Set wieder vermietet werden kann.</td></tr>
+  <tr><td>Exemplare pro Set</td><td>Wie oft ein Set gleichzeitig vermietet werden kann. Einzelne Sets können abweichen.</td></tr>
+  <tr><td>Kaution</td><td>Betrag in CHF, den der Bot nennt.</td></tr>
+  <tr><td>Verspätungsgebühr pro Tag</td><td>Pro angefangenem Tag.</td></tr>
+  <tr><td>Wie wird die Kaution bezahlt?</td><td><b>Im Shop-Preis enthalten</b> · <b>separat</b> (eigenes Kautions-Produkt im Shop) · <b>bar bei der Abholung</b>. Der Bot erklärt es dem Kunden genau so.</td></tr>
+  <tr><td>Link zum Kautions-Produkt</td><td>Nur bei «separat»: der Shop-Link, den der Bot schickt.</td></tr>
+  <tr><td>Abholadresse</td><td>Wird dem Kunden genannt. Nur diese Adresse – der Showroom wird nur auf Nachfrage erwähnt.</td></tr>
+  <tr><td>Mögliche Abholzeiten</td><td>Leer lassen, wenn es keine festen Zeiten gibt: der Bot sagt dann, der Zeitpunkt werde abgesprochen, statt etwas zu erfinden.</td></tr>
+</table>
+
+<h3>Shop (PartyDekoMiet)</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>Shop-Adresse</td><td>Von hier liest der Bot die Produkte.</td></tr>
+  <tr><td>Katalog neu laden</td><td>Wie oft der Katalog aktualisiert wird. Standard alle 6 Stunden.</td></tr>
+</table>
+
+<h3>Kalender (PartyDekoMiet)</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>Kalender-ID</td><td>Der Google-Kalender für Buchungen. Muss mit dem Dienstkonto geteilt sein.</td></tr>
+  <tr><td>Stichwörter für Sperrtage</td><td>Ganztägige Kalendereinträge mit einem dieser Wörter im Titel sperren <b>alle</b> Sets an dem Tag – so tragen Sie Ferien ein.</td></tr>
+</table>
+
+<h3>Studio</h3>
+<table>
+  <tr><th>Feld</th><th>Bedeutung</th></tr>
+  <tr><td>Studio-Bot aktiv</td><td>Eigener Schalter, unabhängig von PartyDekoMiet.</td></tr>
+  <tr><td>WhatsApp des Inhabers (Studio)</td><td>Eigene Nummer für das Studio.</td></tr>
+  <tr><td>Nummern für Benachrichtigungen (Studio)</td><td>Wer Terminanfragen erhält. <b>Getrennt von PartyDekoMiet</b> – siehe Kapitel 5.</td></tr>
+  <tr><td>Preise ausserhalb der Liste</td><td><b>Durchlassen und vermerken</b> (Standard) oder <b>zurückhalten</b>. Siehe Hinweis unten.</td></tr>
+  <tr><td>Kalender-ID (Studio)</td><td>Eigener Kalender, getrennt vom PartyDekoMiet-Kalender. Zeitzone Zürich.</td></tr>
+  <tr><td>Mindestvorlauf</td><td>Wie kurzfristig ein Termin noch angefragt werden kann. Standard 1 Stunde.</td></tr>
+  <tr><td>Pufferzeit zwischen Terminen</td><td>Zeit zum Wechseln, bevor dieselbe Person den nächsten Termin annimmt. Standard 15 Minuten.</td></tr>
+  <tr><td>Zahlung (Studio)</td><td><b>Vor Ort</b> oder <b>im Voraus</b>. Bestimmt, was der Bot zur Bezahlung sagt.</td></tr>
+  <tr><td>Stornierungsregel</td><td>Z.&nbsp;B. «Bis 2 Stunden vorher kostenlos stornierbar». Leer = der Bot nennt keine Regel.</td></tr>
+  <tr><td>Beispiel-Bestätigung</td><td>Ein Beispiel, wie Sie einen Termin normalerweise bestätigen. Der Bot übernimmt diesen Ton.</td></tr>
+  <tr><td>Stichwörter für Sperrtage (Studio)</td><td>Wie beim Kalender oben, für das Studio.</td></tr>
+</table>
+
+<div class="box warn">
+  <b>Preise ausserhalb der Liste.</b>
+  Nennt der Bot einen Preis, der zu keinem aktiven Service gehört, kann er die
+  Antwort entweder trotzdem senden und den Fall vermerken, oder sie
+  zurückhalten und an Sie übergeben. Solange die Serviceliste noch nicht
+  vollständig ist, ist <b>Durchlassen</b> sinnvoll. Ist sie vollständig, ist
+  <b>Zurückhalten</b> der sicherere Wert.
+</div>
+
+<h3>Dashboard</h3>
+<p>
+  <b>Sprache des Dashboards</b> – Deutsch oder Englisch. Betrifft nur diese
+  Oberfläche, nicht die Sprache, in der der Bot Kunden antwortet.
+</p>
+
+<div class="box">
+  <b>Speichern nicht vergessen.</b>
+  Geänderte Felder werden erst mit <i>Speichern</i> übernommen; solange etwas
+  offen ist, zeigt das Dashboard <i>Nicht gespeicherte Änderungen</i>. Einzelne
+  Felder können auch serverseitig fest vorgegeben sein – solche sind
+  gekennzeichnet und lassen sich hier nicht ändern.
+</div>
+
+<h2>12 · Was der Assistent tut – und was nicht</h2>
 
 <h3>Beide Assistenten</h3>
 <ul>
@@ -436,7 +543,7 @@ desto weniger landet bei Ihnen.</p>
   <li>Die beiden Kalender nicht zusammenlegen.</li>
 </ul>
 
-<h2>12 · Wenn etwas nicht funktioniert</h2>
+<h2>13 · Wenn etwas nicht funktioniert</h2>
 
 <table>
   <tr><th>Beobachtung</th><th>Das hilft</th></tr>

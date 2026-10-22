@@ -393,35 +393,54 @@ describe('a tool call that names the record instead of its id', () => {
   });
 });
 
-describe('the photo goes with the details, not one request later', () => {
-  // Live: asked for details, got text; had to ask again before the picture
-  // arrived. A customer reading the first answer concludes there is no photo.
-  let pro, svc;
+describe('the photo is sent by the lookup, not left to the model', () => {
+  // Live, twice: asked for a professional's details, got text and no picture -
+  // the model skipped the instruction to send one. Telling it harder is not a
+  // fix, so the lookup sends the photo itself.
+  let pro, svc, sent, photos;
 
   beforeEach(async () => {
     await db.init(createMemoryBackend());
     settings.load();
-    pro = (await directory.createProfessional({ name: 'Sofia' })).professional;
+    pro = (await directory.createProfessional({ name: 'Sofia', photoFileId: 'F1' })).professional;
     svc = (await directory.createService({ name: 'Sofia', priceChf: 1000, notes: 'Ganzkoerper.' })).service;
+    sent = [];
+    photos = { sendForAnswer: async (chatId, people) => { sent.push(...people.map((p) => p.name)); return people.map((p) => p.name); } };
   });
 
-  test('get_service says to send the photo when there is one', async () => {
-    await directory.updateProfessional(pro.id, { photoFileId: 'F1' });
-    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
-    assert.match(res.note, /send_professional_photo/);
-    assert.match(res.note, /derselben Antwort/);
+  test('get_professional_profile sends her photo without being asked', async () => {
+    const res = await runTool('get_professional_profile', { professional_id: 'Sofia' }, { directory, photos, chatId: 'c1' });
+    assert.deepStrictEqual(sent, ['Sofia']);
+    assert.deepStrictEqual(res.photoSent, ['Sofia']);
   });
 
-  test('with no photo on file it says nothing about photos', async () => {
-    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
-    assert.ok(!res.note || !/send_professional_photo/.test(res.note));
+  test('get_service sends it when the service belongs to one person', async () => {
+    await directory.updateService(svc.id, { professionalId: pro.id });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory, photos, chatId: 'c1' });
+    assert.deepStrictEqual(res.photoSent, ['Sofia']);
+    assert.match(res.note, /NICHT noch einmal/);
   });
 
-  test('a missing description and an available photo are both reported', async () => {
-    await directory.updateProfessional(pro.id, { photoFileId: 'F1' });
-    await directory.updateService(svc.id, { notes: '' });
-    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
-    assert.match(res.note, /Erfinde keine Beschreibung/);
-    assert.match(res.note, /send_professional_photo/);
+  test('a service everyone offers does not fire off every photo', async () => {
+    await directory.createProfessional({ name: 'Gabriela', photoFileId: 'F2' });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory, photos, chatId: 'c1' });
+    assert.deepStrictEqual(sent, [], 'a pile of pictures nobody asked for');
+    assert.deepStrictEqual(res.photoSent, []);
+    assert.match(res.note, /Mehrere Personen/);
+  });
+
+  test('the answer still comes back when sending the photo fails', async () => {
+    const broken = { sendForAnswer: async () => { throw new Error('WhatsApp down'); } };
+    await assert.rejects(() => broken.sendForAnswer(), /WhatsApp down/); // the stub really does throw
+    const forgiving = { sendForAnswer: async () => [] };
+    const res = await runTool('get_professional_profile', { professional_id: 'Sofia' }, { directory, photos: forgiving, chatId: 'c1' });
+    assert.strictEqual(res.ok, true);
+    assert.deepStrictEqual(res.photoSent, []);
+  });
+
+  test('with no photos wired at all the lookup still answers', async () => {
+    const res = await runTool('get_professional_profile', { professional_id: 'Sofia' }, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.deepStrictEqual(res.photoSent, []);
   });
 });

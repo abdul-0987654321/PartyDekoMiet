@@ -141,14 +141,21 @@ const DEFS = [
       required: ['professional_id'],
       additionalProperties: false,
     },
-    handler: async (args, { directory }) => {
+    handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
       const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
       if (hit.error) return { ok: false, error: hit.error };
       const profile = directory.profileFor(hit.record.id);
       if (!profile) return { ok: false, error: `Professional ${hit.record.name} nicht gefunden.` };
+
+      // Sent here rather than left to the model: looking her up IS the moment
+      // the customer wants to see her, and an instruction to send it got
+      // skipped often enough that customers concluded there was no photo.
+      const photoSent = photos ? await photos.sendForAnswer(chatId, [profile.professional]) : [];
+
       return {
         ok: true,
+        photoSent,
         professional: {
           id: profile.professional.id,
           name: profile.professional.name,
@@ -173,7 +180,7 @@ const DEFS = [
       required: ['service_id'],
       additionalProperties: false,
     },
-    handler: async (args, { directory }) => {
+    handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
       const hit = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service');
       if (hit.error) return { ok: false, error: hit.error };
@@ -186,8 +193,15 @@ const DEFS = [
         ? all.filter((p) => p.id === service.professionalId)
         : all;
 
+      // Only when the service points at one person: sending every
+      // professional's photo because someone asked about a service they all
+      // offer would be a pile of pictures nobody asked for.
+      const photoSent =
+        photos && offeredBy.length === 1 ? await photos.sendForAnswer(chatId, offeredBy) : [];
+
       return {
         ok: true,
+        photoSent,
         service: serviceView(service),
         offeredBy: offeredBy.map((p) => ({
           id: p.id,
@@ -202,9 +216,11 @@ const DEFS = [
             : 'Zu diesem Service ist keine Beschreibung hinterlegt. Sag ehrlich, dass dazu nichts weiter hinterlegt ist, nenne Dauer und Preis, und biete an, die Frage ans Team weiterzugeben. Erfinde keine Beschreibung.',
           // Asking for details and being told to ask again for a picture reads
           // like the bot has nothing. If there is a photo, it goes with the answer.
-          offeredBy.some((p) => p.photoFileId)
-            ? 'Zu dieser Person ist ein Foto hinterlegt: schicke es mit send_professional_photo in derselben Antwort, ohne dass extra danach gefragt werden muss.'
-            : null,
+          photoSent.length
+            ? `Das Foto von ${photoSent.join(', ')} wurde soeben automatisch mitgeschickt. Erwaehne es kurz ("ich habe dir ein Foto geschickt") und rufe send_professional_photo NICHT noch einmal auf.`
+            : offeredBy.length > 1 && offeredBy.some((p) => p.photoFileId)
+              ? 'Mehrere Personen bieten diesen Service an. Fragt der Kunde nach einer bestimmten, schick ihr Foto mit send_professional_photo.'
+              : null,
         ].filter(Boolean).join(' ') || undefined,
       };
     },

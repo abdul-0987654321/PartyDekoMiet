@@ -14,7 +14,9 @@
  */
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const { browserTriple, deviceLabel, KNOWN_PLATFORMS, DEFAULT_PLATFORM } = require('../src/whatsapp/device');
+const {
+  browserTriple, deviceLabel, KNOWN_PLATFORMS, KNOWN_BROWSERS, DEFAULT_PLATFORM, PAIRING_BROWSER,
+} = require('../src/whatsapp/device');
 
 describe('the platform slot', () => {
   test('is a real OS name for both businesses - this is the whole bug', () => {
@@ -49,7 +51,7 @@ describe('the platform slot', () => {
 });
 
 describe('what the owner sees under Linked devices', () => {
-  test('each business is named, so two linked numbers can be told apart', () => {
+  test('each business is named on a QR link, so two numbers can be told apart', () => {
     assert.strictEqual(deviceLabel(browserTriple({ business: 'party', env: {} })), 'PartyDekoMiet (Ubuntu)');
     assert.strictEqual(deviceLabel(browserTriple({ business: 'studio', env: {} })), 'Studio (Ubuntu)');
   });
@@ -69,5 +71,48 @@ describe('what the owner sees under Linked devices', () => {
     assert.strictEqual(triple.length, 3);
     for (const part of triple) assert.strictEqual(typeof part, 'string');
     assert.ok(triple.every((p) => p.length));
+  });
+});
+
+
+describe('pairing mode: the browser name decides whether the phone accepts it', () => {
+  // Baileys turns the BROWSER name into a numeric companion platform id for the
+  // pairing request. An unrecognised name becomes OTHER_WEB_CLIENT and the phone
+  // refuses the link - on every number, which is exactly what was happening.
+  test('pairing never sends the business name as the browser', () => {
+    for (const business of ['party', 'studio']) {
+      const [, browser] = browserTriple({ business, mode: 'pairing', env: {} });
+      assert.ok(
+        KNOWN_BROWSERS.includes(browser),
+        `pairing sends "${browser}", which maps to OTHER_WEB_CLIENT and is rejected`
+      );
+      assert.ok(!/partydekomiet|studio/i.test(browser));
+    }
+  });
+
+  test('pairing defaults to Chrome, and the platform is still a real OS', () => {
+    const triple = browserTriple({ mode: 'pairing', env: {} });
+    assert.deepStrictEqual(triple, ['Ubuntu', PAIRING_BROWSER, '22.04.4']);
+  });
+
+  test('a per-business name override cannot leak into the pairing browser', () => {
+    const env = { STUDIO_DEVICE_NAME: 'Wellness Zuerich' };
+    assert.strictEqual(browserTriple({ business: 'studio', mode: 'pairing', env })[1], PAIRING_BROWSER);
+    // ...but it still names the device on the QR link the owner keeps.
+    assert.strictEqual(browserTriple({ business: 'studio', mode: 'qr', env })[1], 'Wellness Zuerich');
+  });
+
+  test('an unrecognised pairing-browser override is ignored', () => {
+    for (const bad of ['Studio', 'MyBot', '', 'Chromium']) {
+      assert.strictEqual(browserTriple({ mode: 'pairing', env: { WHATSAPP_PAIRING_BROWSER: bad } })[1], PAIRING_BROWSER);
+    }
+  });
+
+  test('a recognised one is honoured, case-insensitively', () => {
+    assert.strictEqual(browserTriple({ mode: 'pairing', env: { WHATSAPP_PAIRING_BROWSER: 'safari' } })[1], 'Safari');
+  });
+
+  test('qr mode is the default, so nothing silently links as Chrome', () => {
+    assert.strictEqual(browserTriple({ business: 'studio', env: {} })[1], 'Studio');
   });
 });

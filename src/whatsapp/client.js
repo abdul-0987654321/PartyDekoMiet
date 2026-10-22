@@ -47,7 +47,11 @@ const baileysLogger = pino({ level: 'silent' });
 /** @param {'party'|'studio'} [business] defaults to 'party' - existing callers are unaffected. */
 function createWhatsAppClient(business = 'party') {
   const logTag = business === 'studio' ? '[studio] ' : '';
-  const deviceTriple = browserTriple({ business });
+  // Recomputed per connection attempt: a socket that is about to be linked by
+  // pairing code has to present a browser name WhatsApp recognises, which is
+  // not the business name. See device.js.
+  const currentTriple = () =>
+    browserTriple({ business, mode: runtime.pairingRequest ? 'pairing' : 'qr' });
 
   const runtime = {
     sock: null,
@@ -262,6 +266,7 @@ function createWhatsAppClient(business = 'party') {
     try {
       detachSocket();
       const { state, saveCreds } = useSheetAuthState(business);
+      const deviceTriple = currentTriple();
       const version = await resolveVersion();
       log.info(
         `${logTag}Starting WhatsApp connection (${hasSession(business) ? 'stored session' : 'new session, QR needed'}, ` +

@@ -134,7 +134,7 @@ async function save() {
 }
 
 async function remove(id) {
-  if (!confirm(t('delete_confirm'))) return;
+  if (!(await ask(t('delete_confirm')))) return;
   await api(`/api/studio/professionals/${encodeURIComponent(id)}`, { method: 'DELETE' });
   refresh();
 }

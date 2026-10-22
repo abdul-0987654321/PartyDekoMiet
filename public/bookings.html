@@ -99,10 +99,10 @@ function actions(b) {
 
 async function setStatus(id, status) {
   const question = status === 'CANCELLED' ? t('b_cancel_q') : status === 'CONFIRMED' ? t('b_confirm_q') : null;
-  if (question && !confirm(question)) return;
+  if (question && !(await ask(question))) return;
   const res = await api(`/api/bookings/${encodeURIComponent(id)}/status`, { method:'POST', body:{ status } });
-  if (!res.ok) { alert(res.error || 'error'); return; }
-  if (res.calendarWarning) alert(`${t('b_cal_warn')}\n${res.calendarWarning}`);
+  if (!res.ok) { await say(res.error || 'error', { danger: true }); return; }
+  if (res.calendarWarning) await say(res.calendarWarning, { title: t('b_cal_warn') });
   refresh();
 }
 

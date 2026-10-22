@@ -109,7 +109,7 @@ async function send() {
   try {
     const res = await api(`/api/chats/${encodeURIComponent(current)}/send`, { method:'POST', body:{ text } });
     if (res.ok) { $('msg').value = ''; await openChat(current); }
-    else alert(res.error || 'error');
+    else await say(res.error || 'error', { danger: true });
   } finally { $('send').disabled = false; }
 }
 $('send').onclick = send;

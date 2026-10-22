@@ -170,6 +170,16 @@ async function boot() {
 
   // 5. WhatsApp side.
   runtime.notify = createNotifier({ client: whatsapp });
+  const partyAlerts = runtime.notify.recipients();
+  if (partyAlerts.length) {
+    log.info(`Booking alerts go to: ${partyAlerts.join(', ')}`);
+    state.alertError = null;
+  } else {
+    state.alertError =
+      'No alert number set - booking requests will reach nobody. ' +
+      'Dashboard: Settings, "Numbers for alerts" or "Owner number".';
+    log.warn(state.alertError);
+  }
   const messenger = createMessenger({ client: whatsapp });
   runtime.bookings = createBookings({ catalog, calendar: runtime.calendar, notify: runtime.notify });
 
@@ -277,6 +287,22 @@ async function bootStudio() {
 
     studioRuntime.notify = createNotifier({ client: studioWhatsapp, business: 'studio' });
     studioRuntime.appointments = createAppointments({ calendar: studioRuntime.calendar, notify: studioRuntime.notify });
+
+    // Say who alerts go to, at boot. An appointment request that reaches nobody
+    // looks exactly like a working bot from the customer's side - they are told
+    // the team will confirm, and the team never hears about it. There are two
+    // separate alert settings (Studio's own and PartyDekoMiet's) and filling in
+    // the wrong one is silent, so name the setting in the warning.
+    const studioAlerts = studioRuntime.notify.recipients();
+    if (studioAlerts.length) {
+      log.info(`[studio] Appointment alerts go to: ${studioAlerts.join(', ')}`);
+      studioState.alertError = null;
+    } else {
+      studioState.alertError =
+        'No Studio alert number set - appointment requests will reach nobody. ' +
+        'Dashboard: switch to Studio, Settings, "Numbers for alerts (Studio)" or "Owner number (Studio)".';
+      log.warn(`[studio] ${studioState.alertError}`);
+    }
 
     studioRuntime.photos = createPhotos({ client: studioWhatsapp });
 

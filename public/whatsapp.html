@@ -65,7 +65,7 @@ $('tab_pair').onclick = () => showTab('pair');
 
 $('connect').onclick = async () => { await api('/api/whatsapp/connect', { method:'POST' }); refresh(); };
 $('relink').onclick = async () => {
-  if (!confirm(t('relink_confirm'))) return;
+  if (!(await ask(t('relink_confirm')))) return;
   await api('/api/whatsapp/relink', { method:'POST' }); refresh();
 };
 $('pair_go').onclick = async () => {

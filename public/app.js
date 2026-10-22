@@ -75,6 +75,7 @@ const T = {
     s_adv: 'Erweitert', s_unsaved: 'Ungespeicherte Änderungen',
 
     biz_party: 'PartyDeko', biz_studio: 'Studio',
+    lb_ok: 'OK', lb_yes: 'Ja, weiter', lb_cancel: 'Abbrechen',
     nav_appointments: 'Termine', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Standorte',
     add: 'Hinzufügen', edit: 'Bearbeiten', delete: 'Löschen', delete_confirm: 'Wirklich löschen?',
     active: 'Aktiv', inactive: 'Inaktiv', name: 'Name', photo: 'Foto', upload_photo: 'Foto hochladen',
@@ -160,6 +161,7 @@ const T = {
     s_adv: 'Advanced', s_unsaved: 'Unsaved changes',
 
     biz_party: 'PartyDeko', biz_studio: 'Studio',
+    lb_ok: 'OK', lb_yes: 'Yes, continue', lb_cancel: 'Cancel',
     nav_appointments: 'Appointments', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Locations',
     add: 'Add', edit: 'Edit', delete: 'Delete', delete_confirm: 'Really delete this?',
     active: 'Active', inactive: 'Inactive', name: 'Name', photo: 'Photo', upload_photo: 'Upload photo',
@@ -343,4 +345,79 @@ async function api(path, options) {
     throw new Error('unauthorised');
   }
   return res.json();
+}
+
+/* ---------------------------------------------------------------------------
+ * Lightbox: our own modal, in place of the browser's alert() and confirm().
+ *
+ * The native ones are the browser's chrome, not ours - unstyled, impossible to
+ * make mobile-friendly, and on a phone they read like a browser warning rather
+ * than part of this dashboard. They also block the page thread entirely, which
+ * on WhatsApp pages can stall a poll mid-flight.
+ *
+ * Both return promises: say(...) resolves when dismissed, ask(...) resolves
+ * true/false, so a call site changes from `if (!confirm(q)) return;` to
+ * `if (!(await ask(q))) return;` and nothing else moves.
+ * ------------------------------------------------------------------------- */
+
+function closeBox(box, resolve, value) {
+  box.classList.remove('on');
+  // Let the fade finish before the node goes, or it vanishes mid-animation.
+  setTimeout(() => box.remove(), 140);
+  document.removeEventListener('keydown', box._onKey);
+  resolve(value);
+}
+
+function lightbox({ title = '', message = '', confirmLabel, cancelLabel = null, danger = false }) {
+  return new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.className = 'lightbox';
+    box.innerHTML = `
+      <div class="lb-card" role="dialog" aria-modal="true">
+        ${title ? `<h3>${escapeHtml(title)}</h3>` : ''}
+        <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>
+        <div class="lb-actions">
+          ${cancelLabel ? `<button class="ghost" data-act="cancel">${escapeHtml(cancelLabel)}</button>` : ''}
+          <button class="${danger ? 'danger' : ''}" data-act="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+
+    box._onKey = (e) => {
+      if (e.key === 'Escape') closeBox(box, resolve, false);
+      if (e.key === 'Enter') closeBox(box, resolve, true);
+    };
+    box.querySelector('[data-act="ok"]').onclick = () => closeBox(box, resolve, true);
+    const cancel = box.querySelector('[data-act="cancel"]');
+    if (cancel) cancel.onclick = () => closeBox(box, resolve, false);
+    // Clicking the backdrop is a cancel, but only the backdrop itself - a click
+    // that started inside the card and drifted out must not dismiss it.
+    box.onmousedown = (e) => { if (e.target === box) closeBox(box, resolve, false); };
+
+    document.addEventListener('keydown', box._onKey);
+    document.body.appendChild(box);
+    requestAnimationFrame(() => box.classList.add('on'));
+    box.querySelector('[data-act="ok"]').focus();
+  });
+}
+
+/** Message with a single OK. Replaces alert(). */
+function say(message, { title = '', danger = false } = {}) {
+  return lightbox({ title, message, confirmLabel: t('lb_ok'), danger });
+}
+
+/** Yes/no question. Replaces confirm() - resolves true only on confirm. */
+function ask(message, { title = '', confirmLabel = null, danger = true } = {}) {
+  return lightbox({
+    title,
+    message,
+    confirmLabel: confirmLabel || t('lb_yes'),
+    cancelLabel: t('lb_cancel'),
+    danger,
+  });
+}
+
+/** Anything from the server goes through here before it reaches innerHTML. */
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

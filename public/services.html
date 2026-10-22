@@ -41,7 +41,10 @@ function profName(id) {
 }
 
 function render() {
-  if (!rows.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_services')}</p></div>`; return; }
+  if (!rows.length) {
+    $('wrap').innerHTML = emptyState({ icon: '📋', title: t('no_services'), text: t('s_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
+    return;
+  }
   $('wrap').innerHTML = `<div class="bk-list">${rows.map((s) => `
     <div class="bk ${s.active ? 'CONFIRMED' : 'CANCELLED'}">
       <div class="top">
@@ -73,7 +76,10 @@ function formHtml(s) {
     </div>
     <div class="field"><label>${t('s_duration')}</label><input type="number" id="f_durationMin" value="${esc(s?.durationMin || '')}" min="1" max="480"></div>
     <div class="field"><label>${t('s_price')}</label><input type="number" id="f_priceChf" value="${esc(s?.priceChf || '')}" min="0" step="0.05"></div>
-    <div class="field"><label>${t('s_notes')}</label><input type="text" id="f_notes" value="${esc(s?.notes || '')}"></div>
+    <div class="field"><label>${t('s_notes')}</label>
+      <p class="help">${t('s_notes_help')}</p>
+      <textarea id="f_notes" rows="3">${esc(s?.notes || '')}</textarea>
+    </div>
     <div class="field"><label class="check"><input type="checkbox" id="f_active" ${s?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
     <div class="actions inline">
       <button class="primary" id="f_save">${t('save')}</button>
@@ -92,7 +98,8 @@ function openForm(s) {
 }
 function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
 
-$('addbtn').onclick = () => openForm(null);
+function addNew() { openForm(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+$('addbtn').onclick = addNew;
 function startEdit(id) { openForm(rows.find((s) => s.id === id)); }
 
 async function save() {

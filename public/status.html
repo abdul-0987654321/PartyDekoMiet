@@ -24,6 +24,12 @@
   <div class="quick" id="quick"></div>
   <div id="alerts"></div>
 
+  <!-- Studio only: what still has to be filled in, in the order it matters. -->
+  <section id="setupwrap" hidden>
+    <h2 id="h_setup"></h2>
+    <div class="card setup" id="setup"></div>
+  </section>
+
   <h2 id="h_todo"></h2>
   <div class="card" id="todo"></div>
 
@@ -82,6 +88,52 @@ $('toggle').onchange = async (e) => {
   finally { saving = false; await refresh(); }
 };
 
+/**
+ * The Studio starts completely empty, and an empty directory does not look
+ * broken - the bot just answers "I'll check with the team" to everything,
+ * which reads like a bug. This lists what is still missing, in the order it
+ * has to be done, each step linking to the page that does it.
+ *
+ * Steps are ordered by dependency, not by importance: a professional cannot be
+ * given a location that does not exist yet.
+ */
+function setupSteps(d) {
+  const dir = d.directory || {};
+  const connected = d.whatsapp.status === 'connected';
+  return [
+    { key: 'su_location',  done: dir.locations > 0,     href: '/locations',     count: dir.locations },
+    { key: 'su_service',   done: dir.services > 0,      href: '/services',      count: dir.services },
+    { key: 'su_details',   done: dir.services > 0 && dir.servicesWithDetails === dir.services, href: '/services', optional: true },
+    { key: 'su_pro',       done: dir.professionals > 0, href: '/professionals', count: dir.professionals },
+    { key: 'su_photo',     done: dir.photos > 0,        href: '/professionals', optional: true },
+    { key: 'su_hours',     done: Boolean(d.config.calendarConfigured && !d.calendarError), href: '/settings' },
+    { key: 'su_alert',     done: !d.alertError && Boolean(d.config.ownerNumber), href: '/settings' },
+    { key: 'su_wa',        done: connected,             href: '/whatsapp' },
+    { key: 'su_faq',       done: dir.faq > 0,           href: '/faq', optional: true },
+  ];
+}
+
+function renderSetup(d) {
+  const wrap = $('setupwrap');
+  if (d.biz !== 'studio' || !d.directory) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+
+  const steps = setupSteps(d);
+  const required = steps.filter((s) => !s.optional);
+  const left = required.filter((s) => !s.done).length;
+
+  $('h_setup').textContent = left
+    ? `${t('setup')} · ${required.length - left}/${required.length}`
+    : t('setup_done_title');
+
+  $('setup').innerHTML = steps.map((s) => `
+    <a class="step ${s.done ? 'done' : ''}" href="${s.href}">
+      <span class="mark">${s.done ? '✓' : '○'}</span>
+      <span class="lbl">${esc(t(s.key))}${s.optional ? ` <em>${esc(t('su_optional'))}</em>` : ''}</span>
+      <span class="val">${s.count !== undefined && s.count > 0 ? esc(String(s.count)) : ''}</span>
+    </a>`).join('');
+}
+
 function todoList(d) {
   const items = [];
   if (!d.config.hasSheet) items.push([t('fix_sheet'), '/settings']);
@@ -121,6 +173,9 @@ async function refresh() {
   for (const [msg, kind] of [[d.bootError,'err'],[d.storageError,'err'],[d.storageWarning,'warn'],[d.calendarError,'warn']])
     if (msg) al.push(`<p class="banner ${kind}">${esc(msg)}</p>`);
   $('alerts').innerHTML = al.join('');
+
+  // ---- setup checklist (Studio) ----
+  renderSetup(d);
 
   // ---- to do ----
   const todo = todoList(d);

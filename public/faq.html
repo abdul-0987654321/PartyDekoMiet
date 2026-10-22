@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>FAQ</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <h1 id="h1"></h1>
+  <p class="muted" id="intro"></p>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+  <div class="actions inline" style="margin-bottom:16px">
+    <button class="primary" id="addbtn"></button>
+  </div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/faq');
+$('h1').textContent = t('nav_faq');
+$('intro').textContent = t('f_intro');
+$('loading').textContent = t('loading');
+$('addbtn').textContent = '+ ' + t('add');
+
+let rows = [];
+let editingId = null;
+
+// The FAQ table is shared by both bots, so which set is shown follows the
+// dashboard's business switch rather than being a separate choice on the page.
+const qs = () => `?business=${BIZ}`;
+
+async function refresh() {
+  const res = await api('/api/faq' + qs());
+  rows = res.entries || [];
+  render();
+}
+
+function render() {
+  if (!rows.length) {
+    $('wrap').innerHTML = emptyState({
+      icon: '💬', title: t('no_faq'), text: t('f_intro'),
+      actionLabel: '+ ' + t('add'), onclick: 'addNew',
+    });
+    return;
+  }
+  $('wrap').innerHTML = `<div class="bk-list">${rows.map((f) => `
+    <div class="bk ${f.active ? 'CONFIRMED' : 'CANCELLED'}">
+      <div class="top">
+        ${pill(f.active ? t('active') : t('inactive'), f.active ? 'ok' : 'warn')}
+      </div>
+      <div class="set">${esc(f.question)}</div>
+      <div class="who">
+        ${f.answerDe ? `<div><span class="muted">DE</span> ${esc(f.answerDe)}</div>` : ''}
+        ${f.answerEn ? `<div><span class="muted">EN</span> ${esc(f.answerEn)}</div>` : ''}
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick="startEdit('${esc(f.id)}')">${t('edit')}</button>
+        <button class="ghost" onclick="remove('${esc(f.id)}')">${t('delete')}</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function formHtml(f) {
+  return `
+    <div class="field"><label>${t('f_question')}</label>
+      <p class="help">${t('f_q_help')}</p>
+      <input type="text" id="f_question" value="${esc(f?.question || '')}">
+    </div>
+    <div class="field"><label>${t('f_answer_de')}</label>
+      <p class="help">${t('f_a_help')}</p>
+      <textarea id="f_answerDe" rows="3">${esc(f?.answerDe || '')}</textarea>
+    </div>
+    <div class="field"><label>${t('f_answer_en')}</label>
+      <textarea id="f_answerEn" rows="3">${esc(f?.answerEn || '')}</textarea>
+    </div>
+    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${f?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
+    <div class="actions inline">
+      <button class="primary" id="f_save">${t('save')}</button>
+      <button class="ghost" id="f_cancel">${t('reset')}</button>
+      <span id="f_msg" class="muted"></span>
+    </div>`;
+}
+
+function openForm(f) {
+  editingId = f?.id || null;
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = formHtml(f);
+  $('f_cancel').onclick = closeForm;
+  $('f_save').onclick = save;
+  $('f_question').focus();
+}
+function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
+
+function addNew() { openForm(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+$('addbtn').onclick = addNew;
+function startEdit(id) { openForm(rows.find((f) => f.id === id)); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+async function save() {
+  $('f_msg').textContent = t('saving');
+  const body = {
+    question: $('f_question').value.trim(),
+    answerDe: $('f_answerDe').value.trim(),
+    answerEn: $('f_answerEn').value.trim(),
+    active: $('f_active').checked,
+  };
+  const res = editingId
+    ? await api(`/api/faq/${encodeURIComponent(editingId)}`, { method: 'PATCH', body })
+    : await api('/api/faq' + qs(), { method: 'POST', body });
+  if (!res.ok) {
+    $('f_msg').textContent = '';
+    $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`;
+    return;
+  }
+  $('alerts').innerHTML = '';
+  closeForm();
+  refresh();
+}
+
+async function remove(id) {
+  if (!(await ask(t('delete_confirm')))) return;
+  await api(`/api/faq/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  refresh();
+}
+
+refresh();
+</script>
+</body></html>

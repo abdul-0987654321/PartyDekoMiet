@@ -76,6 +76,28 @@ const T = {
 
     biz_party: 'PartyDeko', biz_studio: 'Studio',
     lb_ok: 'OK', lb_yes: 'Ja, weiter', lb_cancel: 'Abbrechen',
+    setup: 'Einrichtung', setup_done_title: 'Einrichtung abgeschlossen', su_optional: '(optional)',
+    su_location: 'Standort anlegen',
+    su_service: 'Services mit Dauer und Preis anlegen',
+    su_details: 'Bei jedem Service eintragen, was er beinhaltet',
+    su_pro: 'Professionals anlegen',
+    su_photo: 'Fotos hochladen',
+    su_hours: 'Kalender verbinden',
+    su_alert: 'Nummer fuer Benachrichtigungen eintragen',
+    su_wa: 'WhatsApp-Nummer verknuepfen',
+    su_faq: 'Haeufige Fragen beantworten',
+    nav_faq: 'Fragen & Antworten',
+    empty_add: 'Jetzt anlegen',
+    no_locations_yet: 'Noch kein Standort angelegt.',
+    no_services_yet: 'Noch kein Service angelegt.',
+    pick_none: 'Noch keine vorhanden',
+    add_first: 'Zuerst anlegen',
+    s_notes_help: 'Was dieser Service beinhaltet. Genau das erzaehlt der Bot, wenn ein Kunde nach Details fragt - bleibt das Feld leer, sagt er, dass er dazu nichts weiss.',
+    f_intro: 'Eigene Fragen und Antworten. Der Bot benutzt sie woertlich - er formuliert sie nicht um.',
+    no_faq: 'Noch keine Fragen hinterlegt.',
+    f_question: 'Frage des Kunden', f_answer_de: 'Antwort (Deutsch)', f_answer_en: 'Antwort (Englisch)',
+    f_q_help: 'Worum es geht, in den Worten eines Kunden. Z.B. "Habt ihr Parkplaetze?"',
+    f_a_help: 'Eine Sprache reicht - die andere wird dann auch damit beantwortet.',
     nav_appointments: 'Termine', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Standorte',
     add: 'Hinzufügen', edit: 'Bearbeiten', delete: 'Löschen', delete_confirm: 'Wirklich löschen?',
     active: 'Aktiv', inactive: 'Inaktiv', name: 'Name', photo: 'Foto', upload_photo: 'Foto hochladen',
@@ -162,6 +184,28 @@ const T = {
 
     biz_party: 'PartyDeko', biz_studio: 'Studio',
     lb_ok: 'OK', lb_yes: 'Yes, continue', lb_cancel: 'Cancel',
+    setup: 'Setup', setup_done_title: 'Setup complete', su_optional: '(optional)',
+    su_location: 'Add a location',
+    su_service: 'Add services with duration and price',
+    su_details: 'Say what each service includes',
+    su_pro: 'Add professionals',
+    su_photo: 'Upload photos',
+    su_hours: 'Connect the calendar',
+    su_alert: 'Set a number for alerts',
+    su_wa: 'Link the WhatsApp number',
+    su_faq: 'Answer common questions',
+    nav_faq: 'Questions & answers',
+    empty_add: 'Add one now',
+    no_locations_yet: 'No location added yet.',
+    no_services_yet: 'No service added yet.',
+    pick_none: 'None yet',
+    add_first: 'Add one first',
+    s_notes_help: 'What this service includes. This is exactly what the bot tells a customer who asks for details - leave it empty and it will say it does not know.',
+    f_intro: 'Your own questions and answers. The bot uses them word for word - it does not rewrite them.',
+    no_faq: 'No questions added yet.',
+    f_question: "Customer's question", f_answer_de: 'Answer (German)', f_answer_en: 'Answer (English)',
+    f_q_help: 'How a customer would ask it. E.g. "Do you have parking?"',
+    f_a_help: 'One language is enough - the other will use the same answer.',
     nav_appointments: 'Appointments', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Locations',
     add: 'Add', edit: 'Edit', delete: 'Delete', delete_confirm: 'Really delete this?',
     active: 'Active', inactive: 'Inactive', name: 'Name', photo: 'Photo', upload_photo: 'Upload photo',
@@ -235,6 +279,7 @@ const NAV_LINKS = {
     ['/chats', 'nav_chats', '💬'],
     ['/bookings', 'nav_bookings', '🗓'],
     ['/whatsapp', 'nav_whatsapp', '🔗'],
+    ['/faq', 'nav_faq', '❓'],
     ['/settings', 'nav_settings', '⚙'],
   ],
   studio: [
@@ -245,6 +290,7 @@ const NAV_LINKS = {
     ['/professionals', 'nav_professionals', '👤'],
     ['/services', 'nav_services', '📋'],
     ['/locations', 'nav_locations', '📍'],
+    ['/faq', 'nav_faq', '❓'],
     ['/settings', 'nav_settings', '⚙'],
   ],
 };
@@ -420,4 +466,46 @@ function ask(message, { title = '', confirmLabel = null, danger = true } = {}) {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/**
+ * An empty list is a dead end unless it says what to do next. Every list page
+ * uses this instead of a bare "nothing here" line, so the way forward is always
+ * one tap away - including when the missing thing lives on another page.
+ *
+ * @param {object} o
+ * @param {string} o.icon
+ * @param {string} o.title
+ * @param {string} [o.text]
+ * @param {string} [o.actionLabel]
+ * @param {string} [o.href]    another page; omit for an on-page button
+ * @param {string} [o.onclick] name of a global function, for an on-page action
+ */
+function emptyState({ icon = '○', title, text = '', actionLabel = '', href = '', onclick = '' }) {
+  const action = !actionLabel
+    ? ''
+    : href
+      ? `<a class="primary" href="${href}">${escapeHtml(actionLabel)}</a>`
+      : `<button class="primary" onclick="${escapeHtml(onclick)}()">${escapeHtml(actionLabel)}</button>`;
+  return `<div class="card emptybox">
+    <div class="ic">${icon}</div>
+    <h3>${escapeHtml(title)}</h3>
+    ${text ? `<p>${escapeHtml(text)}</p>` : ''}
+    ${action}
+  </div>`;
+}
+
+/**
+ * A <select> over records from another page. When there are none, the dropdown
+ * is useless on its own - it offers one empty choice and no way to fix that -
+ * so this renders the hint and the link to the page that fills it.
+ */
+function pickerWithLink({ id, items, selected = '', href, addLabel, emptyText }) {
+  const options = [`<option value="">–</option>`]
+    .concat(items.map((i) => `<option value="${escapeHtml(i.id)}"${i.id === selected ? ' selected' : ''}>${escapeHtml(i.name)}</option>`))
+    .join('');
+  const hint = items.length
+    ? `<div class="pickhint"><a href="${href}">+ ${escapeHtml(addLabel)}</a></div>`
+    : `<div class="pickhint">${escapeHtml(emptyText)} <a href="${href}">${escapeHtml(addLabel)} →</a></div>`;
+  return `<select id="${id}">${options}</select>${hint}`;
 }

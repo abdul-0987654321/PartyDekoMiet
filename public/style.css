@@ -347,3 +347,37 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
   .lb-actions { flex-direction: column-reverse; }
   .lb-actions button { width: 100%; }
 }
+
+/* ---- Setup checklist: what a new owner still has to fill in -------------- */
+.card.setup { padding: 8px 10px; }
+.setup .step {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 10px; border-radius: 10px;
+  text-decoration: none; color: var(--text); font-size: 14.5px;
+  border-bottom: 1px solid var(--line);
+}
+.setup .step:last-child { border-bottom: 0; }
+.setup .step:hover { background: var(--panel); }
+.setup .step .mark {
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  background: rgba(251,191,36,.15); color: var(--warn);
+}
+.setup .step.done .mark { background: rgba(52,211,153,.15); color: var(--ok); }
+/* A finished step steps back visually - what is left should be what stands out */
+.setup .step.done .lbl { color: var(--muted); }
+.setup .step .lbl { flex: 1; min-width: 0; }
+.setup .step .lbl em { font-style: normal; color: var(--muted); font-size: 12px; }
+.setup .step .val { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.setup .step::after { content: '›'; color: var(--muted); font-size: 18px; line-height: 1; }
+
+/* ---- Empty state: never a dead end, always the way out ------------------- */
+.emptybox { text-align: center; padding: 34px 20px; }
+.emptybox .ic { font-size: 30px; opacity: .55; }
+.emptybox h3 { margin: 12px 0 4px; font-size: 16px; }
+.emptybox p { margin: 0 auto 18px; color: var(--muted); font-size: 13.5px; max-width: 330px; }
+.emptybox .primary { text-decoration: none; display: inline-block; }
+
+/* A picker whose list is empty: say so and link to where it is filled */
+.pickhint { margin-top: 7px; font-size: 12.5px; color: var(--muted); }
+.pickhint a { font-weight: 600; }

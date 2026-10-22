@@ -25,6 +25,8 @@ const log = require('../log');
 const auth = require('./auth');
 const db = require('../store/db');
 const { matchesOtherBusiness } = require('../whatsapp/router');
+const directory = require('../studio/directory');
+const faqStore = require('../faq-store');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
@@ -97,6 +99,7 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   app.get('/professionals', page('professionals.html'));
   app.get('/services', page('services.html'));
   app.get('/locations', page('locations.html'));
+  app.get('/faq', page('faq.html'));
 
   app.get('/api/status', (req, res) => {
     const { biz, state: st, runtime: rt, whatsapp: wa } = pick(req);
@@ -120,6 +123,23 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       whatsapp: wa ? wa.getStatus() : { status: 'not-wired' },
       pausedChats: rt.router ? rt.router.listPaused() : [],
       lang: s.dashboardLanguage || 'de',
+      // What the Studio has been filled in with. The dashboard turns this into
+      // a setup checklist: a new owner otherwise has no way of knowing what is
+      // still missing, and the bot answers "I'll check with the team" to
+      // everything until it is all there, with nothing saying why.
+      directory: isStudio
+        ? {
+            locations: directory.listLocations({ activeOnly: true }).length,
+            professionals: directory.listProfessionals({ activeOnly: true }).length,
+            services: directory.listServices({ activeOnly: true }).length,
+            servicesWithDetails: directory
+              .listServices({ activeOnly: true })
+              .filter((x) => String(x.notes || '').trim()).length,
+            photos: directory.listProfessionals({ activeOnly: true }).filter((p) => p.photoFileId).length,
+            faq: faqStore.list({ business: 'studio', activeOnly: true }).length,
+          }
+        : null,
+      alertError: st.alertError || null,
       config: {
         model: config.openai?.model,
         hasOpenAiKey: Boolean(config.openai?.apiKey),
@@ -357,6 +377,31 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     const svc = biz === 'studio' ? rt.appointments : rt.bookings;
     if (!svc) return res.status(503).json({ ok: false, error: `${biz === 'studio' ? 'appointments' : 'bookings'} not ready` });
     const result = await svc.setStatus(String(req.params.id), String(req.body?.status || ''));
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  }));
+
+  // ---- FAQ: both businesses, selected by ?business= ----
+  // Not under /api/studio/: PartyDekoMiet has an FAQ too (its file-based one),
+  // and the owner adds to the same table from the same page with the dashboard
+  // business switch deciding which set is shown.
+  const faqBusiness = (req) => (String(req.query.business || req.body?.business) === 'studio' ? 'studio' : 'party');
+
+  app.get('/api/faq', (req, res) => {
+    res.json({ ok: true, entries: faqStore.list({ business: faqBusiness(req) }) });
+  });
+  app.post('/api/faq', safe(async (req, res) => {
+    const result = await faqStore.create({ ...(req.body || {}), business: faqBusiness(req) });
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  }));
+  app.patch('/api/faq/:id', safe(async (req, res) => {
+    const result = await faqStore.update(String(req.params.id), req.body || {});
+    if (!result.ok) return res.status(400).json(result);
+    res.json(result);
+  }));
+  app.delete('/api/faq/:id', safe(async (req, res) => {
+    const result = await faqStore.remove(String(req.params.id));
     if (!result.ok) return res.status(400).json(result);
     res.json(result);
   }));

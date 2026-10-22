@@ -33,7 +33,10 @@ async function refresh() {
 }
 
 function render() {
-  if (!rows.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${t('no_locations')}</p></div>`; return; }
+  if (!rows.length) {
+    $('wrap').innerHTML = emptyState({ icon: '📍', title: t('no_locations'), text: t('l_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
+    return;
+  }
   $('wrap').innerHTML = `<div class="bk-list">${rows.map((l) => `
     <div class="bk ${l.active ? 'CONFIRMED' : 'CANCELLED'}">
       <div class="top">
@@ -71,7 +74,8 @@ function openForm(l) {
 }
 function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
 
-$('addbtn').onclick = () => openForm(null);
+function addNew() { openForm(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+$('addbtn').onclick = addNew;
 function startEdit(id) { openForm(rows.find((l) => l.id === id)); }
 
 async function save() {

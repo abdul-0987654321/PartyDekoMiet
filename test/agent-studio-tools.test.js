@@ -181,3 +181,64 @@ describe('agent.js with the Studio tools injected', () => {
     assert.strictEqual(out.toolCalls[0].result.professionals[0].name, 'Gabriela');
   });
 });
+
+describe('service details and photos', () => {
+  // Live chat: "Can you provide full details of home service" was answered with
+  // "I'm unable to retrieve the full details" - twice. The details existed in
+  // the service's notes field; the tools simply never returned it. And a photo
+  // uploaded in the dashboard could not be sent at all, because no tool sent one.
+  let pro, svc;
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+    pro = (await directory.createProfessional({ name: 'Gabriela', workingHours: 'Mo-Fr 10-18' })).professional;
+    svc = (await directory.createService({
+      name: 'Home', durationMin: 60, priceChf: 100,
+      notes: 'Ganzkoerpermassage mit warmem Oel, inkl. Dusche.',
+    })).service;
+  });
+
+  test('list_services carries what the service includes', async () => {
+    const res = await runTool('list_services', {}, { directory });
+    assert.strictEqual(res.services[0].details, 'Ganzkoerpermassage mit warmem Oel, inkl. Dusche.');
+  });
+
+  test('get_professional_profile carries the details and the working hours', async () => {
+    const res = await runTool('get_professional_profile', { professional_id: pro.id }, { directory });
+    assert.strictEqual(res.services[0].details, svc.notes);
+    assert.strictEqual(res.professional.workingHours, 'Mo-Fr 10-18');
+  });
+
+  test('a service with no notes reports an empty string, never undefined', async () => {
+    const bare = (await directory.createService({ name: 'Bare', priceChf: 50 })).service;
+    const res = await runTool('list_services', {}, { directory });
+    assert.strictEqual(res.services.find((s) => s.id === bare.id).details, '');
+  });
+
+  test('hasPhoto is false until one is uploaded, then true', async () => {
+    let res = await runTool('get_professional_profile', { professional_id: pro.id }, { directory });
+    assert.strictEqual(res.professional.hasPhoto, false);
+
+    await directory.updateProfessional(pro.id, { photoFileId: 'FILE123' });
+    res = await runTool('get_professional_profile', { professional_id: pro.id }, { directory });
+    assert.strictEqual(res.professional.hasPhoto, true);
+  });
+
+  test('send_professional_photo forwards the stored photo', async () => {
+    await directory.updateProfessional(pro.id, { photoFileId: 'FILE123' });
+    const sent = [];
+    const photos = { sendProfessional: async (chatId, professional, note) => sent.push({ chatId, professional, note }) };
+    const res = await runTool('send_professional_photo', { professional_id: pro.id, note: 'Das ist Gabriela' }, { directory, photos, chatId: 'c1' });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(sent[0].professional.name, 'Gabriela');
+    assert.strictEqual(sent[0].note, 'Das ist Gabriela');
+  });
+
+  test('with no photo on file it refuses, and tells the bot not to describe her', async () => {
+    const res = await runTool('send_professional_photo', { professional_id: pro.id }, { directory, photos: {} });
+    assert.strictEqual(res.ok, false);
+    assert.match(res.error, /kein Foto/);
+    assert.match(res.error, /beschreibe sie nicht/i);
+  });
+});

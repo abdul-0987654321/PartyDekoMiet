@@ -46,6 +46,7 @@ const baileysLogger = pino({ level: 'silent' });
 /** @param {'party'|'studio'} [business] defaults to 'party' - existing callers are unaffected. */
 function createWhatsAppClient(business = 'party') {
   const logTag = business === 'studio' ? '[studio] ' : '';
+  const deviceName = business === 'studio' ? 'Studio' : 'PartyDekoMiet';
 
   const runtime = {
     sock: null,
@@ -269,7 +270,11 @@ function createWhatsAppClient(business = 'party') {
         ...(version ? { version } : {}),
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, baileysLogger) },
         logger: baileysLogger,
-        browser: ['PartyDekoMiet', 'Chrome', '120.0.0'],
+        // What the owner sees under "Linked devices" on their phone. Two bots
+        // run in this one process on two different numbers, so the party name
+        // on the Studio's device list is simply wrong - and it is the only
+        // label telling the owner which of the two they are looking at.
+        browser: [deviceName, 'Chrome', '120.0.0'],
         markOnlineOnConnect: false,
         syncFullHistory: false,
         shouldSyncHistoryMessage: () => false,

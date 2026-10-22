@@ -247,8 +247,18 @@ const NAV_LINKS = {
   ],
 };
 
+/** The selected business's own name. Every place the brand is shown reads this. */
+function brandName() {
+  return BIZ === 'studio' ? 'Studio' : 'PartyDekoMiet';
+}
+
 function renderNav(active) {
   const links = NAV_LINKS[BIZ] || NAV_LINKS.party;
+  // Each page ships a static <title> with the party name in it. The browser tab
+  // is the one label that is visible on every page and in every bookmark, so it
+  // has to follow the switch like the sidebar does.
+  const pageKey = links.find(([h]) => h === active)?.[1] || 'nav_status';
+  document.title = `${t(pageKey)} – ${brandName()}`;
   const langBtns = `<span class="langswitch">
       <button class="${LANG === 'de' ? 'on' : ''}" onclick="setLang('de')">DE</button>
       <button class="${LANG === 'en' ? 'on' : ''}" onclick="setLang('en')">EN</button>
@@ -261,7 +271,7 @@ function renderNav(active) {
   const side = document.createElement('aside');
   side.className = 'side';
   side.innerHTML = `
-    <div class="brand">${BIZ === 'studio' ? 'Studio' : 'PartyDekoMiet'}<small>WhatsApp Assistant</small></div>
+    <div class="brand">${brandName()}<small>WhatsApp Assistant</small></div>
     ${bizBtns}
     ${links.map(([href, key, ic]) =>
       `<a href="${href}" class="${href === active ? 'on' : ''}"><span class="ic">${ic}</span>${t(key)}</a>`).join('')}

@@ -27,6 +27,7 @@ const { createBookings } = require('./bookings');
 const { createAppointments } = require('./appointments');
 const directory = require('./studio/directory');
 const faqStore = require('./faq-store');
+const { createPhotos } = require('./studio/photos');
 const { createNotifier } = require('./notify/owner');
 const { createMessenger } = require('./whatsapp/messenger');
 const { createRouter } = require('./whatsapp/router');
@@ -277,11 +278,14 @@ async function bootStudio() {
     studioRuntime.notify = createNotifier({ client: studioWhatsapp, business: 'studio' });
     studioRuntime.appointments = createAppointments({ calendar: studioRuntime.calendar, notify: studioRuntime.notify });
 
+    studioRuntime.photos = createPhotos({ client: studioWhatsapp });
+
     studioRuntime.services = {
       directory,
       calendar: studioRuntime.calendar,
       appointments: studioRuntime.appointments,
       notify: studioRuntime.notify,
+      photos: studioRuntime.photos,
     };
 
     studioRuntime.router = createRouter({

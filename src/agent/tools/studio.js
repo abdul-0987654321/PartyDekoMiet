@@ -62,6 +62,11 @@ const DEFS = [
           name: s.name,
           durationMin: s.durationMin,
           priceChf: s.priceChf,
+          // What the service actually includes. Without it the bot knows a name,
+          // a length and a price and nothing else, so "tell me more about it"
+          // can only be answered with "I cannot retrieve the details" - which
+          // is what a customer was told live.
+          details: s.notes || '',
         })),
       };
     },
@@ -84,10 +89,53 @@ const DEFS = [
       if (!profile) return { ok: false, error: `Professional ${args.professional_id} nicht gefunden.` };
       return {
         ok: true,
-        professional: { id: profile.professional.id, name: profile.professional.name, languages: profile.professional.languages },
-        services: profile.services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, priceChf: s.priceChf })),
+        professional: {
+          id: profile.professional.id,
+          name: profile.professional.name,
+          languages: profile.professional.languages,
+          workingHours: profile.professional.workingHours || '',
+          hasPhoto: Boolean(profile.professional.photoFileId),
+        },
+        services: profile.services.map((s) => ({
+          id: s.id,
+          name: s.name,
+          durationMin: s.durationMin,
+          priceChf: s.priceChf,
+          details: s.notes || '',
+        })),
         location: profile.location ? { name: profile.location.name, address: profile.location.address } : null,
       };
+    },
+  },
+  {
+    name: 'send_professional_photo',
+    description:
+      "Send the customer a professional's photo, when they ask to see her or ask for pictures. Only works if her profile has one - get_professional_profile says so in hasPhoto. Send at most one per reply, and never describe her appearance in words yourself.",
+    parameters: {
+      type: 'object',
+      properties: {
+        professional_id: { type: 'string', description: 'id from list_professionals' },
+        note: { type: 'string', description: 'Optional one-line caption in the customer language' },
+      },
+      required: ['professional_id'],
+      additionalProperties: false,
+    },
+    handler: async (args, { directory, photos, chatId }) => {
+      if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
+      if (!photos) return UNAVAILABLE('Der Bildversand');
+      const professional = directory.getProfessional(args.professional_id);
+      if (!professional) return { ok: false, error: `Professional ${args.professional_id} nicht gefunden.` };
+      if (!professional.photoFileId) {
+        // Not an error the customer should hear as a failure - there is simply
+        // no photo on file, and inventing a description instead would be worse.
+        return { ok: false, error: `Fuer ${professional.name} ist kein Foto hinterlegt. Sag das ehrlich, beschreibe sie nicht.` };
+      }
+      try {
+        await photos.sendProfessional(chatId, professional, args.note);
+        return { ok: true, sent: professional.name };
+      } catch (err) {
+        return { ok: false, error: `Das Foto konnte nicht gesendet werden: ${err.message}` };
+      }
     },
   },
   {

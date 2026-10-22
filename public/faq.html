@@ -7,13 +7,15 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body><div class="shell"><main class="content" id="content">
-  <h1 id="h1"></h1>
-  <p class="muted" id="intro"></p>
-  <div id="alerts"></div>
-  <div class="card" id="formcard" hidden></div>
-  <div class="actions inline" style="margin-bottom:16px">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
     <button class="primary" id="addbtn"></button>
   </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
   <div id="wrap"><p class="muted" id="loading"></p></div>
 </main></div>
 <script src="/app.js"></script>
@@ -45,15 +47,16 @@ function render() {
     });
     return;
   }
-  $('wrap').innerHTML = `<div class="bk-list">${rows.map((f) => `
-    <div class="bk ${f.active ? 'CONFIRMED' : 'CANCELLED'}">
-      <div class="top">
-        ${pill(f.active ? t('active') : t('inactive'), f.active ? 'ok' : 'warn')}
+  $('wrap').innerHTML = `<div class="tiles">${rows.map((f) => `
+    <div class="tile ${f.active ? '' : 'off'}">
+      <div class="head">
+        <span class="shot">❓</span>
+        <div class="title"><b>${esc(f.question)}</b></div>
+        ${f.active ? '' : pill(t('inactive'), 'warn')}
       </div>
-      <div class="set">${esc(f.question)}</div>
-      <div class="who">
-        ${f.answerDe ? `<div><span class="muted">DE</span> ${esc(f.answerDe)}</div>` : ''}
-        ${f.answerEn ? `<div><span class="muted">EN</span> ${esc(f.answerEn)}</div>` : ''}
+      <div class="facts">
+        ${f.answerDe ? `<div><dt>DE</dt><dd>${esc(f.answerDe)}</dd></div>` : ''}
+        ${f.answerEn ? `<div><dt>EN</dt><dd>${esc(f.answerEn)}</dd></div>` : ''}
       </div>
       <div class="acts">
         <button class="ghost" onclick="startEdit('${esc(f.id)}')">${t('edit')}</button>

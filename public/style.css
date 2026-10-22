@@ -415,3 +415,72 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
   .msg { font-size: 15px; }
   .thread .compose textarea { font-size: 16px; } /* 16px stops iOS zooming in */
 }
+
+/* ── Directory tiles: professionals, services, locations, FAQ ──────────────
+   These pages were borrowing the booking card, which is built around a status
+   and a pair of dates. A directory entry has neither: it has a name, a couple
+   of facts, and two actions. Hence their own, quieter tile - the record should
+   read first, the chrome second.                                            */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+
+.tile {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 11px;
+  transition: border-color .15s, transform .15s;
+}
+.tile:hover { border-color: var(--accent); }
+/* Inactive is a state, not a warning: fade it rather than colour it. */
+.tile.off { opacity: .55; }
+
+.tile .head { display: flex; align-items: center; gap: 12px; }
+.tile .shot {
+  width: 46px; height: 46px; border-radius: 50%; flex: none;
+  object-fit: cover; background: var(--panel);
+  display: grid; place-items: center; font-weight: 700; color: var(--accent);
+  border: 1px solid var(--line);
+}
+.tile .title { flex: 1; min-width: 0; }
+.tile .title b { display: block; font-size: 15.5px; line-height: 1.3; }
+.tile .title span { color: var(--muted); font-size: 12.5px; }
+
+/* The number the owner checks at a glance */
+.tile .price { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.tile .price small { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+
+.tile .facts { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.tile .facts div { display: flex; gap: 8px; }
+.tile .facts dt { color: var(--muted); flex: 0 0 86px; font-size: 12.5px; }
+.tile .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tile .note { color: var(--muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.tile .acts { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+.tile .acts button { flex: 1; padding: 9px 10px; font-size: 13.5px; }
+
+/* A chip for a short fact that reads better inline than in a row */
+.chip {
+  display: inline-block; padding: 3px 9px; border-radius: 7px;
+  background: var(--bg); border: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+
+/* Page header: title on the left, the one action on the right */
+.pagehead { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+.pagehead .grow { flex: 1; min-width: 0; }
+.pagehead h1 { margin-bottom: 2px; }
+.pagehead p { margin: 0; }
+@media (max-width: 860px) {
+  .pagehead { margin-bottom: 14px; }
+  .pagehead p { display: none; }  /* the intro is in the manual, not in the way */
+}
+
+/* The Add button sits beside the title, so it stays reachable on a long list
+   without a sticky bar covering the last row. */
+.pagehead > button.primary { flex: none; white-space: nowrap; }
+@media (max-width: 520px) {
+  .pagehead { flex-direction: column; align-items: stretch; }
+  .pagehead > button.primary { width: 100%; }
+}
+
+/* Phones hide the page <h1> (the top bar already names the page), which left
+   the header as an empty box above the button. */
+@media (max-width: 860px) { .pagehead .grow:empty, .pagehead h1 { display: none; } }

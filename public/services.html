@@ -7,13 +7,15 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body><div class="shell"><main class="content" id="content">
-  <h1 id="h1"></h1>
-  <p class="muted" id="intro"></p>
-  <div id="alerts"></div>
-  <div class="card" id="formcard" hidden></div>
-  <div class="actions inline" style="margin-bottom:16px">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
     <button class="primary" id="addbtn"></button>
   </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
   <div id="wrap"><p class="muted" id="loading"></p></div>
 </main></div>
 <script src="/app.js"></script>
@@ -45,21 +47,22 @@ function render() {
     $('wrap').innerHTML = emptyState({ icon: '📋', title: t('no_services'), text: t('s_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
     return;
   }
-  $('wrap').innerHTML = `<div class="bk-list">${rows.map((s) => `
-    <div class="bk ${s.active ? 'CONFIRMED' : 'CANCELLED'}">
-      <div class="top">
-        ${pill(s.active ? t('active') : t('inactive'), s.active ? 'ok' : 'warn')}
-        <span class="muted">${esc(s.id)}</span>
+  $('wrap').innerHTML = `<div class="tiles">${rows.map((s) => `
+    <div class="tile ${s.active ? '' : 'off'}">
+      <div class="head">
+        <div class="title">
+          <b>${esc(s.name)}</b>
+          <span>${esc(s.professionalId ? profName(s.professionalId) : t('s_for_all'))}</span>
+        </div>
+        ${s.active ? '' : pill(t('inactive'), 'warn')}
       </div>
-      <div class="set">${esc(s.name)}</div>
-      <div class="dates">
-        <div><small>${t('s_duration')}</small><b>${esc(s.durationMin || '–')}</b></div>
-        <div><small>${t('s_price')}</small><b>${s.priceChf ? 'CHF ' + esc(s.priceChf) : '–'}</b></div>
+      <div class="price">
+        ${s.priceChf ? 'CHF ' + esc(s.priceChf) : '<span class="muted">' + t('s_no_price') + '</span>'}
+        ${s.durationMin ? `<small>· ${esc(s.durationMin)} min</small>` : ''}
       </div>
-      <div class="who">
-        ${t('s_for')}: ${esc(s.professionalId ? profName(s.professionalId) : t('s_for_all'))}
-        ${s.notes ? `<br><span class="muted">${esc(s.notes)}</span>` : ''}
-      </div>
+      ${s.notes
+        ? `<div class="note">${esc(s.notes)}</div>`
+        : `<div class="note"><span class="pill warn">${t('s_no_notes')}</span></div>`}
       <div class="acts">
         <button class="ghost" onclick="startEdit('${esc(s.id)}')">${t('edit')}</button>
         <button class="ghost" onclick="remove('${esc(s.id)}')">${t('delete')}</button>

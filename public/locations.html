@@ -7,13 +7,15 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body><div class="shell"><main class="content" id="content">
-  <h1 id="h1"></h1>
-  <p class="muted" id="intro"></p>
-  <div id="alerts"></div>
-  <div class="card" id="formcard" hidden></div>
-  <div class="actions inline" style="margin-bottom:16px">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
     <button class="primary" id="addbtn"></button>
   </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
   <div id="wrap"><p class="muted" id="loading"></p></div>
 </main></div>
 <script src="/app.js"></script>
@@ -37,14 +39,14 @@ function render() {
     $('wrap').innerHTML = emptyState({ icon: '📍', title: t('no_locations'), text: t('l_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
     return;
   }
-  $('wrap').innerHTML = `<div class="bk-list">${rows.map((l) => `
-    <div class="bk ${l.active ? 'CONFIRMED' : 'CANCELLED'}">
-      <div class="top">
-        ${pill(l.active ? t('active') : t('inactive'), l.active ? 'ok' : 'warn')}
-        <span class="muted">${esc(l.id)}</span>
+  $('wrap').innerHTML = `<div class="tiles">${rows.map((l) => `
+    <div class="tile ${l.active ? '' : 'off'}">
+      <div class="head">
+        <span class="shot">📍</span>
+        <div class="title"><b>${esc(l.name)}</b></div>
+        ${l.active ? '' : pill(t('inactive'), 'warn')}
       </div>
-      <div class="set">${esc(l.name)}</div>
-      <div class="who">${esc(l.address || '–')}</div>
+      <div class="note">${l.address ? esc(l.address) : `<span class="pill warn">${t('l_no_address')}</span>`}</div>
       <div class="acts">
         <button class="ghost" onclick="startEdit('${esc(l.id)}')">${t('edit')}</button>
         <button class="ghost" onclick="remove('${esc(l.id)}')">${t('delete')}</button>

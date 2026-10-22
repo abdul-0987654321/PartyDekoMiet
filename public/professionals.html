@@ -7,13 +7,15 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body><div class="shell"><main class="content" id="content">
-  <h1 id="h1"></h1>
-  <p class="muted" id="intro"></p>
-  <div id="alerts"></div>
-  <div class="card" id="formcard" hidden></div>
-  <div class="actions inline" style="margin-bottom:16px">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
     <button class="primary" id="addbtn"></button>
   </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
   <div id="wrap"><p class="muted" id="loading"></p></div>
 </main></div>
 <script src="/app.js"></script>
@@ -49,24 +51,32 @@ function render() {
       : emptyState({ icon: '📍', title: t('no_locations_yet'), text: t('l_intro'), actionLabel: t('su_location'), href: '/locations' });
     return;
   }
-  $('wrap').innerHTML = `<div class="bk-list">${rows.map((p) => `
-    <div class="bk ${p.active ? 'CONFIRMED' : 'CANCELLED'}">
-      <div class="top">
-        ${pill(p.active ? t('active') : t('inactive'), p.active ? 'ok' : 'warn')}
-        <span class="muted">${esc(p.id)}</span>
+  $('wrap').innerHTML = `<div class="tiles">${rows.map((p) => {
+    const langs = (Array.isArray(p.languages) ? p.languages.join(', ') : p.languages) || '';
+    return `
+    <div class="tile ${p.active ? '' : 'off'}">
+      <div class="head">
+        ${p.photoFileId
+          ? `<img class="shot" src="/api/studio/photo/${esc(p.photoFileId)}" alt="">`
+          : `<span class="shot">${esc(p.name.trim().charAt(0).toUpperCase() || '?')}</span>`}
+        <div class="title">
+          <b>${esc(p.name)}</b>
+          <span>${esc(p.locationId ? locationName(p.locationId) : t('p_no_location'))}</span>
+        </div>
+        ${p.active ? '' : pill(t('inactive'), 'warn')}
       </div>
-      ${p.photoFileId ? `<img src="/api/studio/photo/${esc(p.photoFileId)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">` : ''}
-      <div class="set">${esc(p.name)}${p.age ? ` · ${esc(p.age)}` : ''}</div>
-      <div class="who">
-        ${t('p_lang_short')}: ${esc((Array.isArray(p.languages) ? p.languages.join(', ') : p.languages) || t('p_none_lang'))}<br>
-        ${p.locationId ? esc(locationName(p.locationId)) + '<br>' : ''}
-        <span class="muted">${esc(p.workingHours || t('p_none_hours'))}</span>
+      <div class="facts">
+        <div><dt>${t('p_lang_short')}</dt><dd>${langs ? esc(langs) : `<span class="muted">${t('p_none_lang')}</span>`}</dd></div>
+        <div><dt>${t('p_hours')}</dt><dd>${p.workingHours ? esc(p.workingHours) : `<span class="muted">${t('p_none_hours')}</span>`}</dd></div>
+        ${p.age ? `<div><dt>${t('p_age')}</dt><dd>${esc(p.age)}</dd></div>` : ''}
       </div>
+      ${p.photoFileId ? '' : `<div class="note"><span class="pill warn">${t('p_no_photo')}</span></div>`}
       <div class="acts">
         <button class="ghost" onclick="startEdit('${esc(p.id)}')">${t('edit')}</button>
         <button class="ghost" onclick="remove('${esc(p.id)}')">${t('delete')}</button>
       </div>
-    </div>`).join('')}</div>`;
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function formHtml(p) {

@@ -242,3 +242,82 @@ describe('service details and photos', () => {
     assert.match(res.error, /beschreibe sie nicht/i);
   });
 });
+
+describe('a price can never be mixed up with a duration', () => {
+  // Live: a CHF 1000 service was quoted to a customer as "15 minutes, 10 CHF",
+  // and in the same conversation as "1000 CHF" from a different tool. Two bare
+  // unlabelled numbers in the tool result were enough to swap them.
+  let svc;
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+    svc = (await directory.createService({ name: 'Sofia', durationMin: 15, priceChf: 1000 })).service;
+  });
+
+  test('list_services spells both out, and keeps the numbers too', async () => {
+    const [s] = (await runTool('list_services', {}, { directory })).services;
+    assert.strictEqual(s.price, 'CHF 1000.-');
+    assert.strictEqual(s.duration, '15 Minuten');
+    assert.strictEqual(s.priceChf, 1000);
+    assert.strictEqual(s.durationMin, 15);
+  });
+
+  test('the spelled-out price never carries the duration digits', async () => {
+    const [s] = (await runTool('list_services', {}, { directory })).services;
+    assert.ok(!s.price.includes('15'), s.price);
+    assert.ok(!s.duration.includes('1000'), s.duration);
+  });
+
+  test('a missing price says so instead of reading as zero or blank', async () => {
+    await directory.updateService(svc.id, { priceChf: '' });
+    const [s] = (await runTool('list_services', {}, { directory })).services;
+    assert.match(s.price, /kein Preis/);
+    assert.strictEqual(s.priceChf, null);
+  });
+});
+
+describe('get_service: asking about one service by name', () => {
+  // Live: "I want Sofia details" -> "It seems I'm unable to retrieve the
+  // details for the Sofia service" - there was no tool that answered that.
+  let pro, svc;
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+    pro = (await directory.createProfessional({ name: 'Sofia', languages: 'en', workingHours: 'Mo-Do 9-10' })).professional;
+    svc = (await directory.createService({
+      name: 'Sofia', durationMin: 15, priceChf: 1000, notes: 'Ganzkoerper, 15 Minuten.',
+    })).service;
+  });
+
+  test('returns the description, price and duration together', async () => {
+    const res = await runTool('get_service', { service_id: svc.id }, { directory });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.service.details, 'Ganzkoerper, 15 Minuten.');
+    assert.strictEqual(res.service.price, 'CHF 1000.-');
+  });
+
+  test('a service with no professional set is offered by everyone', async () => {
+    const res = await runTool('get_service', { service_id: svc.id }, { directory });
+    assert.deepStrictEqual(res.offeredBy.map((p) => p.name), ['Sofia']);
+  });
+
+  test('a service tied to one professional lists only her', async () => {
+    await directory.createProfessional({ name: 'Gabriela' });
+    await directory.updateService(svc.id, { professionalId: pro.id });
+    const res = await runTool('get_service', { service_id: svc.id }, { directory });
+    assert.deepStrictEqual(res.offeredBy.map((p) => p.name), ['Sofia']);
+  });
+
+  test('with no description it says so rather than inviting an invention', async () => {
+    await directory.updateService(svc.id, { notes: '' });
+    const res = await runTool('get_service', { service_id: svc.id }, { directory });
+    assert.strictEqual(res.service.details, '');
+    assert.match(res.note, /Erfinde keine Beschreibung/);
+  });
+
+  test('an unknown id is an error, not an empty answer', async () => {
+    assert.strictEqual((await runTool('get_service', { service_id: 'nope' }, { directory })).ok, false);
+  });
+});

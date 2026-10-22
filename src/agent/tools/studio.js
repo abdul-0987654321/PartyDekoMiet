@@ -22,6 +22,34 @@ const UNAVAILABLE = (what) => ({
   error: `${what} ist noch nicht angebunden. Sag dem Kunden, dass du das gerade nicht pruefen kannst, und gib den Fall weiter.`,
 });
 
+/**
+ * One shape for a service, everywhere it is returned.
+ *
+ * Price and duration are spelled out as strings as well as given as numbers.
+ * A bare `"priceChf": 1000` next to a bare `"durationMin": 15` was quoted back
+ * to a customer as "15 minutes, 10 CHF" - the model mixed two unlabelled
+ * numbers up. `"price": "CHF 1000.-"` cannot be mixed up with `"duration":
+ * "15 Minuten"`, and the numbers stay for anything that needs to compute.
+ */
+function serviceView(s) {
+  // Number('') is 0, and a price of 0 is a real price - "free" is not the same
+  // answer as "not filled in yet". So an empty field stays absent.
+  const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
+  const price = num(s.priceChf);
+  const mins = num(s.durationMin);
+  return {
+    id: s.id,
+    name: s.name,
+    price: Number.isFinite(price) && price > 0 ? `CHF ${price}.-` : 'kein Preis hinterlegt',
+    duration: Number.isFinite(mins) && mins > 0 ? `${mins} Minuten` : 'keine Dauer hinterlegt',
+    priceChf: Number.isFinite(price) ? price : null,
+    durationMin: Number.isFinite(mins) ? mins : null,
+    // What the service includes. Empty means the owner has not written it yet -
+    // say so, never invent one.
+    details: String(s.notes || '').trim(),
+  };
+}
+
 const DEFS = [
   {
     name: 'list_professionals',
@@ -57,17 +85,7 @@ const DEFS = [
       return {
         ok: true,
         count: services.length,
-        services: services.map((s) => ({
-          id: s.id,
-          name: s.name,
-          durationMin: s.durationMin,
-          priceChf: s.priceChf,
-          // What the service actually includes. Without it the bot knows a name,
-          // a length and a price and nothing else, so "tell me more about it"
-          // can only be answered with "I cannot retrieve the details" - which
-          // is what a customer was told live.
-          details: s.notes || '',
-        })),
+        services: services.map(serviceView),
       };
     },
   },
@@ -96,14 +114,48 @@ const DEFS = [
           workingHours: profile.professional.workingHours || '',
           hasPhoto: Boolean(profile.professional.photoFileId),
         },
-        services: profile.services.map((s) => ({
-          id: s.id,
-          name: s.name,
-          durationMin: s.durationMin,
-          priceChf: s.priceChf,
-          details: s.notes || '',
-        })),
+        services: profile.services.map(serviceView),
         location: profile.location ? { name: profile.location.name, address: profile.location.address } : null,
+      };
+    },
+  },
+  {
+    name: 'get_service',
+    description:
+      'Everything known about ONE service: what it includes, how long it takes, what it costs, and who offers it. Call this whenever a customer asks about a particular service by name - never answer "I cannot retrieve the details".',
+    parameters: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'id from list_services' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+    handler: async (args, { directory }) => {
+      if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
+      const service = directory.getService(args.service_id);
+      if (!service) return { ok: false, error: `Service ${args.service_id} nicht gefunden.` };
+
+      // A service either belongs to one professional or is offered by everyone.
+      // The customer asked about the service, so answer for the service.
+      const all = directory.listProfessionals({ activeOnly: true });
+      const offeredBy = service.professionalId
+        ? all.filter((p) => p.id === service.professionalId)
+        : all;
+
+      return {
+        ok: true,
+        service: serviceView(service),
+        offeredBy: offeredBy.map((p) => ({
+          id: p.id,
+          name: p.name,
+          languages: p.languages,
+          workingHours: p.workingHours || '',
+          hasPhoto: Boolean(p.photoFileId),
+        })),
+        note: serviceView(service).details
+          ? undefined
+          : 'Zu diesem Service ist keine Beschreibung hinterlegt. Sag ehrlich, dass dazu nichts weiter hinterlegt ist, nenne Dauer und Preis, und biete an, die Frage ans Team weiterzugeben. Erfinde keine Beschreibung.',
       };
     },
   },

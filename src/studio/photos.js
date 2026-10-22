@@ -14,6 +14,31 @@
 const db = require('../store/db');
 const log = require('../log');
 
+/**
+ * Write the picture into the chat history, so the dashboard shows what the
+ * customer was actually sent. Without this the owner reads "I've sent you a
+ * photo of Sofia" with no photo anywhere - the same gap product cards had
+ * before messenger.js started recording them.
+ *
+ * The dashboard serves the file from its own endpoint rather than a public
+ * URL, which is also where the professionals page reads it from.
+ */
+function record(chatId, text, photoFileId) {
+  try {
+    db.put('chat', {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      business: 'studio',
+      at: new Date().toISOString(),
+      jid: chatId,
+      direction: 'out',
+      text,
+      image: `/api/studio/photo/${encodeURIComponent(photoFileId)}`,
+    });
+  } catch (err) {
+    log.warn(`[studio] Could not record the sent photo for ${chatId}: ${err.message}`);
+  }
+}
+
 function createPhotos({ client }) {
   /**
    * @param {string} chatId
@@ -26,6 +51,7 @@ function createPhotos({ client }) {
     if (!file?.buffer?.length) throw new Error('the stored photo is empty');
     const caption = String(note || professional.name || '').trim();
     await client.forwardImage(chatId, file.buffer, caption, file.mimeType);
+    record(chatId, caption, professional.photoFileId);
     log.info(`[studio] Photo sent for ${professional.name} to ${chatId}`);
     return { ok: true };
   }

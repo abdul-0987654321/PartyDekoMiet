@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Bedienungsanleitung – WhatsApp Assistent</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm; }
+  * { box-sizing: border-box; }
+  body {
+    font: 10.5pt/1.55 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1a1f2b; margin: 0;
+  }
+  h1 { font-size: 24pt; margin: 0 0 4pt; letter-spacing: -0.4pt; }
+  h1 + .sub { color: #6b7483; font-size: 11pt; margin: 0 0 22pt; }
+  h2 {
+    page-break-after: avoid;
+    font-size: 13pt; margin: 22pt 0 7pt; padding-top: 9pt;
+    border-top: 1.2pt solid #1a1f2b;
+  }
+  h3 { page-break-after: avoid; font-size: 11pt; margin: 13pt 0 4pt; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+  li { margin-bottom: 3.5pt; }
+  .lead { font-size: 11pt; color: #3a4050; }
+
+  .box {
+    background: #f4f6fa; border-left: 2.5pt solid #3b82f6;
+    padding: 9pt 12pt; margin: 9pt 0 12pt; font-size: 10pt;
+  }
+  .box.warn { background: #fdf6e7; border-left-color: #d69e2e; }
+  .box.stop { background: #fdf0f0; border-left-color: #d64545; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .box > b:first-child { display: block; margin-bottom: 3pt; }
+
+  table { width: 100%; page-break-inside: avoid; border-collapse: collapse; margin: 7pt 0 12pt; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 5pt 7pt; border-bottom: 0.6pt solid #dde2ea; vertical-align: top; }
+  th { background: #f4f6fa; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.4pt; color: #5b6475; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+
+  .steps { counter-reset: s; padding-left: 0; list-style: none; }
+  .steps li { counter-increment: s; position: relative; padding-left: 20pt; margin-bottom: 6pt; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0.5pt;
+    width: 14pt; height: 14pt; border-radius: 50%;
+    background: #1a1f2b; color: #fff; font-size: 8pt; font-weight: 700;
+    text-align: center; line-height: 14pt;
+  }
+
+  .path { background: #eef1f6; padding: 1pt 4pt; border-radius: 2pt; font-size: 9.5pt; white-space: nowrap; }
+  .toc { columns: 2; column-gap: 20pt; font-size: 10pt; margin-bottom: 4pt; }
+  .toc div { break-inside: avoid; margin-bottom: 3pt; }
+  .toc span { color: #6b7483; margin-right: 5pt; }
+  .page-break { page-break-before: always; }
+  footer { margin-top: 16pt; page-break-inside: avoid; padding-top: 8pt; border-top: 0.6pt solid #dde2ea; color: #6b7483; font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<h1>WhatsApp Assistent</h1>
+<p class="sub">Bedienungsanleitung für PartyDekoMiet und das Studio</p>
+
+<p class="lead">
+  Dieses Handbuch erklärt, wie Sie die beiden WhatsApp-Assistenten im Dashboard
+  verwalten: was Sie eintragen müssen, wie Sie die WhatsApp-Nummern verbinden,
+  wie Anfragen bei Ihnen ankommen und was die Assistenten dürfen und was nicht.
+</p>
+
+<div class="toc">
+  <div><span>1</span>Das Wichtigste in Kürze</div>
+  <div><span>2</span>Anmelden und umschalten</div>
+  <div><span>3</span>Die Status-Seite</div>
+  <div><span>4</span>WhatsApp verbinden</div>
+  <div><span>5</span>Benachrichtigungen</div>
+  <div><span>6</span>Studio einrichten</div>
+  <div><span>7</span>Fragen &amp; Antworten</div>
+  <div><span>8</span>Termine und Buchungen</div>
+  <div><span>9</span>Chats</div>
+  <div><span>10</span>Was der Assistent tut – und was nicht</div>
+  <div><span>11</span>Wenn etwas nicht funktioniert</div>
+</div>
+
+<h2>1 · Das Wichtigste in Kürze</h2>
+
+<p>
+  Sie haben <b>zwei getrennte Assistenten</b> auf zwei eigenen WhatsApp-Nummern:
+  einen für PartyDekoMiet und einen für das Studio. Beide werden über <b>dasselbe
+  Dashboard</b> verwaltet, oben links schalten Sie zwischen ihnen um.
+</p>
+
+<div class="box">
+  <b>Die Daten der beiden bleiben getrennt.</b>
+  Schreibt dieselbe Person beiden Nummern, sind das zwei verschiedene Kundinnen
+  für das System. Chats, Kundendaten, Termine und Buchungen der einen Seite
+  erscheinen nie auf der anderen.
+</div>
+
+<p>Der Assistent beantwortet Kundenfragen selbständig – aber <b>nur mit dem, was
+Sie eingetragen haben</b>. Er erfindet nichts. Ist etwas nicht hinterlegt, sagt er
+das ehrlich und gibt die Frage an Sie weiter. Je vollständiger Ihre Angaben,
+desto weniger landet bei Ihnen.</p>
+
+<h2>2 · Anmelden und umschalten</h2>
+
+<ol class="steps">
+  <li>Dashboard-Adresse im Browser öffnen (Handy oder Computer, beides funktioniert).</li>
+  <li>Mit dem Passwort anmelden.</li>
+  <li>Oben links zwischen <span class="path">PartyDeko</span> und <span class="path">Studio</span> umschalten.</li>
+</ol>
+
+<p>
+  Welcher Betrieb gerade aktiv ist, sehen Sie jederzeit oben links. <b>Alles, was
+  Sie danach sehen und ändern, gilt nur für diesen Betrieb.</b> Rechts oben können
+  Sie die Sprache des Dashboards umstellen (Deutsch / Englisch).
+</p>
+
+<h2>3 · Die Status-Seite</h2>
+
+<p>Die Startseite zeigt in einer Zeile, ob der Assistent gerade antwortet:</p>
+
+<table>
+  <tr><th>Anzeige</th><th>Bedeutung</th></tr>
+  <tr><td>Grün</td><td>Verbunden und aktiv – Kunden bekommen Antworten.</td></tr>
+  <tr><td>Gelb</td><td>Verbunden, aber ausgeschaltet. Niemand bekommt eine Antwort.</td></tr>
+  <tr><td>Rot</td><td>Keine WhatsApp-Verbindung. Siehe Kapitel 4.</td></tr>
+</table>
+
+<p>
+  Mit dem Schalter daneben schalten Sie den Assistenten <b>ein oder aus</b>. Aus
+  heisst: eingehende Nachrichten werden gespeichert, aber nicht beantwortet –
+  sinnvoll in den Ferien oder wenn Sie eine Weile selbst antworten möchten.
+</p>
+
+<h3>Einrichtung</h3>
+<p>
+  Beim Studio steht darunter eine Checkliste mit allem, was noch fehlt – in der
+  Reihenfolge, in der es gemacht werden muss. Jeder Punkt führt mit einem Klick
+  auf die richtige Seite. Erledigte Punkte treten in den Hintergrund, offene
+  bleiben sichtbar. <b>Arbeiten Sie die Liste von oben nach unten ab.</b>
+</p>
+
+<h3>Probleme</h3>
+<p>
+  Darunter stehen Dinge, die Aufmerksamkeit brauchen – fehlende Kalender&shy;verbindung,
+  keine Benachrichtigungsnummer, keine WhatsApp-Verbindung. Ist die Liste leer,
+  ist alles in Ordnung.
+</p>
+
+<h2 class="page-break">4 · WhatsApp verbinden</h2>
+
+<p>
+  Jeder Assistent braucht seine <b>eigene</b> WhatsApp-Nummer. Die Nummer muss auf
+  einem Telefon eingerichtet sein, das Sie zur Hand haben. Es gibt zwei Wege –
+  beide führen zum selben Ergebnis.
+</p>
+
+<h3>Mit QR-Code (empfohlen)</h3>
+<ol class="steps">
+  <li>Im Dashboard auf <span class="path">WhatsApp</span> gehen, Reiter <span class="path">QR-Code</span>.</li>
+  <li>Auf dem Telefon WhatsApp öffnen → Einstellungen → <b>Verknüpfte Geräte</b> → <b>Gerät hinzufügen</b>.</li>
+  <li>Den Code auf dem Bildschirm abscannen.</li>
+</ol>
+<p>Nach wenigen Sekunden wechselt die Status-Seite auf grün.</p>
+
+<h3>Mit Nummer (Kopplungscode)</h3>
+<p>Wenn das Scannen nicht möglich ist, zum Beispiel weil Sie nur ein Gerät haben:</p>
+<ol class="steps">
+  <li>Reiter <span class="path">Mit Nummer</span>, die WhatsApp-Nummer international eingeben (z.&nbsp;B. 41791234567).</li>
+  <li>Das Dashboard zeigt einen achtstelligen Code.</li>
+  <li>Auf dem Telefon: Verknüpfte Geräte → Gerät hinzufügen → <b>Mit Telefonnummer verknüpfen</b> → Code eingeben.</li>
+</ol>
+
+<div class="box warn">
+  <b>Der Code gilt nur kurz.</b>
+  Geben Sie ihn innerhalb etwa einer Minute ein. Läuft er ab, erzeugt das
+  Dashboard automatisch einen neuen – nehmen Sie dann immer den <b>zuletzt
+  angezeigten</b>, nie einen älteren.
+</div>
+
+<h3>Verbindung gelöst oder abgebrochen</h3>
+<p>
+  Unter <b>Verknüpfte Geräte</b> auf Ihrem Telefon erscheint der Assistent als
+  eigenes Gerät. Löschen Sie diesen Eintrag dort, ist die Verbindung sofort
+  beendet und der Assistent antwortet nicht mehr – in dem Fall einfach neu
+  verbinden.
+</p>
+<p>
+  Mit <span class="path">Neu verknüpfen</span> im Dashboard lösen Sie die
+  Verbindung absichtlich, zum Beispiel um eine andere Nummer zu verwenden.
+</p>
+
+<h2>5 · Benachrichtigungen</h2>
+
+<p>
+  Eine <b>Benachrichtigung</b> ist eine WhatsApp-Nachricht, die der Assistent
+  <i>Ihnen</i> schickt, sobald etwas passiert, das Sie wissen müssen:
+</p>
+
+<ul>
+  <li>eine neue Termin- oder Buchungsanfrage, mit allen Angaben</li>
+  <li>ein Kunde, den der Assistent an einen Menschen weitergibt</li>
+  <li>ein Referenzbild, das ein Kunde geschickt hat</li>
+  <li>eine technische Störung, die Sie betrifft</li>
+</ul>
+
+<p>
+  Eingetragen wird die Nummer unter <span class="path">Einstellungen</span> →
+  <b>Nummern für Benachrichtigungen</b>. Mehrere Nummern mit Komma trennen.
+  Bleibt das Feld leer, wird die Inhaber-Nummer verwendet.
+</p>
+
+<div class="box stop">
+  <b>Achtung: zwei getrennte Einstellungen.</b>
+  Das Studio hat eine eigene Benachrichtigungsnummer. Tragen Sie die Nummer nur
+  bei PartyDekoMiet ein, erfahren Sie von Studio-Terminen nichts – der Kunde
+  bekommt die Bestätigung, Sie aber keine Nachricht. Prüfen Sie beide Seiten
+  über die Umschaltung oben links.
+</div>
+
+<h2 class="page-break">6 · Studio einrichten</h2>
+
+<p>Diese Reihenfolge einhalten – jeder Schritt braucht den vorherigen:</p>
+
+<h3>Standorte</h3>
+<p>Name und Adresse jedes Standorts. Ohne Standort kann keine Person zugeordnet werden.</p>
+
+<h3>Services</h3>
+<p>Alles, was gebucht werden kann – mit <b>Dauer</b> und <b>Preis</b>.</p>
+
+<div class="box">
+  <b>Das Feld «Was ist enthalten» ist das wichtigste.</b>
+  Genau diesen Text gibt der Assistent weiter, wenn ein Kunde nach Details fragt.
+  Bleibt es leer, antwortet er sinngemäss «dazu ist nichts hinterlegt» – und der
+  Kunde springt ab. In der Liste erkennen Sie solche Einträge an der Markierung
+  <i>Beschreibung fehlt</i>.
+</div>
+
+<p>
+  Ein Service ohne zugeordnete Person gilt für alle. Soll ihn nur eine bestimmte
+  Person anbieten, wählen Sie sie im Feld darüber aus.
+</p>
+
+<h3>Professionals</h3>
+<p>Name, Sprachen, Arbeitszeiten, Standort und – sehr empfohlen – ein Foto.</p>
+<p>
+  Fragt ein Kunde nach einer Person oder ihrem Service, schickt der Assistent
+  das Foto <b>automatisch</b> mit. Pro Gespräch wird dasselbe Foto nur einmal
+  gesendet. Ist kein Foto hinterlegt, sagt er das – er beschreibt niemanden mit
+  eigenen Worten.
+</p>
+
+<h3>Kalender</h3>
+<p>
+  Das Studio braucht einen <b>eigenen</b> Google-Kalender, getrennt vom
+  PartyDekoMiet-Kalender, sonst blockieren sich die Termine gegenseitig.
+  Die Kalender-ID tragen Sie unter <span class="path">Einstellungen</span> ein.
+</p>
+
+<div class="box warn">
+  <b>Zeitzone prüfen.</b>
+  Der Kalender muss auf <b>Zürich</b> stehen. Steht er auf einer anderen Zeitzone,
+  werden alle Termine um mehrere Stunden verschoben eingetragen – und das fällt
+  erst auf, wenn jemand zur falschen Zeit vor der Tür steht.
+</div>
+
+<h2>7 · Fragen &amp; Antworten</h2>
+
+<p>
+  Unter <span class="path">Fragen &amp; Antworten</span> hinterlegen Sie eigene
+  Antworten auf Fragen, die immer wieder kommen – Parkplätze, Bezahlung,
+  Anfahrt, Hausregeln.
+</p>
+
+<ul>
+  <li>Die Frage so formulieren, wie ein Kunde sie stellen würde.</li>
+  <li>Eine Sprache genügt; die andere wird dann ebenfalls damit beantwortet.</li>
+  <li><b>Der Assistent verwendet Ihre Antwort wörtlich.</b> Er formuliert sie nicht um.</li>
+  <li>Änderungen gelten ab der nächsten Nachricht – ohne Neustart.</li>
+</ul>
+
+<p>
+  Mit dem Schalter <i>Aktiv</i> nehmen Sie eine Antwort vorübergehend heraus,
+  ohne sie zu löschen. Jeder Betrieb hat seine eigene Liste.
+</p>
+
+<h2>8 · Termine und Buchungen</h2>
+
+<p>
+  Jede Anfrage ist zuerst <b>offen</b> (PENDING) – nie bestätigt. Der Assistent
+  sagt dem Kunden ausdrücklich, dass die Zeit frei aussieht und das Team sich
+  meldet. <b>Verbindlich wird es erst, wenn Sie bestätigen.</b>
+</p>
+
+<table>
+  <tr><th>Aktion</th><th>Was passiert</th></tr>
+  <tr><td>Bestätigen</td><td>Der Eintrag im Kalender wird auf bestätigt gesetzt, der Kunde erhält eine Nachricht.</td></tr>
+  <tr><td>Absagen</td><td>Der Termin wird freigegeben, der Kunde erhält eine Absage.</td></tr>
+</table>
+
+<p>
+  Offene Anfragen sind farblich markiert, damit nichts liegen bleibt. Über
+  <i>Chat öffnen</i> kommen Sie direkt zur Unterhaltung.
+</p>
+
+<h2>9 · Chats</h2>
+
+<p>
+  Hier sehen Sie jede Unterhaltung mit – auch Bilder, die der Assistent
+  verschickt hat. Oben können Sie nach Name, Nummer oder Text suchen.
+</p>
+
+<h3>Selbst antworten</h3>
+<p>
+  Schreiben Sie unten ins Feld und senden Sie. Der Kunde bekommt die Nachricht
+  von derselben Nummer. <b>Sobald Sie selbst antworten, pausiert der Assistent
+  diesen Chat</b> – damit nicht zwei gleichzeitig schreiben.
+</p>
+<p>
+  Mit <span class="path">Bot fortsetzen</span> übergeben Sie wieder an den
+  Assistenten. Pausierte Chats stehen auch auf der Status-Seite.
+</p>
+
+<h3>Verlauf löschen</h3>
+<p>
+  <span class="path">Verlauf löschen</span> entfernt die gespeicherte
+  Unterhaltung aus dem Dashboard. Auf WhatsApp bleibt sie bestehen – beim Kunden
+  wie bei Ihnen. Die Kundendaten bleiben ebenfalls erhalten.
+</p>
+
+<h2>10 · Was der Assistent tut – und was nicht</h2>
+
+<h3>Beide Assistenten</h3>
+<ul>
+  <li>Antworten in der Sprache des Kunden, rund um die Uhr.</li>
+  <li>Nennen nur Preise und Angaben, die Sie eingetragen haben.</li>
+  <li>Verstehen Sprachnachrichten.</li>
+  <li>Bestätigen <b>nie</b> selbst einen Termin oder eine Buchung.</li>
+  <li>Erfinden nichts. Fehlt etwas, geben sie die Frage an Sie weiter.</li>
+</ul>
+
+<h3>Studio – feste Regeln</h3>
+<p>
+  Der Studio-Assistent ist <b>die Rezeption</b>, nicht eine der Personen. Das ist
+  fest eingebaut und gilt in jeder Sprache und in jedem Gespräch:
+</p>
+<ul>
+  <li>Er spricht <b>über</b> die Professionals, nie in deren Namen («sie bietet», nie «ich biete»).</li>
+  <li>Er nennt ausschliesslich Services von der offiziellen Preisliste.</li>
+  <li>Er bietet <b>nichts</b> darüber hinaus an, verhandelt nichts und bestätigt nichts in diese Richtung – unabhängig davon, wie ein Kunde fragt.</li>
+  <li>Er beschreibt niemandes Aussehen. Entweder ein hinterlegtes Foto – oder gar nichts.</li>
+  <li>Er stellt das Studio auf jedem Kanal gleich dar.</li>
+</ul>
+
+<div class="box">
+  <b>Wird nach etwas gefragt, das darüber hinausgeht,</b> sagt der Assistent
+  sachlich, dass er nur die Services der Liste bearbeitet, und gibt den Fall an
+  das Team weiter. Er diskutiert nicht darüber.
+</div>
+
+<h3>Was Sie tun sollten</h3>
+<ul>
+  <li>Services, Preise und Beschreibungen vollständig halten – das ist die häufigste Ursache für «der Bot weiss nichts».</li>
+  <li>Offene Anfragen zeitnah bestätigen oder absagen.</li>
+  <li>Nach einer Preisänderung kurz selbst eine Testnachricht schicken.</li>
+</ul>
+
+<h3>Was Sie nicht tun sollten</h3>
+<ul>
+  <li>Die WhatsApp-Nummer des Assistenten nicht gleichzeitig auf WhatsApp Web verwenden.</li>
+  <li>Den Geräteeintrag auf dem Telefon nicht löschen, solange der Assistent laufen soll.</li>
+  <li>Die beiden Kalender nicht zusammenlegen.</li>
+</ul>
+
+<h2>11 · Wenn etwas nicht funktioniert</h2>
+
+<table>
+  <tr><th>Beobachtung</th><th>Das hilft</th></tr>
+  <tr>
+    <td>Keine Antworten</td>
+    <td>Status-Seite prüfen: Schalter auf ein? Verbindung grün? Chat eventuell pausiert.</td>
+  </tr>
+  <tr>
+    <td>Status rot</td>
+    <td>WhatsApp neu verbinden (Kapitel 4). Meist wurde das Gerät auf dem Telefon entfernt.</td>
+  </tr>
+  <tr>
+    <td>Kopplungscode wird nicht akzeptiert</td>
+    <td>Immer den zuletzt angezeigten Code nehmen und innerhalb einer Minute eingeben. Sonst QR-Code verwenden.</td>
+  </tr>
+  <tr>
+    <td>Keine Benachrichtigung erhalten</td>
+    <td>Nummer im <b>richtigen</b> Betrieb eingetragen? Studio und PartyDekoMiet haben getrennte Felder.</td>
+  </tr>
+  <tr>
+    <td>«Dazu ist nichts hinterlegt»</td>
+    <td>Beim betreffenden Service fehlt die Beschreibung. In der Liste an <i>Beschreibung fehlt</i> erkennbar.</td>
+  </tr>
+  <tr>
+    <td>Termine zur falschen Zeit</td>
+    <td>Zeitzone des Kalenders auf Zürich stellen.</td>
+  </tr>
+  <tr>
+    <td>Erste Antwort dauert lange</td>
+    <td>Nach längerer Pause braucht der Server einen Moment. Danach ist es wieder schnell.</td>
+  </tr>
+</table>
+
+<footer>
+  Bei Fragen oder Problemen, die hier nicht stehen, melden Sie sich bitte direkt –
+  mit einem Screenshot und der ungefähren Uhrzeit lässt sich fast alles schnell klären.
+</footer>
+
+</body>
+</html>

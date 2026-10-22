@@ -33,6 +33,7 @@ const log = require('../log');
 const settings = require('../settings');
 const { useSheetAuthState, clearSession, hasSession } = require('./auth-state');
 const { resolveWaVersion } = require('./wa-version');
+const { browserTriple, deviceLabel } = require('./device');
 
 // Reads the build web.whatsapp.com is actually serving, instead of the Baileys
 // repo's hardcoded list - see wa-version.js for why that matters. Resolved
@@ -46,7 +47,7 @@ const baileysLogger = pino({ level: 'silent' });
 /** @param {'party'|'studio'} [business] defaults to 'party' - existing callers are unaffected. */
 function createWhatsAppClient(business = 'party') {
   const logTag = business === 'studio' ? '[studio] ' : '';
-  const deviceName = business === 'studio' ? 'Studio' : 'PartyDekoMiet';
+  const deviceTriple = browserTriple({ business });
 
   const runtime = {
     sock: null,
@@ -264,17 +265,15 @@ function createWhatsAppClient(business = 'party') {
       const version = await resolveVersion();
       log.info(
         `${logTag}Starting WhatsApp connection (${hasSession(business) ? 'stored session' : 'new session, QR needed'}, ` +
-          `protocol ${version ? version.join('.') : 'library default'})`
+          `protocol ${version ? version.join('.') : 'library default'}, as "${deviceLabel(deviceTriple)}")`
       );
       const sock = makeWASocket({
         ...(version ? { version } : {}),
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, baileysLogger) },
         logger: baileysLogger,
-        // What the owner sees under "Linked devices" on their phone. Two bots
-        // run in this one process on two different numbers, so the party name
-        // on the Studio's device list is simply wrong - and it is the only
-        // label telling the owner which of the two they are looking at.
-        browser: [deviceName, 'Chrome', '120.0.0'],
+        // See device.js: the first slot must be a real OS name or pairing by
+        // phone number is rejected, however harmless a custom one looks.
+        browser: deviceTriple,
         markOnlineOnConnect: false,
         syncFullHistory: false,
         shouldSyncHistoryMessage: () => false,

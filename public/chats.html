@@ -22,6 +22,7 @@
           <div class="muted" id="sub" style="font-size:12px"></div>
         </div>
         <button class="ghost" id="resume" hidden></button>
+        <button class="ghost danger-link" id="wipe" title=""></button>
       </div>
       <div class="body" id="body"><p class="empty" id="pick"></p></div>
       <div class="compose">
@@ -112,6 +113,7 @@ async function openChat(jid) {
   $('who').textContent = d.customer?.name || c?.name || d.phone;
   $('sub').textContent = d.phone;
   $('resume').hidden = !d.paused;
+  $('wipe').hidden = !(d.messages || []).length;
   $('resume').textContent = t('resume_bot');
   $('resume').onclick = async () => {
     await api('/api/whatsapp/resume', { method:'POST', body:{ jid } });
@@ -145,6 +147,21 @@ async function openChat(jid) {
 }
 
 $('back').onclick = () => { $('wrap').classList.remove('open'); current = null; };
+
+$('wipe').textContent = t('chat_delete');
+$('wipe').onclick = async () => {
+  if (!current) return;
+  const who = $('who').textContent || '';
+  if (!(await ask(t('chat_delete_q').replace('{who}', who), { title: t('chat_delete') }))) return;
+  const res = await api('/api/chats/' + encodeURIComponent(current), { method: 'DELETE' });
+  if (!res.ok) { await say(res.error || 'error', { danger: true }); return; }
+  // The thread is gone, so go back to the list rather than showing an empty one.
+  current = null;
+  $('body').dataset.sig = '';
+  $('body').innerHTML = `<p class="empty">${t('chat_pick')}</p>`;
+  $('wrap').classList.remove('open');
+  loadList();
+};
 
 async function send() {
   const text = $('msg').value.trim();

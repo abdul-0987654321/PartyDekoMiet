@@ -269,6 +269,24 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     res.json({ ok: true, jid, phone: require('../contacts').phoneOf(jid), customer, paused, messages });
   });
 
+  /**
+   * Clears a conversation's history from the dashboard.
+   *
+   * Only this business's rows: the two bots share one chat table, and the same
+   * person can have written to both numbers. The customer record is kept - the
+   * owner is clearing a transcript, not forgetting who someone is - and nothing
+   * is deleted on anyone's phone, which is said plainly in the confirmation.
+   */
+  app.delete('/api/chats/:jid', safe(async (req, res) => {
+    const { biz } = pick(req);
+    const jid = String(req.params.jid);
+    const doomed = db.all('chat').filter((m) => m.jid === jid && (m.business || 'party') === biz);
+    for (const m of doomed) db.remove('chat', m.id);
+    await db.flush();
+    log.info(`Chat history cleared for ${jid} (${biz}): ${doomed.length} message(s)`);
+    res.json({ ok: true, deleted: doomed.length });
+  }));
+
   app.post('/api/chats/:jid/send', safe(async (req, res) => {
     const { biz, runtime: rt, whatsapp: wa } = pick(req);
     if (!wa) return res.status(503).json({ ok: false, error: 'WhatsApp not wired' });

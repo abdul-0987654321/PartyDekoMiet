@@ -392,3 +392,36 @@ describe('a tool call that names the record instead of its id', () => {
     assert.deepStrictEqual(sent, ['Gabriela']);
   });
 });
+
+describe('the photo goes with the details, not one request later', () => {
+  // Live: asked for details, got text; had to ask again before the picture
+  // arrived. A customer reading the first answer concludes there is no photo.
+  let pro, svc;
+
+  beforeEach(async () => {
+    await db.init(createMemoryBackend());
+    settings.load();
+    pro = (await directory.createProfessional({ name: 'Sofia' })).professional;
+    svc = (await directory.createService({ name: 'Sofia', priceChf: 1000, notes: 'Ganzkoerper.' })).service;
+  });
+
+  test('get_service says to send the photo when there is one', async () => {
+    await directory.updateProfessional(pro.id, { photoFileId: 'F1' });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    assert.match(res.note, /send_professional_photo/);
+    assert.match(res.note, /derselben Antwort/);
+  });
+
+  test('with no photo on file it says nothing about photos', async () => {
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    assert.ok(!res.note || !/send_professional_photo/.test(res.note));
+  });
+
+  test('a missing description and an available photo are both reported', async () => {
+    await directory.updateProfessional(pro.id, { photoFileId: 'F1' });
+    await directory.updateService(svc.id, { notes: '' });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, { directory });
+    assert.match(res.note, /Erfinde keine Beschreibung/);
+    assert.match(res.note, /send_professional_photo/);
+  });
+});

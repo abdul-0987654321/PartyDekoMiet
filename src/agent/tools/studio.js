@@ -196,9 +196,16 @@ const DEFS = [
           workingHours: p.workingHours || '',
           hasPhoto: Boolean(p.photoFileId),
         })),
-        note: serviceView(service).details
-          ? undefined
-          : 'Zu diesem Service ist keine Beschreibung hinterlegt. Sag ehrlich, dass dazu nichts weiter hinterlegt ist, nenne Dauer und Preis, und biete an, die Frage ans Team weiterzugeben. Erfinde keine Beschreibung.',
+        note: [
+          serviceView(service).details
+            ? null
+            : 'Zu diesem Service ist keine Beschreibung hinterlegt. Sag ehrlich, dass dazu nichts weiter hinterlegt ist, nenne Dauer und Preis, und biete an, die Frage ans Team weiterzugeben. Erfinde keine Beschreibung.',
+          // Asking for details and being told to ask again for a picture reads
+          // like the bot has nothing. If there is a photo, it goes with the answer.
+          offeredBy.some((p) => p.photoFileId)
+            ? 'Zu dieser Person ist ein Foto hinterlegt: schicke es mit send_professional_photo in derselben Antwort, ohne dass extra danach gefragt werden muss.'
+            : null,
+        ].filter(Boolean).join(' ') || undefined,
       };
     },
   },

@@ -484,3 +484,7 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 /* Phones hide the page <h1> (the top bar already names the page), which left
    the header as an empty box above the button. */
 @media (max-width: 860px) { .pagehead .grow:empty, .pagehead h1 { display: none; } }
+
+/* Destructive action in a header: present, but never the eye-catching thing */
+button.danger-link { color: var(--muted); border-color: transparent; }
+button.danger-link:hover { color: var(--err); border-color: var(--err); background: none; }

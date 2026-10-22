@@ -9,6 +9,7 @@
 
 const log = require('./log');
 const db = require('./store/db');
+const customers = require('./customers');
 const settings = require('./settings');
 const { rentalWindow } = require('./calendar/dates');
 
@@ -89,14 +90,13 @@ function createBookings({ catalog, calendar, notify }) {
     });
 
     const jid = args.chatId || '';
-    const customer = db.get('customers', jid);
 
     const booking = {
       id: newId(),
       business: 'party',
       status: 'PENDING',
       jid,
-      phone: require('./contacts').phoneOf(jid) || '',
+      phone: require('./contacts').phoneOf('party', jid) || '',
       customerName: args.customer_name,
       productId: product.id,
       productHandle: product.handle,
@@ -128,16 +128,12 @@ function createBookings({ catalog, calendar, notify }) {
     }
 
     db.put('bookings', booking);
-    db.put('customers', {
-      ...(customer || { createdAt: new Date().toISOString() }),
-      jid,
-      business: 'party',
+    customers.save('party', jid, {
       phone: booking.phone,
       name: booking.customerName,
       occasion: booking.occasion,
       childAge: booking.childAge,
       partyDate: booking.pickupDate,
-      updatedAt: new Date().toISOString(),
     });
     await db.flush();
 

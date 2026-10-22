@@ -19,6 +19,7 @@ const db = require('../store/db');
 const settings = require('../settings');
 const { m } = require('../notify/messages');
 const contacts = require('../contacts');
+const customers = require('../customers');
 
 /**
  * Both bots share the `state` table/sheet, so each needs its own pause-state key
@@ -345,7 +346,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
   async function handle(msg) {
     const jid = msg.key.remoteJid;
     let text = textOf(msg);
-    contacts.remember(msg); // real phone number + WhatsApp name, for alerts and the dashboard
+    contacts.remember(business, msg); // real phone number + WhatsApp name, for alerts and the dashboard
 
     // 0. The owner talking to the bot in its own chat (same number as the bot).
     if (msg.key.fromMe && isSelfChat(jid)) return handleOwnerInput(msg, jid, text);
@@ -411,13 +412,9 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
       try {
         const buffer = await client.downloadImage(msg);
         const fileId = await db.putFile(`referenz-${Date.now()}.jpg`, 'image/jpeg', buffer);
-        const customer = db.get('customers', jid);
-        db.put('customers', {
-          ...(customer || { jid, business, createdAt: new Date().toISOString() }),
-          jid,
+        customers.save(business, jid, {
           phone: jid.split('@')[0],
           referencePhotoFileId: fileId,
-          updatedAt: new Date().toISOString(),
         });
         await notify.owner(m().referencePhoto(jid, text), { kind: 'reference_photo', jid }, buffer);
         photoNote = '\n\n[Der Kunde hat ein Referenzbild geschickt. Es wurde gespeichert und ans Team weitergegeben.]';
@@ -436,7 +433,7 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
         message: voiceMark + (text || '[Bild ohne Text]') + photoNote,
         services,
         chatId: jid,
-        customerName: db.get('customers', jid)?.name,
+        customerName: customers.get(business, jid)?.name,
       });
     } catch (err) {
       // The AI failed (bad key, quota, outage). The customer must not be left in

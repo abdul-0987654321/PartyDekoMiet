@@ -41,8 +41,15 @@ const TABLES = {
   session: { key: 'key', raw: true },
   state: { key: 'key', raw: true },
   customers: {
-    key: 'jid',
+    // Keyed per business, not by jid alone. The two bots run on two numbers but
+    // share this table, and the same person can write to both - as a party
+    // customer and as a studio client. On a bare jid that is ONE row: whichever
+    // bot wrote last owned the name, the occasion, the party date, and the
+    // `business` tag flipped under the other one. Two businesses, two records.
+    key: 'id',
+    derive: (c) => c.id || `${c.business || 'party'}:${c.jid}`,
     view: (c) => ({
+      id: c.id || `${c.business || 'party'}:${c.jid}`,
       jid: c.jid,
       business: c.business || 'party',
       phone: c.phone,
@@ -240,7 +247,7 @@ async function init(b) {
     for (const row of rows) {
       try {
         const rec = fromFlat(table, row);
-        if (rec) cache[table].set(String(rec[TABLES[table].key]), rec);
+        if (rec) cache[table].set(keyOf(table, rec), rec);
       } catch (err) {
         log.warn(`Skipping unreadable ${table} row: ${err.message}`);
       }
@@ -259,8 +266,23 @@ function all(table) {
   return Array.from(cache[table].values());
 }
 
+/**
+ * The stored key for a record. `derive` lets a table build its key from other
+ * fields, which is how customers get one row per business without every caller
+ * having to compose the id itself - and how rows written before the key changed
+ * still land in the right place on load.
+ */
+function keyOf(table, record) {
+  const def = TABLES[table];
+  return String(def.derive ? def.derive(record) : record[def.key]);
+}
+
 function put(table, record) {
-  const key = String(record[TABLES[table].key]);
+  const def = TABLES[table];
+  const key = keyOf(table, record);
+  // Keep the derived key on the record, so what is written to the Sheet and
+  // what is cached here agree.
+  if (def.derive && record[def.key] !== key) record = { ...record, [def.key]: key };
   cache[table].set(key, record);
   queue[table].upsert.set(key, record);
   queue[table].remove.delete(key);

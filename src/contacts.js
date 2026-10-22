@@ -10,6 +10,7 @@
  */
 
 const db = require('./store/db');
+const customers = require('./customers');
 
 const digits = (s) => String(s || '').replace(/[^0-9]/g, '');
 const userPart = (jid) => String(jid || '').split('@')[0].split(':')[0];
@@ -25,20 +26,22 @@ function phoneFromMessage(msg) {
 }
 
 /** Saves the phone number and WhatsApp name of the person behind a chat. */
-function remember(msg) {
+/**
+ * @param {'party'|'studio'} business whose customer this is. It used to default
+ *   to 'party' for every message, on both bots, so a studio client was filed
+ *   under the rental shop the moment they said hello.
+ */
+function remember(business, msg) {
   try {
     const jid = msg?.key?.remoteJid;
     if (!jid || msg.key.fromMe) return;
     const phone = phoneFromMessage(msg);
     const pushName = msg.pushName || null;
-    const row = db.get('customers', jid);
+    const row = customers.get(business, jid);
     if (row && (!phone || row.phone === phone) && (!pushName || row.pushName === pushName)) return;
-    db.put('customers', {
-      ...(row || { jid, business: 'party', createdAt: new Date().toISOString() }),
-      jid,
+    customers.save(business, jid, {
       ...(phone ? { phone } : {}),
       ...(pushName ? { pushName } : {}),
-      updatedAt: new Date().toISOString(),
     });
   } catch {
     /* storage not ready: showing the id is the fallback */
@@ -46,9 +49,15 @@ function remember(msg) {
 }
 
 /** The number to show for a chat: the real phone when known, else the id. */
-function phoneOf(jid) {
+function phoneOf(business, jid) {
   try {
-    const row = db.get('customers', jid);
+    // A caller that does not know the business (alert formatting, say) passes
+    // null: the phone number is the same person either way, so look in both
+    // rather than guessing one and showing a raw WhatsApp id.
+    const rows = business
+      ? [customers.get(business, jid)]
+      : [customers.get('party', jid), customers.get('studio', jid)];
+    const row = rows.find((r) => r?.phone);
     if (row?.phone && /^\d{8,15}$/.test(String(row.phone))) return String(row.phone);
   } catch {
     /* no storage */

@@ -10,6 +10,7 @@
 
 const log = require('./log');
 const db = require('./store/db');
+const customers = require('./customers');
 const settings = require('./settings');
 const directory = require('./studio/directory');
 
@@ -52,13 +53,12 @@ function createAppointments({ calendar, notify }) {
     }
 
     const jid = args.chatId || '';
-    const customer = db.get('customers', jid);
 
     const appt = {
       id: newId(),
       status: 'PENDING',
       jid,
-      phone: require('./contacts').phoneOf(jid) || '',
+      phone: require('./contacts').phoneOf('studio', jid) || '',
       customerName: args.customer_name,
       professionalId: professional.id,
       professionalName: professional.name,
@@ -89,14 +89,7 @@ function createAppointments({ calendar, notify }) {
     }
 
     db.put('appointments', appt);
-    db.put('customers', {
-      ...(customer || { createdAt: new Date().toISOString() }),
-      jid,
-      business: 'studio',
-      phone: appt.phone,
-      name: appt.customerName,
-      updatedAt: new Date().toISOString(),
-    });
+    customers.save('studio', jid, { phone: appt.phone, name: appt.customerName });
     await db.flush();
 
     if (notify) {

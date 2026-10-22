@@ -599,17 +599,17 @@ describe('test of 15 Oct 18:10: multi-line product list and hidden WhatsApp ids'
   });
 
   test('the real phone number is kept for a hidden-id chat and shown instead of the id', () => {
-    contacts.remember({ key: { remoteJid: JID, fromMe: false, remoteJidAlt: '41791234567@s.whatsapp.net' }, pushName: 'Anma' });
-    assert.strictEqual(contacts.phoneOf(JID), '41791234567');
-    assert.strictEqual(db.get('customers', JID).pushName, 'Anma');
+    contacts.remember('party', { key: { remoteJid: JID, fromMe: false, remoteJidAlt: '41791234567@s.whatsapp.net' }, pushName: 'Anma' });
+    assert.strictEqual(contacts.phoneOf('party', JID), '41791234567');
+    assert.strictEqual(require('../src/customers').get('party', JID).pushName, 'Anma');
     const { m } = require('../src/notify/messages');
     assert.match(m().handoff(JID, 'x'), /41791234567/);
   });
 
   test('older Baileys field senderPn works too; unknown stays the id', () => {
-    contacts.remember({ key: { remoteJid: '999@lid', fromMe: false, senderPn: '41765550000@s.whatsapp.net' } });
-    assert.strictEqual(contacts.phoneOf('999@lid'), '41765550000');
-    assert.strictEqual(contacts.phoneOf('888@lid'), '888');
+    contacts.remember('party', { key: { remoteJid: '999@lid', fromMe: false, senderPn: '41765550000@s.whatsapp.net' } });
+    assert.strictEqual(contacts.phoneOf('party', '999@lid'), '41765550000');
+    assert.strictEqual(contacts.phoneOf('party', '888@lid'), '888');
   });
 });
 

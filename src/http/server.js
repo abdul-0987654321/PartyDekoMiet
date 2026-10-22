@@ -240,10 +240,10 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     const paused = new Set((rt.router ? rt.router.listPaused() : []).map((p) => p.jid));
     const chats = [...byJid.entries()]
       .map(([jid, last]) => {
-        const customer = db.get('customers', jid);
+        const customer = require('../customers').get(biz, jid);
         return {
           jid,
-          phone: require('../contacts').phoneOf(jid),
+          phone: require('../contacts').phoneOf(biz, jid),
           name: customer?.name || customer?.pushName || null,
           lastAt: last.at,
           lastText: String(last.text || '').slice(0, 120),
@@ -264,9 +264,9 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
       .filter((m) => m.jid === jid && (m.business || 'party') === biz)
       .sort((a, b) => String(a.at).localeCompare(String(b.at)))
       .slice(-300);
-    const customer = db.get('customers', jid) || null;
+    const customer = require('../customers').get(biz, jid) || null;
     const paused = (rt.router ? rt.router.listPaused() : []).find((p) => p.jid === jid) || null;
-    res.json({ ok: true, jid, phone: require('../contacts').phoneOf(jid), customer, paused, messages });
+    res.json({ ok: true, jid, phone: require('../contacts').phoneOf(biz, jid), customer, paused, messages });
   });
 
   /**

@@ -23,7 +23,7 @@ function ownerLang() {
 const short = (jid) => {
   if (!jid) return '';
   try {
-    return require('../contacts').phoneOf(jid);
+    return require('../contacts').phoneOf(null, jid);
   } catch {
     return String(jid).split('@')[0];
   }

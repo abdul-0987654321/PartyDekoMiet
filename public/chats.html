@@ -10,7 +10,10 @@
   <h1 id="h1"></h1>
   <p class="muted" id="note"></p>
   <div class="chatwrap" id="wrap">
-    <div class="chatlist" id="list"><p class="empty" id="loading"></p></div>
+    <div class="chatlist" id="listwrap">
+      <div class="chatsearch"><input type="text" id="search" autocomplete="off"></div>
+      <div id="list"><p class="empty" id="loading"></p></div>
+    </div>
     <div class="thread" id="thread">
       <div class="head">
         <button class="ghost back" id="back">←</button>
@@ -38,24 +41,48 @@ $('pick').textContent = t('chat_pick');
 $('send').textContent = t('chat_send');
 $('back').textContent = t('chat_back');
 $('msg').placeholder = t('chat_ph');
+$('search').placeholder = t('chat_search');
 
 let current = null;
 let chats = [];
 
+/** First letter of the name, or of the number - enough to tell rows apart. */
+function initial(c) {
+  const s = String(c.name || c.phone || '?').trim();
+  return (s.match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();
+}
+
+function renderList() {
+  const q = $('search').value.trim().toLowerCase();
+  const shown = q
+    ? chats.filter((c) => `${c.name || ''} ${c.phone || ''} ${c.lastText || ''}`.toLowerCase().includes(q))
+    : chats;
+
+  if (!shown.length) {
+    $('list').innerHTML = `<p class="empty">${esc(q ? t('chat_no_match') : t('chat_none'))}</p>`;
+    return;
+  }
+  $('list').innerHTML = shown.map((c) => `
+    <div class="chatitem ${c.jid === current ? 'on' : ''}" onclick="openChat('${esc(c.jid)}')">
+      <span class="ava">${esc(initial(c))}</span>
+      <div class="meta">
+        <div class="top">
+          <span class="who">${esc(c.name || c.phone)}</span>
+          <span class="when">${esc(shortTime(c.lastAt))}</span>
+        </div>
+        <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(String(c.lastText || '').replace(/\*/g, '').split('\n')[0])}</div>
+      </div>
+      ${c.paused ? pill(t('chat_paused'), 'warn') : ''}
+    </div>`).join('');
+}
+
 async function loadList() {
   const d = await api('/api/chats');
   chats = d.chats || [];
-  if (!chats.length) { $('list').innerHTML = `<p class="empty">${t('chat_none')}</p>`; return; }
-  $('list').innerHTML = chats.map((c) => `
-    <div class="chatitem ${c.jid === current ? 'on' : ''}" onclick="openChat('${esc(c.jid)}')">
-      <div class="top">
-        <span class="who">${esc(c.name || c.phone)}</span>
-        <span class="when">${esc(shortTime(c.lastAt))}</span>
-      </div>
-      <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(String(c.lastText || '').replace(/\*/g, '').split('\n')[0])}</div>
-      ${c.paused ? `<div style="margin-top:5px">${pill(t('chat_paused'), 'warn')}</div>` : ''}
-    </div>`).join('');
+  renderList();
 }
+
+$('search').oninput = renderList;
 
 /** WhatsApp formatting for display: *bold*, _italic_, clickable links. */
 function waText(raw) {
@@ -75,6 +102,9 @@ function shortTime(iso) {
 }
 
 async function openChat(jid) {
+  // Switching to a different chat must always land at the newest message, so
+  // the "keep the scroll position" rule below applies to a refresh, not a move.
+  if (jid !== current) $('body').dataset.sig = '';
   current = jid;
   $('wrap').classList.add('open');
   const d = await api('/api/chats/' + encodeURIComponent(jid));
@@ -87,8 +117,17 @@ async function openChat(jid) {
     await api('/api/whatsapp/resume', { method:'POST', body:{ jid } });
     openChat(jid); loadList();
   };
+  // The thread refreshes every 15 seconds. Replacing innerHTML unconditionally
+  // threw the reader back to the bottom mid-sentence and lost any text
+  // selection, which is what made reading an older conversation impossible.
+  // So: only redraw when something actually changed, and only scroll down if
+  // the reader was already at the bottom.
+  const body = $('body');
+  const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 60;
+  const keepTop = body.scrollTop;
+
   let lastDay = '';
-  $('body').innerHTML = (d.messages || []).map((m) => {
+  const html = (d.messages || []).map((m) => {
     const day = m.at ? new Date(m.at).toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-CH', { weekday:'short', day:'2-digit', month:'2-digit' }) : '';
     const sep = day && day !== lastDay ? `<div class="daysep">${esc(day)}</div>` : '';
     lastDay = day || lastDay;
@@ -96,7 +135,12 @@ async function openChat(jid) {
     const img = m.image ? `<a href="${esc(m.image)}" target="_blank" rel="noopener"><img src="${esc(m.image)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></a>` : '';
     return `${sep}<div class="msg ${dir}${m.image ? ' prod' : ''}">${img}<div class="txt">${waText(m.text)}</div><span class="ts">${esc(shortTime(m.at))}</span></div>`;
   }).join('') || `<p class="empty">${t('chat_none')}</p>`;
-  $('body').scrollTop = $('body').scrollHeight;
+
+  if (html !== body.dataset.sig) {
+    body.innerHTML = html;
+    body.dataset.sig = html;
+    body.scrollTop = atBottom ? body.scrollHeight : keepTop;
+  }
   loadList();
 }
 

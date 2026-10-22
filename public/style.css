@@ -381,3 +381,37 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 /* A picker whose list is empty: say so and link to where it is filled */
 .pickhint { margin-top: 7px; font-size: 12.5px; color: var(--muted); }
 .pickhint a { font-weight: 600; }
+
+/* ---- Chat list: scannable rows, and a search that actually fits ---------- */
+.chatlist { display: flex; flex-direction: column; }
+.chatsearch { padding: 10px; border-bottom: 1px solid var(--line); flex: none; }
+.chatsearch input { padding: 9px 12px; font-size: 14px; border-radius: 99px; }
+.chatlist > #list { flex: 1; overflow-y: auto; }
+
+.chatitem { display: flex; align-items: center; gap: 11px; }
+.chatitem .ava {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+  font-weight: 700; font-size: 15px;
+}
+.chatitem .meta { flex: 1; min-width: 0; }
+.chatitem.on .ava { background: var(--accent); color: #fff; }
+
+/* ---- Thread: comfortable to read for more than a few lines -------------- */
+.thread .body { gap: 3px; scroll-behavior: auto; }
+/* Consecutive messages from the same side belong together, so only the last
+   one in a run keeps the pointed corner. */
+.msg.in + .msg.in { border-top-left-radius: 6px; }
+.msg.out + .msg.out { border-top-right-radius: 6px; }
+.msg { margin-top: 5px; }
+.msg .txt { overflow-wrap: anywhere; }
+.msg .ts { font-variant-numeric: tabular-nums; }
+.daysep { position: sticky; top: 0; z-index: 1; }
+
+@media (max-width: 860px) {
+  /* Fill the screen instead of a short, cramped box */
+  .chatwrap { height: calc(100dvh - var(--nav-h) - 96px); }
+  .msg { font-size: 15px; }
+  .thread .compose textarea { font-size: 16px; } /* 16px stops iOS zooming in */
+}

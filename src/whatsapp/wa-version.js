@@ -29,6 +29,17 @@
  */
 const PINNED_FALLBACK = Object.freeze([2, 3000, 1044015310]);
 
+/**
+ * Is `a` older than `b`? Compared part by part, like a version number.
+ */
+function isOlderThan(a, b) {
+  if (!isValidVersion(a) || !isValidVersion(b)) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i];
+  }
+  return false;
+}
+
 /** A usable version is exactly three numbers, e.g. [2, 3000, 1044015310]. */
 function isValidVersion(value) {
   return (
@@ -64,11 +75,32 @@ function parseVersionEnv(raw) {
  * @param {object}   [deps.log]           {info, warn} - optional
  * @returns {Promise<{version:number[], source:string}>}
  */
-async function resolveWaVersion({ fetchWaWeb, fetchBaileys, env = process.env, log } = {}) {
+async function resolveWaVersion({ fetchWaWeb, fetchBaileys, env = process.env, log, knownGood } = {}) {
   const note = (msg) => log?.info?.(msg);
+
+  /**
+   * Refuses a version older than one that has already connected successfully.
+   *
+   * web.whatsapp.com served 2.3000.1041589577 one night after serving
+   * 2.3000.1053619311 for hours - twelve million builds backwards. WhatsApp
+   * then rejected its own stale answer with 405 on every attempt, both numbers
+   * went down, and the reconnect cap stopped them for good. The lookup is the
+   * right source; it just cannot be trusted to move only forwards.
+   */
+  const notBackwards = (version, source) => {
+    if (!isValidVersion(knownGood) || !isOlderThan(version, knownGood)) return null;
+    log?.warn?.(
+      `${source} offered protocol ${version.join('.')}, which is older than ${knownGood.join('.')} - ` +
+        'the last version that actually connected. Keeping the newer one; a stale answer here is ' +
+        'rejected with 405 and takes the connection down.'
+    );
+    return { version: [...knownGood], source: 'known-good' };
+  };
 
   const override = parseVersionEnv(env.WHATSAPP_VERSION);
   if (override) {
+    // Deliberately not guarded: a hand-set version is how an operator rolls
+    // back on purpose when a newer build turns out to be the broken one.
     note(`WhatsApp protocol ${override.join('.')} (WHATSAPP_VERSION override)`);
     return { version: override, source: 'env' };
   }
@@ -78,6 +110,11 @@ async function resolveWaVersion({ fetchWaWeb, fetchBaileys, env = process.env, l
     try {
       const res = await fetchWaWeb();
       if (isValidVersion(res?.version)) {
+        const kept = notBackwards(res.version, 'web.whatsapp.com');
+        if (kept) {
+          note(`WhatsApp protocol ${kept.version.join('.')} (last known-good)`);
+          return kept;
+        }
         note(`WhatsApp protocol ${res.version.join('.')} (live from web.whatsapp.com)`);
         return { version: res.version, source: 'wa-web' };
       }
@@ -93,6 +130,11 @@ async function resolveWaVersion({ fetchWaWeb, fetchBaileys, env = process.env, l
     try {
       const res = await fetchBaileys();
       if (isValidVersion(res?.version) && res.isLatest !== false) {
+        const kept = notBackwards(res.version, 'the Baileys version list');
+        if (kept) {
+          note(`WhatsApp protocol ${kept.version.join('.')} (last known-good)`);
+          return kept;
+        }
         note(`WhatsApp protocol ${res.version.join('.')} (Baileys version list)`);
         return { version: res.version, source: 'baileys' };
       }
@@ -101,8 +143,15 @@ async function resolveWaVersion({ fetchWaWeb, fetchBaileys, env = process.env, l
     }
   }
 
+  // A version that has genuinely connected beats a constant compiled in months
+  // ago, so it wins here too.
+  if (isValidVersion(knownGood) && isOlderThan(PINNED_FALLBACK, knownGood)) {
+    note(`WhatsApp protocol ${knownGood.join('.')} (last known-good - both lookups failed)`);
+    return { version: [...knownGood], source: 'known-good' };
+  }
+
   note(`WhatsApp protocol ${PINNED_FALLBACK.join('.')} (pinned fallback - both lookups failed)`);
   return { version: [...PINNED_FALLBACK], source: 'pinned' };
 }
 
-module.exports = { resolveWaVersion, parseVersionEnv, isValidVersion, PINNED_FALLBACK };
+module.exports = { resolveWaVersion, parseVersionEnv, isValidVersion, isOlderThan, PINNED_FALLBACK };

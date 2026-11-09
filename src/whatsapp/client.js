@@ -32,7 +32,8 @@ const pino = require('pino');
 const log = require('../log');
 const settings = require('../settings');
 const { useSheetAuthState, clearSession, hasSession } = require('./auth-state');
-const { resolveWaVersion } = require('./wa-version');
+const { resolveWaVersion, isOlderThan } = require('./wa-version');
+const db = require('../store/db');
 const { browserTriple, deviceLabel } = require('./device');
 
 // Reads the build web.whatsapp.com is actually serving, instead of the Baileys
@@ -90,10 +91,38 @@ function createWhatsAppClient(business = 'party') {
    * Which protocol version to announce. The whole 405 story and the ordering
    * live in wa-version.js; this just adds the per-business log prefix.
    */
+  // The newest version this number has actually connected with. Stored, so a
+  // restart does not forget it - the night both bots died, the process had been
+  // up for hours and the knowledge was only in memory anyway.
+  const KNOWN_GOOD_KEY = `wa-version-ok:${business}`;
+
+  function knownGoodVersion() {
+    try {
+      const raw = db.get('state', KNOWN_GOOD_KEY)?.value;
+      const parsed = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function rememberWorkingVersion(version) {
+    if (!Array.isArray(version)) return;
+    const previous = knownGoodVersion();
+    if (previous && !isOlderThan(previous, version)) return; // already at least this new
+    try {
+      db.put('state', { key: KNOWN_GOOD_KEY, value: JSON.stringify(version) });
+      log.info(`${logTag}Protocol ${version.join('.')} connected - remembered as the known-good version`);
+    } catch (err) {
+      log.warn(`${logTag}Could not store the known-good protocol version: ${err.message}`);
+    }
+  }
+
   async function resolveVersion() {
     const { version } = await resolveWaVersion({
       fetchWaWeb: fetchLatestWaWebVersion,
       fetchBaileys: fetchLatestBaileysVersion,
+      knownGood: knownGoodVersion(),
       log: {
         info: (msg) => log.info(`${logTag}${msg}`),
         warn: (msg) => log.warn(`${logTag}${msg}`),
@@ -346,6 +375,9 @@ function createWhatsAppClient(business = 'party') {
             name: sock.user?.name || sock.user?.verifiedName || null,
           };
           log.info(`${logTag}WhatsApp connected as ${runtime.me.name || ''} ${runtime.me.id || ''}`);
+          // Proof that this version works, which is the only thing that makes
+          // it safe to refuse an older one later.
+          rememberWorkingVersion(version);
         }
         if (connection === 'close') {
           const code = lastDisconnect?.error?.output?.statusCode;

@@ -13,6 +13,7 @@ const {
   resolveWaVersion,
   parseVersionEnv,
   isValidVersion,
+  isOlderThan,
   PINNED_FALLBACK,
 } = require('../src/whatsapp/wa-version');
 
@@ -137,5 +138,101 @@ describe('lookup order', () => {
     const res = await resolveWaVersion({ env: {} });
     res.version[2] = 1;
     assert.strictEqual(PINNED_FALLBACK[2], 1044015310);
+  });
+});
+
+describe('the version must never go backwards', () => {
+  // Live, 8 Nov: web.whatsapp.com served 2.3000.1041589577 after serving
+  // 2.3000.1053619311 for hours - twelve million builds backwards. WhatsApp
+  // then rejected its own stale answer with 405 on every attempt. Both numbers
+  // went down and the reconnect cap stopped them until someone clicked Connect.
+  const WORKING = [2, 3000, 1053619311];
+  const STALE_LIVE = [2, 3000, 1041589577];
+
+  test('an older live answer is refused in favour of what actually connected', async () => {
+    const res = await resolveWaVersion({
+      fetchWaWeb: ok(STALE_LIVE),
+      knownGood: WORKING,
+      env: {},
+    });
+    assert.deepStrictEqual(res.version, WORKING);
+    assert.strictEqual(res.source, 'known-good');
+  });
+
+  test('a newer live answer is still accepted', async () => {
+    const newer = [2, 3000, 1060000000];
+    const res = await resolveWaVersion({ fetchWaWeb: ok(newer), knownGood: WORKING, env: {} });
+    assert.deepStrictEqual(res.version, newer);
+    assert.strictEqual(res.source, 'wa-web');
+  });
+
+  test('the same version is not treated as backwards', async () => {
+    const res = await resolveWaVersion({ fetchWaWeb: ok([...WORKING]), knownGood: WORKING, env: {} });
+    assert.strictEqual(res.source, 'wa-web');
+  });
+
+  test('a stale Baileys list answer is refused too', async () => {
+    const res = await resolveWaVersion({
+      fetchWaWeb: boom('offline'),
+      fetchBaileys: ok(STALE_LIVE),
+      knownGood: WORKING,
+      env: {},
+    });
+    assert.deepStrictEqual(res.version, WORKING);
+    assert.strictEqual(res.source, 'known-good');
+  });
+
+  test('with both lookups down, a proven version beats the compiled-in constant', async () => {
+    const res = await resolveWaVersion({
+      fetchWaWeb: boom('offline'),
+      fetchBaileys: boom('offline'),
+      knownGood: WORKING,
+      env: {},
+    });
+    assert.deepStrictEqual(res.version, WORKING);
+  });
+
+  test('a hand-set WHATSAPP_VERSION still wins - that is how you roll back on purpose', async () => {
+    const res = await resolveWaVersion({
+      knownGood: WORKING,
+      env: { WHATSAPP_VERSION: '2.3000.1041589577' },
+    });
+    assert.deepStrictEqual(res.version, STALE_LIVE);
+    assert.strictEqual(res.source, 'env');
+  });
+
+  test('nothing changes when no version has connected yet', async () => {
+    const res = await resolveWaVersion({ fetchWaWeb: ok(STALE_LIVE), env: {} });
+    assert.deepStrictEqual(res.version, STALE_LIVE);
+    assert.strictEqual(res.source, 'wa-web');
+  });
+
+  test('a corrupt stored value is ignored rather than blocking every version', async () => {
+    for (const junk of [null, 'nope', [2, 3000], undefined]) {
+      const res = await resolveWaVersion({ fetchWaWeb: ok(STALE_LIVE), knownGood: junk, env: {} });
+      assert.strictEqual(res.source, 'wa-web', `knownGood ${JSON.stringify(junk)} must not block`);
+    }
+  });
+
+  test('the caller cannot mutate the stored known-good array', async () => {
+    const stored = [...WORKING];
+    const res = await resolveWaVersion({ fetchWaWeb: ok(STALE_LIVE), knownGood: stored, env: {} });
+    res.version[2] = 1;
+    assert.deepStrictEqual(stored, WORKING);
+  });
+});
+
+describe('isOlderThan', () => {
+  test('compares part by part, not as one number', () => {
+    assert.ok(isOlderThan([2, 3000, 1041589577], [2, 3000, 1053619311]));
+    assert.ok(!isOlderThan([2, 3000, 1053619311], [2, 3000, 1041589577]));
+    assert.ok(isOlderThan([2, 2999, 9999999999], [2, 3000, 1]));
+    assert.ok(!isOlderThan([2, 3000, 5], [2, 3000, 5]));
+  });
+
+  test('anything malformed is never "older", so it cannot trigger a refusal', () => {
+    assert.ok(!isOlderThan(null, [2, 3000, 1]));
+    assert.ok(!isOlderThan([2, 3000, 1], null));
+    assert.ok(!isOlderThan('2.3000.1', [2, 3000, 2]));
   });
 });

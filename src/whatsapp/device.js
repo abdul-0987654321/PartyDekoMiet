@@ -41,9 +41,13 @@ const PAIRING_BROWSER = 'Chrome';
 
 const BUSINESS_NAMES = Object.freeze({ party: 'PartyDekoMiet', studio: 'Studio' });
 
-function businessName(business, env) {
+function businessName(business, env, name) {
   return (
     String(env[business === 'studio' ? 'STUDIO_DEVICE_NAME' : 'PARTY_DEVICE_NAME'] || '').trim() ||
+    // A professional's own number: her name, so she can tell her device apart
+    // from the other five under Linked devices. Passed in rather than looked
+    // up, so this file keeps no dependencies and stays testable on its own.
+    String(name || '').trim() ||
     BUSINESS_NAMES[business] ||
     BUSINESS_NAMES.party
   );
@@ -51,12 +55,13 @@ function businessName(business, env) {
 
 /**
  * @param {object} [opts]
- * @param {'party'|'studio'} [opts.business]
+ * @param {string} [opts.business] line id: 'party', 'studio' or 'pro-<name>'
  * @param {'qr'|'pairing'} [opts.mode] how this socket will be linked
+ * @param {string} [opts.name] the line's own name, for a professional's number
  * @param {object} [opts.env]
  * @returns {[string, string, string]} [platform, browser, version] for Baileys
  */
-function browserTriple({ business = 'party', mode = 'qr', env = process.env } = {}) {
+function browserTriple({ business = 'party', mode = 'qr', name = '', env = process.env } = {}) {
   const rawPlatform = String(env.WHATSAPP_PLATFORM || '').trim();
   // An unrecognised override is the exact bug this file exists to prevent, so
   // it is ignored rather than passed through.
@@ -73,7 +78,7 @@ function browserTriple({ business = 'party', mode = 'qr', env = process.env } = 
     return [platform, browser, version];
   }
 
-  return [platform, businessName(business, env), version];
+  return [platform, businessName(business, env, name), version];
 }
 
 /** How the pair reads on the phone, for logging. */

@@ -13,10 +13,21 @@
  */
 
 const db = require('./store/db');
+const lines = require('./lines');
 
 const BUSINESSES = new Set(['party', 'studio']);
 
-const normalise = (business) => (BUSINESSES.has(business) ? business : 'party');
+/**
+ * Which number a record belongs to.
+ *
+ * Built-in ids pass as they always did. A professional's own number is
+ * recognised by the SHAPE of its id, not by looking it up: a line that has
+ * been deleted must keep its old customers under its own id rather than
+ * having them silently fall into PartyDekoMiet's, which is what an unknown
+ * id used to do.
+ */
+const normalise = (business) =>
+  BUSINESSES.has(business) || lines.looksLikePro(business) ? business : 'party';
 
 /** The stored key. Matches TABLES.customers.derive in store/db.js. */
 function key(business, jid) {

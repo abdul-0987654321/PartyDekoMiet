@@ -13,15 +13,12 @@ const { initAuthCreds, BufferJSON, proto } = require('@itsliaaa/baileys');
 const db = require('../store/db');
 
 /**
- * Both WhatsApp numbers (Party, Studio) share one `session` table/sheet, so each
- * business's rows need their own key namespace or Studio's login would overwrite
- * Party's (or clearing one session would wipe both). Party keeps its original,
- * unprefixed keys for backward compatibility with sessions already on disk/sheet;
- * Studio's are namespaced with `studio:`.
+ * Every WhatsApp number shares this one `session` table, so each number's rows
+ * need their own key namespace - otherwise one login overwrites another, or
+ * clearing one session wipes them all. The rules live in session-keys.js,
+ * which has no dependencies and can be tested without Baileys installed.
  */
-function keyPrefix(business) {
-  return business === 'studio' ? 'studio:' : '';
-}
+const { keyPrefix, ownedBy } = require('./session-keys');
 
 const read = (key, business) => {
   const row = db.get('session', keyPrefix(business) + key);
@@ -64,13 +61,10 @@ function useSheetAuthState(business = 'party') {
   };
 }
 
-/** Wipes the stored WhatsApp session for one business (after logout), so the next start shows a fresh QR. */
+/** Wipes the stored WhatsApp session for one number (after logout), so the next start shows a fresh QR. */
 async function clearSession(business = 'party') {
-  const prefix = keyPrefix(business);
   for (const row of db.all('session')) {
-    // Party (no prefix) must not sweep up Studio's `studio:`-prefixed rows, and vice versa.
-    const owns = prefix ? row.key.startsWith(prefix) : !row.key.startsWith('studio:');
-    if (owns) db.remove('session', row.key);
+    if (ownedBy(row.key, business)) db.remove('session', row.key);
   }
   await db.flush();
 }
@@ -79,4 +73,4 @@ function hasSession(business = 'party') {
   return Boolean(read('creds', business)?.me);
 }
 
-module.exports = { useSheetAuthState, clearSession, hasSession };
+module.exports = { useSheetAuthState, clearSession, hasSession, keyPrefix, ownedBy };

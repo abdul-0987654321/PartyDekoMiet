@@ -14,19 +14,25 @@ const { m } = require('./messages');
 /**
  * @param {object} deps
  * @param {object} deps.client
- * @param {'party'|'studio'} [deps.business] defaults to 'party' - existing callers
+ * @param {string} [deps.business] line id. Defaults to 'party' - existing callers
  *   are unaffected. Only changes which settings keys recipients() reads from.
+ * @param {function():string} [deps.ownNumbers] a professional's own alert
+ *   numbers, read per alert so a change in the dashboard takes effect at once.
+ *   Empty falls back to the Studio's settings, so her requests always reach
+ *   somebody even before her own number is filled in.
  */
-function createNotifier({ client, business = 'party' }) {
+function createNotifier({ client, business = 'party', ownNumbers = null }) {
   /**
-   * Who gets alerts. The dedicated alert list wins; when it is empty the owner
-   * number is used, so a fresh install still notifies someone. Studio reads its
-   * own studioAlertNumbers/studioOwnerWhatsapp settings instead.
+   * Who gets alerts. Her own list wins, then the dedicated alert list, then the
+   * owner number, so a fresh install still notifies someone. Everything that is
+   * not PartyDekoMiet reads the Studio's settings.
    */
   function recipients() {
-    const alertKey = business === 'studio' ? 'studioAlertNumbers' : 'alertNumbers';
-    const ownerKey = business === 'studio' ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
-    const raw = String(settings.get(alertKey) || '').trim();
+    const studioSide = business !== 'party';
+    const alertKey = studioSide ? 'studioAlertNumbers' : 'alertNumbers';
+    const ownerKey = studioSide ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
+    const own = ownNumbers ? String(ownNumbers() || '').trim() : '';
+    const raw = own || String(settings.get(alertKey) || '').trim();
     const list = (raw || String(settings.get(ownerKey) || ''))
       .split(',')
       .map((n) => n.replace(/[^0-9]/g, ''))

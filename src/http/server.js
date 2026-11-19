@@ -27,6 +27,7 @@ const db = require('../store/db');
 const { matchesOtherBusiness } = require('../whatsapp/router');
 const directory = require('../studio/directory');
 const faqStore = require('../faq-store');
+const { clearSession } = require('../whatsapp/auth-state');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
@@ -38,7 +39,12 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
  * WhatsApp client for that one query param; nothing else in the app knows
  * two businesses exist.
  */
-function createServer({ config, state, whatsapp = null, settings = null, runtime = {}, catalog = null, studio = null }) {
+function createServer({
+  config, state, whatsapp = null, settings = null, runtime = {}, catalog = null, studio = null,
+  // The professionals' own numbers: { registry, running, boot }. Optional, so
+  // every existing caller and test that builds a server without them still works.
+  lines = null,
+}) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
@@ -52,12 +58,24 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
     });
   };
 
-  const isStudio = (req) => String(req.query?.biz || req.body?.biz || '') === 'studio';
+  const bizParam = (req) => String(req.query?.biz || req.body?.biz || '');
+  const isStudio = (req) => bizParam(req) === 'studio';
 
-  /** The state/runtime/whatsapp/business for whichever side `?biz=` asked for. */
+  /**
+   * The state/runtime/whatsapp/business for whichever number `?biz=` asked for.
+   *
+   * An unknown or missing value falls back to PartyDekoMiet, which is what it
+   * has always done - important, because a professional's number that has been
+   * deleted must land somewhere harmless rather than throwing on every page.
+   */
   function pick(req) {
-    if (isStudio(req) && studio) {
+    const asked = bizParam(req);
+    if (asked === 'studio' && studio) {
       return { biz: 'studio', state: studio.state, runtime: studio.runtime, whatsapp: studio.whatsapp };
+    }
+    const entry = lines?.running?.get(asked);
+    if (entry) {
+      return { biz: asked, state: entry.state, runtime: entry.runtime, whatsapp: entry.whatsapp, line: entry.line };
     }
     return { biz: 'party', state, runtime, whatsapp };
   }
@@ -99,15 +117,21 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   app.get('/professionals', page('professionals.html'));
   app.get('/services', page('services.html'));
   app.get('/locations', page('locations.html'));
+  app.get('/numbers', page('numbers.html'));
   app.get('/faq', page('faq.html'));
 
   app.get('/api/status', (req, res) => {
     const { biz, state: st, runtime: rt, whatsapp: wa } = pick(req);
     const s = settings ? settings.all() : {};
-    const isStudio = biz === 'studio';
+    // Everything that is not PartyDekoMiet is the Studio side: the Studio's own
+    // number and each professional's number share its calendar, its settings
+    // and its directory, and none of them has a Shopify catalog.
+    const isStudio = biz !== 'party';
+    const line = lines?.running?.get(biz)?.line || null;
     res.json({
       ok: true,
       biz,
+      line: line ? { id: line.id, name: line.name, professionalId: line.professionalId || '' } : null,
       ready: st.ready,
       startedAt: st.startedAt,
       uptimeSeconds: Math.round(process.uptime()),
@@ -382,8 +406,14 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   // ---- Bookings (Party) / Appointments (Studio) ----
   app.get('/api/bookings', (req, res) => {
     const { biz, runtime: rt } = pick(req);
-    if (biz === 'studio') {
-      const rows = rt.appointments ? rt.appointments.list({ status: req.query.status || null }) : [];
+    // Appointments, not bookings, for the Studio and for every professional's
+    // own number - they all book time, not rental sets.
+    if (biz !== 'party') {
+      let rows = rt.appointments ? rt.appointments.list({ status: req.query.status || null }) : [];
+      // On a professional's own number, her appointments only. The Studio's
+      // number still sees everyone's.
+      const her = lines?.running?.get(biz)?.line?.professionalId;
+      if (her) rows = rows.filter((a) => a.professionalId === her);
       return res.json({ ok: true, appointments: rows });
     }
     const rows = rt.bookings ? rt.bookings.list({ status: req.query.status || null }) : [];
@@ -392,8 +422,8 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
 
   app.post('/api/bookings/:id/status', safe(async (req, res) => {
     const { biz, runtime: rt } = pick(req);
-    const svc = biz === 'studio' ? rt.appointments : rt.bookings;
-    if (!svc) return res.status(503).json({ ok: false, error: `${biz === 'studio' ? 'appointments' : 'bookings'} not ready` });
+    const svc = biz === 'party' ? rt.bookings : rt.appointments;
+    if (!svc) return res.status(503).json({ ok: false, error: `${biz === 'party' ? 'bookings' : 'appointments'} not ready` });
     const result = await svc.setStatus(String(req.params.id), String(req.body?.status || ''));
     if (!result.ok) return res.status(400).json(result);
     res.json(result);
@@ -428,6 +458,83 @@ function createServer({ config, state, whatsapp = null, settings = null, runtime
   // All dashboard-editable, nothing hardcoded (HANDOFF.md §8). Every write goes
   // through src/studio/directory.js's own validation, so the API layer here is
   // thin on purpose.
+  // ---- The professionals' own WhatsApp numbers ----
+  // Adding one is adding a number, not a row: it gets its own session, its own
+  // chats and its own customers, and it has to be started and stopped here
+  // rather than on the next deploy - the client adds these himself.
+  if (lines?.registry) {
+    const registry = lines.registry;
+    const running = lines.running;
+
+    const withStatus = (line) => {
+      const entry = running?.get(line.id);
+      return {
+        ...line,
+        connected: entry?.whatsapp ? entry.whatsapp.getStatus().status === 'connected' : false,
+        status: entry?.whatsapp ? entry.whatsapp.getStatus().status : 'stopped',
+        bootError: entry?.state?.bootError || null,
+        alertError: entry?.state?.alertError || null,
+      };
+    };
+
+    app.get('/api/lines', (req, res) => {
+      res.json({ ok: true, lines: registry.all().map(withStatus), max: registry.MAX_PRO_LINES });
+    });
+
+    app.post('/api/lines', safe(async (req, res) => {
+      const result = await registry.create(req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+      // Start it straight away, so the QR page has something to show.
+      if (lines.boot) await lines.boot(result.line);
+      log.info(`New WhatsApp number added: ${result.line.name} (${result.line.id})`);
+      res.json({ ok: true, line: withStatus(result.line) });
+    }));
+
+    app.patch('/api/lines/:id', safe(async (req, res) => {
+      const id = String(req.params.id);
+      const before = registry.get(id);
+      const result = await registry.update(id, req.body || {});
+      if (!result.ok) return res.status(400).json(result);
+
+      // Switching a number off means hanging it up, not just hiding it.
+      const entry = running?.get(id);
+      const wasActive = before?.active !== false;
+      if (entry && wasActive && result.line.active === false) {
+        try { await entry.whatsapp.stop(); } catch (err) { log.warn(`[${id}] stop failed: ${err.message}`); }
+      } else if (!wasActive && result.line.active && lines.boot) {
+        await lines.boot(result.line);
+      }
+      res.json({ ok: true, line: withStatus(result.line) });
+    }));
+
+    app.delete('/api/lines/:id', safe(async (req, res) => {
+      const id = String(req.params.id);
+      if (!registry.get(id)) return res.status(404).json({ ok: false, error: 'not found' });
+      if (registry.isBuiltIn(id)) return res.status(400).json({ ok: false, error: 'this number is built in' });
+
+      // Order matters: unlink the device and hang up, then drop the row. Doing
+      // it the other way round leaves a socket running for a number that no
+      // longer exists, session rows nothing will ever clean up, and a dead
+      // entry under "Linked devices" on her phone.
+      const entry = running?.get(id);
+      if (entry) {
+        try {
+          await entry.whatsapp.logoutAndStop();
+        } catch (err) {
+          log.warn(`[${id}] logout failed, clearing anyway: ${err.message}`);
+          await clearSession(id);
+        }
+        running.delete(id);
+      } else {
+        await clearSession(id);
+      }
+      const result = await registry.remove(id);
+      if (!result.ok) return res.status(400).json(result);
+      log.info(`WhatsApp number removed: ${id} (session cleared)`);
+      res.json({ ok: true });
+    }));
+  }
+
   if (studio?.directory) {
     const dir = studio.directory;
 

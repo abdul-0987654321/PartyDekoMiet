@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1420" media="(prefers-color-scheme: dark)">
+<title>Nummern – Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
+    <button class="primary" id="addbtn"></button>
+  </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+  <div id="wrap"><p class="muted" id="loading"></p></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/numbers');
+$('h1').textContent = t('nav_numbers');
+$('intro').textContent = t('n_intro');
+$('loading').textContent = t('loading');
+$('addbtn').textContent = '+ ' + t('add');
+
+let rows = [];
+let professionals = [];
+let editingId = null;
+
+async function refresh() {
+  const [l, p] = await Promise.all([api('/api/lines'), api('/api/studio/professionals')]);
+  rows = l.lines || [];
+  professionals = p.professionals || [];
+  render();
+}
+
+function profName(id) {
+  return professionals.find((x) => x.id === id)?.name || '';
+}
+
+/**
+ * Switching to a number and opening its QR page in one click. The dashboard
+ * keeps the selected number in this browser, so the link has to set it rather
+ * than pass it along - otherwise the QR page would show whichever number was
+ * selected before.
+ */
+function goConnect(id) {
+  localStorage.setItem('dashBiz', id);
+  location.href = '/whatsapp';
+}
+
+function render() {
+  const extra = rows.filter((l) => !l.builtIn);
+  $('addbtn').hidden = extra.length >= (rows.max || 10);
+
+  $('wrap').innerHTML = `<div class="tiles">${rows.map((l) => `
+    <div class="tile ${l.active === false ? 'off' : ''}">
+      <div class="head">
+        <div class="title">
+          <b>${esc(l.name)}</b>
+          <span>${l.builtIn ? t('n_builtin') : (l.professionalId ? esc(profName(l.professionalId)) : t('n_for_none'))}</span>
+        </div>
+        ${l.connected ? pill(t('n_connected'), 'ok') : pill(t('n_offline'), 'warn')}
+      </div>
+      ${l.bootError ? `<div class="note"><span class="pill err">${esc(l.bootError)}</span></div>` : ''}
+      ${l.alertError && !l.builtIn ? `<div class="note"><span class="pill warn">${t('n_nobody')}</span></div>` : ''}
+      ${!l.builtIn && l.alertNumbers ? `<div class="note">${t('n_alerts')}: ${esc(l.alertNumbers)}</div>` : ''}
+      <div class="acts">
+        <button class="ghost" onclick="goConnect('${esc(l.id)}')">${l.connected ? t('n_open') : t('n_connect')}</button>
+        ${l.builtIn ? '' : `<button class="ghost" onclick="startEdit('${esc(l.id)}')">${t('edit')}</button>`}
+        ${l.builtIn ? '' : `<button class="ghost" onclick="remove('${esc(l.id)}')">${t('delete')}</button>`}
+      </div>
+    </div>`).join('')}</div>
+    ${extra.length ? '' : `<p class="muted" style="margin-top:14px">${t('n_none')}</p>`}`;
+}
+
+function formHtml(l) {
+  return `
+    <div class="field"><label>${t('n_name')}</label>
+      <p class="help">${t('n_name_help')}</p>
+      <input type="text" id="f_name" value="${esc(l?.name || '')}">
+    </div>
+    <div class="field"><label>${t('n_for')}</label>
+      <p class="help">${t('n_for_help')}</p>
+      <select id="f_professionalId"><option value="">${t('n_for_none')}</option>${professionals.map((p) =>
+        `<option value="${esc(p.id)}" ${p.id === l?.professionalId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+    </div>
+    ${l ? `<div class="field"><label>${t('n_alerts')}</label>
+      <p class="help">${t('n_alerts_help')}</p>
+      <input type="text" id="f_alertNumbers" value="${esc(l.alertNumbers || '')}" placeholder="41791234567">
+    </div>
+    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${l.active !== false ? 'checked' : ''}> ${t('active')}</label></div>` : ''}
+    <div class="actions inline">
+      <button class="primary" id="f_save">${t('save')}</button>
+      <button class="ghost" id="f_cancel">${t('reset')}</button>
+      <span id="f_msg" class="muted"></span>
+    </div>`;
+}
+
+function openForm(l) {
+  editingId = l?.id || null;
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = formHtml(l);
+  $('f_cancel').onclick = closeForm;
+  $('f_save').onclick = save;
+}
+function closeForm() { $('formcard').hidden = true; $('formcard').innerHTML = ''; editingId = null; }
+
+function addNew() { openForm(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+$('addbtn').onclick = addNew;
+function startEdit(id) { openForm(rows.find((l) => l.id === id)); }
+
+async function save() {
+  $('f_msg').textContent = t('saving');
+  const patch = {
+    name: $('f_name').value.trim(),
+    professionalId: $('f_professionalId').value,
+  };
+  if (editingId) {
+    patch.alertNumbers = $('f_alertNumbers').value;
+    patch.active = $('f_active').checked;
+  }
+  const res = editingId
+    ? await api(`/api/lines/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
+    : await api('/api/lines', { method: 'POST', body: patch });
+  if (!res.ok) { $('f_msg').textContent = ''; $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+  $('alerts').innerHTML = '';
+  const added = !editingId && res.line;
+  closeForm();
+  await refresh();
+  // A number that has just been created has nothing to show until it is
+  // linked, so go straight to its QR code rather than leaving the owner on a
+  // list with a new "not connected" row.
+  if (added) goConnect(res.line.id);
+}
+
+async function remove(id) {
+  if (!(await ask(t('n_delete_confirm')))) return;
+  const res = await api(`/api/lines/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) { $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+  if (localStorage.getItem('dashBiz') === id) localStorage.setItem('dashBiz', 'studio');
+  refresh();
+}
+
+refresh();
+</script>
+</body></html>

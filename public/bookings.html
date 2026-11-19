@@ -16,7 +16,7 @@
 <script src="/app.js"></script>
 <script>
 renderNav('/bookings');
-const isStudio = BIZ === 'studio';
+const isStudio = BIZ !== 'party'; // the Studio's number and every professional's book appointments
 $('h1').textContent = isStudio ? t('nav_appointments') : t('nav_bookings');
 $('intro').textContent = isStudio ? t('appt_intro') : t('b_intro');
 $('loading').textContent = t('loading');

@@ -158,6 +158,22 @@ const TABLES = {
       updatedAt: l.updatedAt,
     }),
   },
+  // Extra WhatsApp numbers, one per professional. PartyDekoMiet and the Studio
+  // are not in here - those two are built in and cannot be deleted. Each row is
+  // one more number the process connects, with its own session, its own chats
+  // and its own customers; see src/lines.js.
+  lines: {
+    key: 'id',
+    view: (l) => ({
+      id: l.id,
+      active: l.active !== false,
+      name: l.name,
+      professionalId: l.professionalId || '',
+      alertNumbers: l.alertNumbers || '', // empty = the Studio's alert numbers
+      createdAt: l.createdAt,
+      updatedAt: l.updatedAt,
+    }),
+  },
   appointments: {
     key: 'id',
     view: (a) => ({

@@ -43,7 +43,7 @@ $('send').textContent = t('chat_send');
 $('reset').textContent = t('test_reset');
 $('msg').placeholder = t('chat_ph');
 
-const PRESETS = BIZ === 'studio' ? [
+const PRESETS = BIZ !== 'party' ? [
   ['Hallo', 'Hallo, wer bist du?'],
   ['Services', 'Was bietet Gabriela an?'],
   ['Sprache', 'Spricht Sofia Deutsch?'],

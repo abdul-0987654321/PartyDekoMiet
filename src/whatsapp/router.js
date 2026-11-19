@@ -28,7 +28,9 @@ const customers = require('../customers');
  * key for backward compatibility with state already on the sheet.
  */
 function stateKey(business) {
-  return business === 'studio' ? 'chatstate:studio' : 'chatstate';
+  // One key per number: pausing a chat on one professional's line must not
+  // pause the same person on another's.
+  return !business || business === 'party' ? 'chatstate' : `chatstate:${business}`;
 }
 
 function loadState(business) {
@@ -149,7 +151,12 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     calendarId: 'studioCalendarId',
     botEnabled: 'studioBotEnabled',
   };
-  const setting = (key) => settings.get(business === 'studio' && BUSINESS_SETTINGS[key] ? BUSINESS_SETTINGS[key] : key);
+  // Everything that is not PartyDekoMiet is the Studio side, including each
+  // professional's own number: one owner, one calendar, one on/off switch for
+  // the whole studio. Her own switch in the dashboard hangs her number up
+  // entirely, which is a separate thing from this.
+  const studioSide = business !== 'party';
+  const setting = (key) => settings.get(studioSide && BUSINESS_SETTINGS[key] ? BUSINESS_SETTINGS[key] : key);
 
   const isOwner = (jid) => {
     const owner = digits(setting('ownerWhatsapp'));
@@ -218,11 +225,11 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
         return `Bot wieder aktiv fuer ${arg}.`;
       }
       case '/off': {
-        await settings.update({ [business === 'studio' ? 'studioBotEnabled' : 'botEnabled']: false });
+        await settings.update({ [studioSide ? 'studioBotEnabled' : 'botEnabled']: false });
         return 'Bot ist AUS. Mit /on wieder einschalten.';
       }
       case '/on': {
-        await settings.update({ [business === 'studio' ? 'studioBotEnabled' : 'botEnabled']: true });
+        await settings.update({ [studioSide ? 'studioBotEnabled' : 'botEnabled']: true });
         return 'Bot ist AN.';
       }
       case '/status': {

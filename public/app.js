@@ -10,6 +10,24 @@ const T = {
   de: {
     nav_status: 'Status', nav_settings: 'Einstellungen', nav_whatsapp: 'WhatsApp', nav_bookings: 'Buchungen',
     nav_more: 'Mehr',
+    nav_numbers: 'Nummern',
+    biz_pick: 'Nummer wählen',
+    n_intro: 'Jede Professional kann eine eigene WhatsApp-Nummer haben. Kundinnen und Kunden schreiben ihr direkt, und sie sieht nur ihre eigenen Chats und Termine.',
+    n_name: 'Name der Nummer',
+    n_name_help: 'So heisst das Gerät auf ihrem Telefon unter "Verknüpfte Geräte". Am besten ihr Vorname.',
+    n_for: 'Gehört zu',
+    n_for_none: 'Noch niemandem zugeordnet',
+    n_for_help: 'Der Bot auf dieser Nummer spricht nur über sie und über die Services, die alle anbieten.',
+    n_alerts: 'Benachrichtigungen an',
+    n_alerts_help: 'Wer Terminanfragen von dieser Nummer bekommt. Leer = die Studio-Nummern aus den Einstellungen.',
+    n_connect: 'Verbinden',
+    n_open: 'QR-Code öffnen',
+    n_connected: 'Verbunden',
+    n_offline: 'Nicht verbunden',
+    n_builtin: 'Fest eingebaut',
+    n_none: 'Noch keine eigene Nummer für eine Professional.',
+    n_delete_confirm: 'Diese Nummer entfernen? Die Verbindung wird getrennt und die Anmeldung gelöscht. Chats bleiben erhalten.',
+    n_nobody: 'Niemand bekommt Benachrichtigungen von dieser Nummer.',
     tech_details: 'Technische Angaben',
     logout: 'Abmelden', save: 'Speichern', saving: 'Speichert…', saved: 'Gespeichert', reset: 'Zurücksetzen',
     refresh: 'Aktualisieren', loading: 'Lädt…', none: 'keine', yes: 'ja', no: 'nein',
@@ -126,6 +144,24 @@ const T = {
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
     nav_more: 'More',
+    nav_numbers: 'Numbers',
+    biz_pick: 'Choose a number',
+    n_intro: 'Each professional can have her own WhatsApp number. Clients write to her directly, and she sees only her own chats and appointments.',
+    n_name: 'Name of this number',
+    n_name_help: 'What the device is called on her phone under "Linked devices". Her first name works best.',
+    n_for: 'Belongs to',
+    n_for_none: 'Not assigned to anyone yet',
+    n_for_help: 'The bot on this number talks about her only, plus the services everyone offers.',
+    n_alerts: 'Send alerts to',
+    n_alerts_help: 'Who gets appointment requests from this number. Empty = the Studio numbers from Settings.',
+    n_connect: 'Connect',
+    n_open: 'Open QR code',
+    n_connected: 'Connected',
+    n_offline: 'Not connected',
+    n_builtin: 'Built in',
+    n_none: 'No separate number for a professional yet.',
+    n_delete_confirm: 'Remove this number? It will be disconnected and its login deleted. Chats are kept.',
+    n_nobody: 'Nobody receives alerts from this number.',
     tech_details: 'Technical details',
     logout: 'Log out', save: 'Save', saving: 'Saving…', saved: 'Saved', reset: 'Reset',
     refresh: 'Refresh', loading: 'Loading…', none: 'none', yes: 'yes', no: 'no',
@@ -258,6 +294,49 @@ function setBiz(biz) {
 }
 
 /**
+ * The numbers this dashboard can switch between.
+ *
+ * Two buttons worked while there were two. There are six now - PartyDekoMiet,
+ * the Studio, and one per professional - so it is a picker, and the list comes
+ * from the server. It is cached in this browser so the picker draws instantly
+ * on load instead of flashing empty, then refreshed in the background.
+ */
+const BUILT_IN_LINES = [{ id: 'party', name: 'PartyDekoMiet' }, { id: 'studio', name: 'Studio' }];
+let LINES = BUILT_IN_LINES;
+try {
+  const cached = JSON.parse(localStorage.getItem('dashLines') || 'null');
+  if (Array.isArray(cached) && cached.length) LINES = cached;
+} catch { /* a cleared or corrupt cache just means the built-in two */ }
+
+function lineName(id) {
+  return LINES.find((l) => l.id === id)?.name || BUILT_IN_LINES.find((l) => l.id === id)?.name || 'PartyDekoMiet';
+}
+
+function bizOptions() {
+  return LINES.map((l) =>
+    `<option value="${escapeHtml(l.id)}" ${l.id === BIZ ? 'selected' : ''}>${escapeHtml(l.name)}</option>`).join('');
+}
+
+async function refreshLines() {
+  try {
+    const res = await fetch('/api/lines');
+    if (!res.ok) return; // an older deploy without this endpoint keeps the two built-ins
+    const data = await res.json();
+    if (!Array.isArray(data.lines)) return;
+    const next = data.lines.filter((l) => l.builtIn || l.active).map((l) => ({ id: l.id, name: l.name }));
+    if (!next.length) return;
+    if (JSON.stringify(next) === JSON.stringify(LINES)) return;
+    LINES = next;
+    localStorage.setItem('dashLines', JSON.stringify(next));
+    // A number that was deleted or switched off while this tab was open would
+    // otherwise keep sending ?biz= for something that no longer answers.
+    if (!LINES.some((l) => l.id === BIZ)) { setBiz('party'); return; }
+    for (const sel of document.querySelectorAll('.bizpick')) sel.innerHTML = bizOptions();
+    for (const el of document.querySelectorAll('.brandname')) el.textContent = brandName();
+  } catch { /* offline: the cached list is still correct enough to navigate */ }
+}
+
+/**
  * Saves the chosen language on the server too, so the dashboard opens in the
  * same language on the phone and on the laptop, and so the setting shown under
  * Settings matches what the switch did.
@@ -336,7 +415,19 @@ const NAV_LINKS = {
     ['/services', 'nav_services', 'list'],
     ['/locations', 'nav_locations', 'pin'],
     ['/whatsapp', 'nav_whatsapp', 'link'],
+    ['/numbers', 'nav_numbers', 'person'],
     ['/faq', 'nav_faq', 'help'],
+    ['/settings', 'nav_settings', 'settings'],
+  ],
+  // A professional's own number. She has no team, no service list and no
+  // locations of her own - those are the Studio's, edited once on the Studio's
+  // side. What belongs to her number is its connection, its chats and its
+  // appointments.
+  pro: [
+    ['/', 'nav_status', 'status'],
+    ['/chats', 'nav_chats', 'chats'],
+    ['/bookings', 'nav_appointments', 'calendar'],
+    ['/whatsapp', 'nav_whatsapp', 'link'],
     ['/settings', 'nav_settings', 'settings'],
   ],
 };
@@ -353,15 +444,17 @@ const NAV_LINKS = {
 const PHONE_TABS = {
   party: ['/', '/chats', '/bookings', '/settings'],
   studio: ['/', '/chats', '/bookings', '/services'],
+  pro: ['/', '/chats', '/bookings', '/whatsapp'],
 };
 
-/** The selected business's own name. Every place the brand is shown reads this. */
+/** The selected number's own name. Every place the brand is shown reads this. */
 function brandName() {
-  return BIZ === 'studio' ? 'Studio' : 'PartyDekoMiet';
+  return lineName(BIZ);
 }
 
 function renderNav(active) {
-  const links = NAV_LINKS[BIZ] || NAV_LINKS.party;
+  // Anything that is not one of the two built-ins is a professional's number.
+  const links = NAV_LINKS[BIZ] || NAV_LINKS.pro;
   // Each page ships a static <title> with the party name in it. The browser tab
   // is the one label that is visible on every page and in every bookmark, so it
   // has to follow the switch like the sidebar does.
@@ -371,10 +464,10 @@ function renderNav(active) {
       <button class="${LANG === 'de' ? 'on' : ''}" onclick="setLang('de')">DE</button>
       <button class="${LANG === 'en' ? 'on' : ''}" onclick="setLang('en')">EN</button>
     </span>`;
-  const bizBtns = `<span class="langswitch bizswitch">
-      <button class="${BIZ === 'party' ? 'on' : ''}" onclick="setBiz('party')">${t('biz_party')}</button>
-      <button class="${BIZ === 'studio' ? 'on' : ''}" onclick="setBiz('studio')">${t('biz_studio')}</button>
-    </span>`;
+  const bizBtns = `<label class="bizswitch">
+      <span class="sr">${t('biz_pick')}</span>
+      <select class="bizpick" onchange="setBiz(this.value)">${bizOptions()}</select>
+    </label>`;
 
   const item = ([href, key, ic]) =>
     `<a href="${href}" class="${href === active ? 'on' : ''}">${icon(ic)}<span>${t(key)}</span></a>`;
@@ -382,7 +475,7 @@ function renderNav(active) {
   const side = document.createElement('aside');
   side.className = 'side';
   side.innerHTML = `
-    <div class="brand">${brandName()}<small>WhatsApp Assistant</small></div>
+    <div class="brand"><span class="brandname">${escapeHtml(brandName())}</span><small>WhatsApp Assistant</small></div>
     ${bizBtns}
     <nav>${links.map(item).join('')}</nav>
     <div class="grow"></div>
@@ -400,7 +493,7 @@ function renderNav(active) {
   // Its own element rather than the sidebar restyled, because the two carry
   // different items now: the sidebar lists everything, the bar lists the four
   // daily pages.
-  const tabHrefs = PHONE_TABS[BIZ] || PHONE_TABS.party;
+  const tabHrefs = PHONE_TABS[BIZ] || PHONE_TABS.pro;
   const tabs = tabHrefs.map((h) => links.find(([href]) => href === h)).filter(Boolean);
   const rest = links.filter(([href]) => !tabHrefs.includes(href));
   // An open page that lives behind "More" still has to look selected.
@@ -443,6 +536,10 @@ function renderNav(active) {
   top.innerHTML = `<span class="t">${t(pageKey)}</span>${bizBtns}`;
   const content = document.getElementById('content');
   content.insertBefore(top, content.firstChild);
+
+  // The picker is drawn from this browser's cache first; this corrects it if a
+  // number was added, renamed or removed somewhere else.
+  void refreshLines();
 }
 
 /**

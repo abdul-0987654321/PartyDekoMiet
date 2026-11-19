@@ -45,14 +45,34 @@ const fetchLatestWaWebVersion =
 
 const baileysLogger = pino({ level: 'silent' });
 
-/** @param {'party'|'studio'} [business] defaults to 'party' - existing callers are unaffected. */
+/**
+ * @param {string} [business] line id: 'party', 'studio', or 'pro-<name>' for a
+ *   professional's own number. Defaults to 'party' - existing callers are
+ *   unaffected. See src/lines.js.
+ */
 function createWhatsAppClient(business = 'party') {
-  const logTag = business === 'studio' ? '[studio] ' : '';
+  const logTag = business === 'party' ? '' : `[${business}] `;
   // Recomputed per connection attempt: a socket that is about to be linked by
   // pairing code has to present a browser name WhatsApp recognises, which is
-  // not the business name. See device.js.
+  // not the business name. See device.js. The name is looked up per attempt
+  // too, so renaming a professional's number in the dashboard reaches the next
+  // link without a restart.
   const currentTriple = () =>
-    browserTriple({ business, mode: runtime.pairingRequest ? 'pairing' : 'qr' });
+    browserTriple({
+      business,
+      mode: runtime.pairingRequest ? 'pairing' : 'qr',
+      name: lineName(),
+    });
+
+  // Tolerant of a line that is not in the table (or a db that is not loaded
+  // yet): the device name is cosmetic, and must never stop a connection.
+  function lineName() {
+    try {
+      return require('../lines').get(business)?.name || '';
+    } catch {
+      return '';
+    }
+  }
 
   const runtime = {
     sock: null,
@@ -529,9 +549,26 @@ function createWhatsAppClient(business = 'party') {
     return start();
   }
 
+  /**
+   * Unlinks the device and stays down - for a number that is being removed
+   * altogether. Without the logout the entry survives under "Linked devices"
+   * on her phone, pointing at a bot that no longer exists, and she has to go
+   * and find it herself. A failed logout is not fatal: the session is cleared
+   * either way, so this process will never speak as that number again.
+   */
+  async function logoutAndStop() {
+    try {
+      await runtime.sock?.logout();
+    } catch (err) {
+      log.warn(`${logTag}Logout failed (removing anyway): ${err.message}`);
+    }
+    await stop();
+    await clearSession(business);
+  }
+
   return {
     business,
-    start, stop, logoutAndRelink, getStatus, isConnected, onMessage,
+    start, stop, logoutAndRelink, logoutAndStop, getStatus, isConnected, onMessage,
     sendText, sendImage, forwardImage, downloadImage, downloadMedia, isPrivateChat, isOwnMessage,
     startPairing, cancelPairing,
   };

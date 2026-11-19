@@ -24,9 +24,11 @@ $('loading').textContent = t('loading');
 // Each business sees only the settings relevant to it; 'bot'/'dashboard' are
 // shared layout groups shown either way (the bot's name there still makes
 // sense read as "this number's bot").
-const GROUPS = BIZ === 'studio'
-  ? ['bot', 'studio', 'dashboard']
-  : ['bot', 'contacts', 'business', 'shop', 'calendar', 'dashboard'];
+// A professional's own number shares the Studio's settings - one calendar, one
+// owner, one price guard - so it shows the Studio's groups, not Party's.
+const GROUPS = BIZ === 'party'
+  ? ['bot', 'contacts', 'business', 'shop', 'calendar', 'dashboard']
+  : ['bot', 'studio', 'dashboard'];
 let schema = [];
 let serviceAccountEmail = null;
 

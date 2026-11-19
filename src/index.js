@@ -26,6 +26,8 @@ const { createStudioCalendarService } = require('./calendar/studio-service');
 const { createBookings } = require('./bookings');
 const { createAppointments } = require('./appointments');
 const directory = require('./studio/directory');
+const lines = require('./lines');
+const { scopeToProfessional } = require('./studio/scope');
 const faqStore = require('./faq-store');
 const { createPhotos } = require('./studio/photos');
 const { createNotifier } = require('./notify/owner');
@@ -252,6 +254,9 @@ async function bootStudio() {
         allowedPrices: activePrices,
         priceMode: () => settings.get('studioPriceGuard'),
       });
+      // Kept, so each professional's own number can build its agent from the
+      // same pack instead of loading the knowledge folder five more times.
+      studioRuntime.liveKnowledge = liveKnowledge;
 
       const OpenAI = require('openai');
       const openai = new OpenAI({ apiKey: config.openai.apiKey });
@@ -347,9 +352,135 @@ async function bootStudio() {
   }
 }
 
+/**
+ * The professionals' own numbers.
+ *
+ * Each one is a full bot on its own WhatsApp socket, but it is the Studio's
+ * bot: same knowledge, same calendar, same service table, same appointment
+ * flow. What differs is who it is allowed to talk about (scopeToProfessional)
+ * and who its alerts go to. Everything else - chats, customers, session - is
+ * already separated by the line id, the same way Party and Studio are.
+ *
+ * Deliberately best-effort and sequential: one woman's number failing to link
+ * must not stop the next one, and must never touch Party or the Studio.
+ */
+const proLines = new Map(); // line id -> { line, whatsapp, state, runtime }
+
+async function bootLine(line) {
+  const entry =
+    proLines.get(line.id) ||
+    {
+      line,
+      whatsapp: createWhatsAppClient(line.id),
+      state: { startedAt: new Date().toISOString(), ready: false, bootError: null, alertError: null },
+      runtime: {},
+    };
+  entry.line = line;
+  proLines.set(line.id, entry);
+  const tag = `[${line.id}]`;
+
+  try {
+    if (!studioRuntime.liveKnowledge) {
+      throw new Error('the Studio side is not ready, so this number has nothing to answer with');
+    }
+    // Her view of the directory. Everything the agent can see goes through it.
+    const scoped = scopeToProfessional(directory, line.professionalId);
+    const activePrices = () =>
+      scoped
+        .listServices({ activeOnly: true })
+        .map((s) => Number(s.priceChf))
+        .filter((n) => Number.isFinite(n) && n > 0);
+
+    const knowledge = studioRuntime.liveKnowledge;
+    const guards = createStudioGuards({
+      faqAnswers: () => knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
+      allowedPrices: activePrices,
+      priceMode: () => settings.get('studioPriceGuard'),
+    });
+
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: config.openai.apiKey });
+    entry.runtime.agent = createAgent({
+      openai, knowledge, guards, tools: studioTools, config: config.openai,
+    });
+
+    entry.runtime.notify = createNotifier({
+      client: entry.whatsapp,
+      business: line.id,
+      // Read per alert, not captured: renaming or renumbering her in the
+      // dashboard reaches the next appointment request without a restart.
+      ownNumbers: () => lines.get(line.id)?.alertNumbers || '',
+    });
+    entry.runtime.appointments = createAppointments({
+      calendar: studioRuntime.calendar,
+      notify: entry.runtime.notify,
+    });
+    entry.runtime.photos = createPhotos({ client: entry.whatsapp });
+
+    entry.runtime.services = {
+      directory: scoped,
+      calendar: studioRuntime.calendar,
+      appointments: entry.runtime.appointments,
+      notify: entry.runtime.notify,
+      photos: entry.runtime.photos,
+    };
+
+    entry.runtime.router = createRouter({
+      client: entry.whatsapp,
+      agent: entry.runtime.agent,
+      services: entry.runtime.services,
+      notify: entry.runtime.notify,
+      voice: runtime.voice,
+      business: line.id,
+    });
+    entry.runtime.router.init();
+    entry.whatsapp.onMessage((msg) => entry.runtime.router.handle(msg));
+
+    const alerts = entry.runtime.notify.recipients();
+    entry.state.alertError = alerts.length
+      ? null
+      : 'No alert number for this professional and none for the Studio either - her appointment requests reach nobody.';
+    if (alerts.length) log.info(`${tag} Appointment alerts go to: ${alerts.join(', ')}`);
+    else log.warn(`${tag} ${entry.state.alertError}`);
+
+    if (!line.professionalId) {
+      log.warn(`${tag} No professional linked to this number yet - it answers for the whole Studio until one is chosen.`);
+    }
+
+    entry.state.ready = true;
+    entry.state.bootError = null;
+    log.info(`${tag} Boot complete ("${line.name}").`);
+
+    await entry.whatsapp.start();
+  } catch (err) {
+    entry.state.bootError = err.message;
+    log.error(`${tag} Boot failed: ${err.stack || err.message}`);
+  }
+}
+
+/**
+ * Six numbers linking from one IP in the same second looks like a scripted
+ * login burst, which is how a number gets flagged. They go up one at a time
+ * with a gap, which costs nothing - nobody is waiting on the sixth number to
+ * be live half a minute earlier - and keeps the pattern looking like six
+ * ordinary phones.
+ */
+const LINE_START_GAP_MS = 4000;
+
+async function bootLines() {
+  const extra = lines.active().filter((l) => !l.builtIn);
+  if (!extra.length) return;
+  log.info(`Starting ${extra.length} more WhatsApp number(s) for the professionals.`);
+  for (const [i, line] of extra.entries()) {
+    if (i) await new Promise((r) => setTimeout(r, LINE_START_GAP_MS));
+    await bootLine(line);
+  }
+}
+
 const app = createServer({
   config, state, whatsapp, settings, runtime, catalog,
   studio: { state: studioState, runtime: studioRuntime, whatsapp: studioWhatsapp, directory },
+  lines: { registry: lines, running: proLines, boot: bootLine },
 });
 const server = app.listen(config.web.port, () => {
   log.info(`HTTP listening on port ${config.web.port} (env ${config.env}, tz ${config.tz})`);
@@ -361,8 +492,10 @@ const server = app.listen(config.web.port, () => {
     })
     .finally(() => {
       // Studio boots after Party is fully up, and never on Party's own promise
-      // chain, so nothing it does can delay or fail Party's boot.
-      void bootStudio();
+      // chain, so nothing it does can delay or fail Party's boot. The
+      // professionals' numbers come after the Studio, because they build their
+      // agents from its knowledge pack.
+      void bootStudio().then(() => bootLines());
     });
 });
 
@@ -381,6 +514,13 @@ async function shutdown(signal) {
     await studioWhatsapp.stop();
   } catch (err) {
     log.warn(`[studio] WhatsApp stop failed: ${err.message}`);
+  }
+  for (const [id, entry] of proLines) {
+    try {
+      await entry.whatsapp.stop();
+    } catch (err) {
+      log.warn(`[${id}] WhatsApp stop failed: ${err.message}`);
+    }
   }
   try {
     await db.flush();

@@ -89,7 +89,10 @@ $('toggle').onchange = async (e) => {
   const want = e.target.checked;
   e.target.disabled = true;
   try {
-    const key = BIZ === 'studio' ? 'studioBotEnabled' : 'botEnabled';
+    // A professional's own number follows the Studio's switch: one studio, one
+    // on/off. Her own number is taken off the air by switching the number
+    // itself off under Nummern, which is a different thing.
+    const key = BIZ === 'party' ? 'botEnabled' : 'studioBotEnabled';
     const res = await api('/api/settings', { method:'POST', body:{ [key]: want } });
     if (!res.ok) e.target.checked = !want;
   } catch { e.target.checked = !want; }
@@ -200,8 +203,8 @@ async function refresh() {
       : pill(d.storage.backend === 'memory' ? 'memory ⚠' : d.storage.backend, d.storage.backend === 'memory' ? 'warn' : 'ok'))
     : pill(t('missing'),'err');
   // Studio has no Shopify shop, so there is nothing to show here at all.
-  $('catalogrow').hidden = (d.biz === 'studio');
-  if (d.biz !== 'studio') {
+  $('catalogrow').hidden = (d.biz !== 'party');
+  if (d.biz === 'party') {
     $('catalog').innerHTML = d.catalog && d.catalog.count
       ? pill(`${d.catalog.count} ${t('products')}`,'ok')
       : pill(d.catalog && d.catalog.lastError ? t('error') : t('loading'),'warn');

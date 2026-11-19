@@ -76,6 +76,52 @@ function renderBusiness(b) {
 }
 
 /**
+ * The owner's own description of his business, typed into the dashboard.
+ *
+ * This exists because the only text he could enter before was FAQ
+ * question/answer pairs. There was no way to write "this is who we are", so
+ * when a customer asked the most common opening question - "what do you
+ * offer?" - the model had nothing short to say and read out the entire
+ * service list with every price. His words, verbatim, are the short answer.
+ */
+function renderAbout(about) {
+  const text = typeof about === 'string' ? about.trim() : '';
+  if (!text) return '';
+  return `# So beschreibt der Inhaber den Betrieb selbst (eigene Worte)
+${text}
+
+Fragt jemand allgemein, was der Betrieb macht oder anbietet, ist DAS deine
+Antwort - kurz, gern in eigenen Worten, aber ohne etwas hinzuzufuegen, was hier
+nicht steht. Zaehle danach nicht das Angebot auf, sondern frage kurz, was den
+Kunden interessiert.`;
+}
+
+/**
+ * Reply length, for both bots.
+ *
+ * The Studio persona already asked for 1-3 sentences and was ignored, because
+ * `list_services` handed the model the whole catalogue and a full list reads
+ * like an instruction to recite it. Saying it once, as a hard rule, at the end
+ * of the prompt where it is read last.
+ */
+const LENGTH_RULES = `# Antwortlaenge (wichtig)
+Das ist WhatsApp, kein Katalog. Antworte kurz und natuerlich, wie ein Mensch,
+der am Handy tippt.
+
+- In der Regel 1 bis 3 Saetze. Laenger nur, wenn der Kunde ausdruecklich eine
+  Liste, eine Uebersicht oder Vorschlaege verlangt ("schick mir alles", "was
+  kostet was").
+- Zaehle NIE das ganze Angebot, alle Services oder alle Preise auf, nur weil
+  jemand allgemein fragt ("was bietet ihr an?", "was habt ihr?"). Antworte kurz
+  und frage zurueck.
+- Zwei oder drei konkrete Beispiele oder Vorschlaege sind in Ordnung, eine
+  komplette Liste nicht. Danach eine Rueckfrage.
+- Einen Preis nennst du, wenn nach einem bestimmten Service oder einer
+  bestimmten Person gefragt wird - nicht vorher, und nie als Preisliste.
+- Eine Frage pro Nachricht, nicht drei.
+- Keine Aufzaehlungszeichen, keine Ueberschriften, keine Tabellen.`;
+
+/**
  * The tools and request flow, from the business's own knowledge folder.
  * `{{depositChf}}` is the one value the text needs from business.json.
  */
@@ -94,7 +140,7 @@ function renderWorkflow(workflow, business) {
  * @returns {string}
  */
 function buildSystemPrompt(knowledge, ctx = {}) {
-  const { business, faq, rules, persona, damagePrices, workflow } = knowledge;
+  const { business, faq, rules, persona, damagePrices, workflow, about } = knowledge;
   const today = ctx.today || new Date().toISOString().slice(0, 10);
   // The language is decided outside the model and stated here as an instruction.
   // Leaving it to the model meant it re-decided every turn and drifted back to
@@ -112,6 +158,8 @@ ${ctx.customerName ? `Der Kunde heisst ${ctx.customerName}.` : ''}
 # Betrieb
 ${renderBusiness(business)}
 
+${renderAbout(about)}
+
 ${rules}
 
 # Offizielle Antworten (Wortlaut des Kunden - bevorzugt genau so verwenden)
@@ -126,7 +174,11 @@ handoff_to_human weiter.
 
 ${damagePrices}` : ''}
 
-${renderWorkflow(workflow, business)}`;
+${renderWorkflow(workflow, business)}
+
+${LENGTH_RULES}`;
 }
 
-module.exports = { buildSystemPrompt, renderBusiness, renderFaq, renderWorkflow };
+module.exports = {
+  buildSystemPrompt, renderBusiness, renderFaq, renderWorkflow, renderAbout, LENGTH_RULES,
+};

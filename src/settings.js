@@ -158,6 +158,20 @@ const SCHEMA = [
 
   // ── Business rules ───────────────────────────────────────────────────────
   {
+    // The owner's own description, in his own words. Before this existed the
+    // only text he could enter was FAQ question/answer pairs, so there was no
+    // way to say "this is who we are" without inventing a question for it -
+    // and the bot, having nothing short to say, read out the whole price list
+    // whenever someone asked what the business offers.
+    key: 'aboutText', group: 'business', type: 'text', default: '',
+    placeholder: 'Wir vermieten Partydekoration in Zürich. Abholung in Zürich, Rückgabe nach drei Tagen.',
+    label: { de: 'Über den Betrieb (eigene Worte)', en: 'About the business (your own words)' },
+    help: {
+      de: 'Ein paar Zeilen in Ihren eigenen Worten. Der Bot benutzt genau diesen Text, wenn jemand fragt, was Sie anbieten - er zählt dann NICHT die ganze Liste auf. Keine Fragen und Antworten nötig, einfach schreiben.',
+      en: 'A few lines in your own words. The bot uses exactly this text when someone asks what you offer - it does NOT read out the whole list. No question-and-answer needed, just write.',
+    },
+  },
+  {
     key: 'rentalDays', group: 'business', type: 'number', default: 3, min: 1, max: 30,
     env: 'RENTAL_DAYS',
     label: { de: 'Mietdauer (Tage)', en: 'Rental period (days)' },
@@ -276,6 +290,18 @@ const SCHEMA = [
   },
 
   // ── Studio (massage studio, second board on this dashboard) ────────────────
+  {
+    // Same field as aboutText above, for the Studio. Kept as its own key, not
+    // shared: the two businesses must never describe each other, which is the
+    // same separation customers/chats/faq already keep.
+    key: 'studioAboutText', group: 'studio', type: 'text', default: '',
+    placeholder: 'Wir sind ein Studio mit mehreren Professionals in Zürich. Termine nach Vereinbarung.',
+    label: { de: 'Über das Studio (eigene Worte)', en: 'About the Studio (your own words)' },
+    help: {
+      de: 'Ein paar Zeilen in Ihren eigenen Worten - was das Studio ist und was es anbietet. Der Bot antwortet damit kurz, wenn jemand fragt "was bietet ihr an", statt alle Services und Preise aufzuzählen. Keine Fragen und Antworten nötig, einfach schreiben.',
+      en: 'A few lines in your own words - what the Studio is and what it offers. The bot uses this to answer "what do you offer" briefly, instead of listing every service and price. No question-and-answer needed, just write.',
+    },
+  },
   {
     key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '', env: 'STUDIO_OWNER_WHATSAPP',
     placeholder: '41791234567',

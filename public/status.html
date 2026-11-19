@@ -2,7 +2,8 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f1420">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1420" media="(prefers-color-scheme: dark)">
 <title>Status – PartyDekoMiet</title>
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -33,6 +34,11 @@
   <h2 id="h_todo"></h2>
   <div class="card" id="todo"></div>
 
+  <!-- Folded away: the owner needs "is it running" and "what needs doing".
+       Pending writes and the model name are for us, and a page that opens with
+       them is the page the client called confusing. -->
+  <details class="adv tech">
+  <summary id="h_tech"></summary>
   <div class="cols"><div>
   <h2 id="h_sys">System</h2>
   <div class="card">
@@ -57,12 +63,14 @@
     <div class="row"><span id="l_started"></span><span id="started">…</span></div>
   </div>
   </div></div>
+  </details>
 
 </main></div>
 <script src="/app.js"></script>
 <script>
 renderNav('/');
 $('h_todo').textContent = t('problems');
+$('h_tech').textContent = t('tech_details');
 for (const [id, key] of [
   ['l_wa','whatsapp'],['l_storage','storage'],['l_catalog','catalog'],['l_calendar','calendar'],
   ['l_key','openai_key'],['l_owner','owner_number'],['l_paused','paused_chats'],
@@ -71,8 +79,8 @@ for (const [id, key] of [
 ]) $(id).textContent = t(key);
 
 $('quick').innerHTML = [
-  ['/test','q_test','▶'], ['/chats','q_chats','💬'], ['/bookings','q_book','🗓'], ['/settings','q_set','⚙'],
-].map(([href,key,ic]) => `<a href="${href}"><span class="ic">${ic}</span>${t(key)}</a>`).join('');
+  ['/test','q_test','play'], ['/chats','q_chats','chats'], ['/bookings','q_book','calendar'], ['/settings','q_set','settings'],
+].map(([href,key,ic]) => `<a href="${href}">${icon(ic)}${t(key)}</a>`).join('');
 
 let saving = false;
 $('toggle').onchange = async (e) => {

@@ -9,6 +9,8 @@
 const T = {
   de: {
     nav_status: 'Status', nav_settings: 'Einstellungen', nav_whatsapp: 'WhatsApp', nav_bookings: 'Buchungen',
+    nav_more: 'Mehr',
+    tech_details: 'Technische Angaben',
     logout: 'Abmelden', save: 'Speichern', saving: 'Speichert…', saved: 'Gespeichert', reset: 'Zurücksetzen',
     refresh: 'Aktualisieren', loading: 'Lädt…', none: 'keine', yes: 'ja', no: 'nein',
     unreachable: 'Server nicht erreichbar.',
@@ -123,6 +125,8 @@ const T = {
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
+    nav_more: 'More',
+    tech_details: 'Technical details',
     logout: 'Log out', save: 'Save', saving: 'Saving…', saved: 'Saved', reset: 'Reset',
     refresh: 'Refresh', loading: 'Loading…', none: 'none', yes: 'yes', no: 'no',
     unreachable: 'Server unreachable.',
@@ -285,26 +289,70 @@ function setLang(lang) {
  * Renders the shell: a sidebar on desktop, a bottom tab bar on phones.
  * The page's own markup goes inside <div id="content">.
  */
+/**
+ * Line icons, drawn inline.
+ *
+ * These were emoji. Emoji are the one thing on a screen that renders
+ * differently on every phone and makes a paid tool look like a weekend
+ * project, so they are gone. Stroke icons inherit `currentColor`, which means
+ * the active-tab and hover colours below need no icon-specific rules.
+ */
+const ICON_PATHS = {
+  status: '<path d="M3.2 12h3.6l2.4-5.8 4 11.6 2.4-5.8h4.2"/>',
+  chats: '<path d="M20 11.5a7.5 7.5 0 0 1-10.9 6.7L4 19.5l1.4-4.4A7.5 7.5 0 1 1 20 11.5Z"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M8 3.5v3M16 3.5v3M3.5 10h17"/>',
+  link: '<path d="M10 13.8a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10.2a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1-1"/>',
+  person: '<circle cx="12" cy="8.2" r="3.6"/><path d="M5.5 20c.7-3.4 3.3-5.3 6.5-5.3s5.8 1.9 6.5 5.3"/>',
+  list: '<path d="M9 7h11M9 12h11M9 17h11M4.6 7h.01M4.6 12h.01M4.6 17h.01"/>',
+  pin: '<path d="M12 21s6.2-5.3 6.2-10A6.2 6.2 0 0 0 5.8 11c0 4.7 6.2 10 6.2 10Z"/><circle cx="12" cy="10.6" r="2.3"/>',
+  help: '<circle cx="12" cy="12" r="8.4"/><path d="M9.7 9.4a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1.1 1-1.1 1.8M12 16.8h.01"/>',
+  settings: '<path d="M4 7.5h8.2M18.2 7.5H20M4 16.5h2.2M12.2 16.5H20"/><circle cx="15.2" cy="7.5" r="2.4"/><circle cx="9.2" cy="16.5" r="2.4"/>',
+  more: '<circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/>',
+  play: '<path d="M8.4 5.6 18 12l-9.6 6.4V5.6Z"/>',
+};
+
+/** @param {string} name a key of ICON_PATHS */
+function icon(name) {
+  const d = ICON_PATHS[name] || ICON_PATHS.status;
+  return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+}
+
+/** The nav, in the order it reads best in the sidebar. */
 const NAV_LINKS = {
   party: [
-    ['/', 'nav_status', '◉'],
-    ['/chats', 'nav_chats', '💬'],
-    ['/bookings', 'nav_bookings', '🗓'],
-    ['/whatsapp', 'nav_whatsapp', '🔗'],
-    ['/faq', 'nav_faq', '❓'],
-    ['/settings', 'nav_settings', '⚙'],
+    ['/', 'nav_status', 'status'],
+    ['/chats', 'nav_chats', 'chats'],
+    ['/bookings', 'nav_bookings', 'calendar'],
+    ['/whatsapp', 'nav_whatsapp', 'link'],
+    ['/faq', 'nav_faq', 'help'],
+    ['/settings', 'nav_settings', 'settings'],
   ],
   studio: [
-    ['/', 'nav_status', '◉'],
-    ['/chats', 'nav_chats', '💬'],
-    ['/bookings', 'nav_appointments', '🗓'],
-    ['/whatsapp', 'nav_whatsapp', '🔗'],
-    ['/professionals', 'nav_professionals', '👤'],
-    ['/services', 'nav_services', '📋'],
-    ['/locations', 'nav_locations', '📍'],
-    ['/faq', 'nav_faq', '❓'],
-    ['/settings', 'nav_settings', '⚙'],
+    ['/', 'nav_status', 'status'],
+    ['/chats', 'nav_chats', 'chats'],
+    ['/bookings', 'nav_appointments', 'calendar'],
+    ['/professionals', 'nav_professionals', 'person'],
+    ['/services', 'nav_services', 'list'],
+    ['/locations', 'nav_locations', 'pin'],
+    ['/whatsapp', 'nav_whatsapp', 'link'],
+    ['/faq', 'nav_faq', 'help'],
+    ['/settings', 'nav_settings', 'settings'],
   ],
+};
+
+/**
+ * The four tabs a phone shows, plus "More" for the rest.
+ *
+ * Deliberately not "the first four of the list above": the sidebar reads in a
+ * logical order, a phone bar has to carry the four pages that get opened every
+ * day. The Studio used to squeeze all nine into one phone-width bar, which is
+ * a row of 10px labels - the client's complaint was that he could not tell
+ * what to tap.
+ */
+const PHONE_TABS = {
+  party: ['/', '/chats', '/bookings', '/settings'],
+  studio: ['/', '/chats', '/bookings', '/services'],
 };
 
 /** The selected business's own name. Every place the brand is shown reads this. */
@@ -328,13 +376,15 @@ function renderNav(active) {
       <button class="${BIZ === 'studio' ? 'on' : ''}" onclick="setBiz('studio')">${t('biz_studio')}</button>
     </span>`;
 
+  const item = ([href, key, ic]) =>
+    `<a href="${href}" class="${href === active ? 'on' : ''}">${icon(ic)}<span>${t(key)}</span></a>`;
+
   const side = document.createElement('aside');
   side.className = 'side';
   side.innerHTML = `
     <div class="brand">${brandName()}<small>WhatsApp Assistant</small></div>
     ${bizBtns}
-    ${links.map(([href, key, ic]) =>
-      `<a href="${href}" class="${href === active ? 'on' : ''}"><span class="ic">${ic}</span>${t(key)}</a>`).join('')}
+    <nav>${links.map(item).join('')}</nav>
     <div class="grow"></div>
     <div class="foot">
       ${langBtns}
@@ -346,14 +396,53 @@ function renderNav(active) {
   const shell = document.querySelector('.shell');
   shell.insertBefore(side, shell.firstChild);
 
-  // Phones hide the sidebar foot, so the language and business switches move
-  // to a top bar.
-  const bar = document.createElement('div');
-  bar.className = 'mobile-bar';
-  bar.innerHTML = `<span class="t">${t(links.find(([h]) => h === active)?.[1] || 'nav_status')}</span>${bizBtns}${langBtns}
-    <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">${t('logout')}</button></form>`;
+  // ── Phone: four tabs plus "More" ────────────────────────────────────────
+  // Its own element rather than the sidebar restyled, because the two carry
+  // different items now: the sidebar lists everything, the bar lists the four
+  // daily pages.
+  const tabHrefs = PHONE_TABS[BIZ] || PHONE_TABS.party;
+  const tabs = tabHrefs.map((h) => links.find(([href]) => href === h)).filter(Boolean);
+  const rest = links.filter(([href]) => !tabHrefs.includes(href));
+  // An open page that lives behind "More" still has to look selected.
+  const moreOn = rest.some(([href]) => href === active) ? 'on' : '';
+
+  const bar = document.createElement('nav');
+  bar.className = 'tabbar';
+  bar.innerHTML = `${tabs.map(item).join('')}
+    <button class="${moreOn}" id="morebtn" aria-expanded="false">${icon('more')}<span>${t('nav_more')}</span></button>`;
+  document.body.appendChild(bar);
+
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML = `<div class="sheet-card">
+      <nav>${rest.map(item).join('')}</nav>
+      <div class="sheet-foot">
+        ${langBtns}
+        <form method="post" action="/logout" style="margin:0">
+          <button class="link" type="submit">${t('logout')}</button>
+        </form>
+      </div>
+    </div>`;
+  document.body.appendChild(sheet);
+
+  const closeSheet = () => {
+    sheet.classList.remove('on');
+    document.getElementById('morebtn').setAttribute('aria-expanded', 'false');
+  };
+  document.getElementById('morebtn').onclick = () => {
+    const open = !sheet.classList.contains('on');
+    sheet.classList.toggle('on', open);
+    document.getElementById('morebtn').setAttribute('aria-expanded', String(open));
+  };
+  sheet.onclick = (e) => { if (e.target === sheet) closeSheet(); };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+
+  // ── Phone: top bar with the page name and the two switches ──────────────
+  const top = document.createElement('div');
+  top.className = 'mobile-bar';
+  top.innerHTML = `<span class="t">${t(pageKey)}</span>${bizBtns}`;
   const content = document.getElementById('content');
-  content.insertBefore(bar, content.firstChild);
+  content.insertBefore(top, content.firstChild);
 }
 
 /**

@@ -113,7 +113,11 @@ const DEFS = [
   {
     name: 'list_services',
     description:
-      "The studio's service list: every active service with its duration and price. Use this for a general question like \"what do you offer?\" or \"what are your prices?\", where no particular professional has been named yet. These are the only services and the only prices that may ever be mentioned.",
+      "The studio's full service list with durations and prices. These are the only services and the only prices that may ever be mentioned. " +
+      'Call this to check WHAT EXISTS or what something costs - not to read the list out. ' +
+      'Never send the whole list to the customer: for a general question like "what do you offer?" reply in one or two sentences, ' +
+      'name at most two or three examples, and ask what the customer is looking for. ' +
+      'Send a full list only when the customer explicitly asks for one ("send me everything", "what does everything cost").',
     parameters: {
       type: 'object',
       properties: {},

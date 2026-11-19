@@ -107,6 +107,11 @@ async function boot() {
     get faq() {
       return [...knowledge.faq, ...faqStore.forPrompt('party')];
     },
+    // Also a getter: the owner rewrites his description in the dashboard and
+    // the next reply must use it, without a restart.
+    get about() {
+      return settings.get('aboutText');
+    },
   };
 
   const guards = createGuards({
@@ -235,6 +240,11 @@ async function bootStudio() {
         ...knowledge,
         get faq() {
           return [...knowledge.faq, ...faqStore.forPrompt('studio')];
+        },
+        // The Studio's own description - never Party's, same separation the
+        // faq getter above keeps.
+        get about() {
+          return settings.get('studioAboutText');
         },
       };
       const guards = createStudioGuards({

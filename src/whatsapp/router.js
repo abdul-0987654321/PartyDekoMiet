@@ -20,6 +20,7 @@ const settings = require('../settings');
 const { m } = require('../notify/messages');
 const contacts = require('../contacts');
 const customers = require('../customers');
+const { applyReply } = require('../studio/professional-replies');
 
 /**
  * Both bots share the `state` table/sheet, so each needs its own pause-state key
@@ -352,6 +353,54 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
   // ---- Main entry -----------------------------------------------------------
 
+  /**
+   * Is this number one of the professionals'?
+   *
+   * Only on the Studio side, and only for a woman who is active and has given
+   * her number - otherwise an empty field would match every customer whose jid
+   * happens to start with nothing.
+   */
+  function professionalFor(jid) {
+    const appointments = services?.appointments;
+    if (!studioSide || !appointments) return null;
+    const from = digits(jid);
+    if (!from) return null;
+    return (
+      db.all('professionals').find((p) => {
+        if (p.active === false) return false;
+        const own = digits(p.whatsapp);
+        return own.length >= 8 && from.startsWith(own);
+      }) || null
+    );
+  }
+
+  /**
+   * Her J or N. Recorded in the chat like any other message, so the dashboard
+   * shows what happened, but answered from a fixed script.
+   */
+  async function handleProfessionalReply(professional, jid, text) {
+    remember(jid, 'in', text);
+    const texts = m();
+    const { reply, changed, action } = await applyReply({
+      professional, text, appointments: services.appointments, m: texts,
+    });
+
+    await client.sendText(jid, reply);
+    remember(jid, 'out', reply);
+
+    if (changed) {
+      log.info(`[${business}] ${professional.name} ${action}ed appointment ${changed.id} by WhatsApp.`);
+      // The team still needs to know: she answered on her phone, and nobody
+      // else was in that conversation.
+      if (notify) {
+        const what = action === 'confirm'
+          ? (texts.proConfirmedWord || 'bestaetigt')
+          : (texts.proCancelledWord || 'abgesagt');
+        await notify.owner(texts.proToldTeam(changed, what), { kind: 'appointment_status' });
+      }
+    }
+  }
+
   async function handle(msg) {
     const jid = msg.key.remoteJid;
     let text = textOf(msg);
@@ -370,6 +419,12 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
     // 2. A message from the owner's own number: commands and dictated replies.
     if (isOwner(jid)) return handleOwnerInput(msg, jid, text);
+
+    // 2b. A professional answering an alert about her own appointment. She is
+    //     not a customer: her J or N changes the appointment and is answered by
+    //     one line, never by the model and never forwarded to anybody.
+    const pro = professionalFor(jid);
+    if (pro) return handleProfessionalReply(pro, jid, text);
 
     // 3. Everything else is a customer.
     //

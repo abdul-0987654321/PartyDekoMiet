@@ -92,6 +92,25 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
   }
 
   /**
+   * One named number, rather than whoever the alert list points at.
+   *
+   * Used to reach a professional about her own appointment. Kept apart from
+   * owner() on purpose: that one is "tell whoever runs this", this one is "tell
+   * exactly her", and the two must never quietly become the same thing.
+   */
+  async function toNumber(number, text) {
+    const digits = String(number || '').replace(/[^0-9]/g, '');
+    if (digits.length < 8) return { ok: false, error: 'no number' };
+    try {
+      await client.sendText(`${digits}@s.whatsapp.net`, `\u{1F514} ${text}`);
+      return { ok: true };
+    } catch (err) {
+      log.error(`Could not notify ${digits}: ${err.message}`);
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /**
    * How the price reads depends on how the shop handles the deposit. Hardcoding
    * "+ CHF 50.- Kaution" made the owner's copy contradict what the customer was
    * told, because the default is that the deposit is already in the shop price.
@@ -163,7 +182,7 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
     return owner(lines.join('\n'), { kind: 'appointment_request', appointmentId: appt.id });
   }
 
-  return { owner, bookingRequest, appointmentRequest, recipients };
+  return { owner, toNumber, bookingRequest, appointmentRequest, recipients };
 }
 
 module.exports = { createNotifier };

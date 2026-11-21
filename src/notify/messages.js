@@ -48,6 +48,25 @@ const T = {
     },
     appointmentFooter: 'Status [PENDING]. Nach Bestaetigung im Kalender auf [CONFIRMED] aendern.',
 
+    // What the professional herself gets, on her own number. Deliberately
+    // short: she is reading it between clients, and the only thing she has to
+    // do is answer J or N.
+    proRequest: (a) =>
+      `NEUE ANFRAGE FUER DICH\n\n${a.serviceName}\nKunde: ${a.customerName}\n` +
+      `${a.date} um ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
+      `Antworte J zum Bestaetigen oder N zum Absagen.\nCode: ${a.id}`,
+    proConfirmed: (a) => `Bestaetigt: ${a.serviceName}, ${a.date} um ${a.startTime}. Danke!`,
+    proCancelled: (a) => `Abgesagt: ${a.serviceName}, ${a.date} um ${a.startTime}. Das Team wird informiert.`,
+    proNothingOpen: 'Du hast gerade keine offene Anfrage.',
+    proConfirmedWord: 'bestaetigt', proCancelledWord: 'abgesagt',
+    proWhich: (list) =>
+      'Du hast mehrere offene Anfragen. Antworte mit J oder N und dem Code:\n\n' +
+      list.map((a) => `${a.id} - ${a.serviceName}, ${a.date} ${a.startTime}`).join('\n'),
+    proUnknownCode: (code) => `Code ${code} gehoert zu keiner offenen Anfrage von dir.`,
+    proHelp: 'Antworte J zum Bestaetigen oder N zum Absagen. Bei mehreren Anfragen: J und den Code, z.B. "J A20261121-AB12C".',
+    proToldTeam: (a, what) =>
+      `${a.professionalName} hat den Termin ${what}.\n\n${a.serviceName}\nKunde: ${a.customerName}\n${a.date} um ${a.startTime}\nCode: ${a.id}`,
+
     customerWaiting: (reason, jid, text) =>
       `KUNDE WARTET\n\n${reason}\n\nChat: ${short(jid)}\nNachricht: ${cut(text) || '[Bild]'}`,
     skipReasons: {
@@ -112,6 +131,22 @@ const T = {
       price: 'Price', date: 'Date', time: 'Time', source: 'Source', calendar: 'Calendar',
     },
     appointmentFooter: 'Status [PENDING]. Once confirmed, change it to [CONFIRMED] in the calendar.',
+
+    proRequest: (a) =>
+      `NEW REQUEST FOR YOU\n\n${a.serviceName}\nCustomer: ${a.customerName}\n` +
+      `${a.date} at ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
+      `Reply Y to confirm or N to decline.\nCode: ${a.id}`,
+    proConfirmed: (a) => `Confirmed: ${a.serviceName}, ${a.date} at ${a.startTime}. Thank you!`,
+    proCancelled: (a) => `Declined: ${a.serviceName}, ${a.date} at ${a.startTime}. The team has been told.`,
+    proNothingOpen: 'You have no open request right now.',
+    proConfirmedWord: 'confirmed', proCancelledWord: 'declined',
+    proWhich: (list) =>
+      'You have several open requests. Reply with Y or N and the code:\n\n' +
+      list.map((a) => `${a.id} - ${a.serviceName}, ${a.date} ${a.startTime}`).join('\n'),
+    proUnknownCode: (code) => `Code ${code} does not belong to an open request of yours.`,
+    proHelp: 'Reply Y to confirm or N to decline. With several requests: Y and the code, e.g. "Y A20261121-AB12C".',
+    proToldTeam: (a, what) =>
+      `${a.professionalName} ${what} the appointment.\n\n${a.serviceName}\nCustomer: ${a.customerName}\n${a.date} at ${a.startTime}\nCode: ${a.id}`,
 
     customerWaiting: (reason, jid, text) =>
       `CUSTOMER IS WAITING\n\n${reason}\n\nChat: ${short(jid)}\nMessage: ${cut(text) || '[image]'}`,

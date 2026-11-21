@@ -111,6 +111,9 @@ const TABLES = {
       languages: Array.isArray(p.languages) ? p.languages.join(', ') : p.languages || '',
       locationId: p.locationId || '',
       photoFileId: p.photoFileId || '',
+      // Her own WhatsApp number, so an appointment for her reaches her even
+      // when the customer wrote to the Studio's main number. Digits only.
+      whatsapp: String(p.whatsapp || '').replace(/[^0-9]/g, ''),
       workingHours: p.workingHours || '', // free text per day, owner-edited
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,

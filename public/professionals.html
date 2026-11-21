@@ -129,6 +129,13 @@ function formHtml(p) {
     <div class="field"><label>${t('p_address')}</label>
       <input type="text" id="f_locationAddress" value="${esc(locationAddress(p?.locationId))}" placeholder="Langstrasse 175, 8004 Zürich">
     </div>
+    <!-- Her own number, so a request for her reaches her even when the
+         customer wrote to the Studio's main number - and so she can answer
+         J or N to confirm it. -->
+    <div class="field"><label>${t('p_whatsapp')}</label>
+      <p class="help">${t('p_whatsapp_help')}</p>
+      <input type="text" id="f_whatsapp" value="${esc(p?.whatsapp || '')}" placeholder="41791234567">
+    </div>
     <div class="field"><label>${t('p_hours')}</label><input type="text" id="f_workingHours" value="${esc(p?.workingHours || '')}" placeholder="Mo-Fr 10-18"></div>
     <div class="field"><label class="check"><input type="checkbox" id="f_active" ${p?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
     <div class="field"><label>${t('photo')}</label>
@@ -180,6 +187,7 @@ async function save() {
     age: $('f_age').value ? Number($('f_age').value) : '',
     languages: $('f_languages').value,
     locationId: loc.id,
+    whatsapp: $('f_whatsapp').value,
     workingHours: $('f_workingHours').value,
     active: $('f_active').checked,
   };

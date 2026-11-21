@@ -107,6 +107,15 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
 
     if (notify) {
       await notify.appointmentRequest(appt, { calendarLink });
+
+      // And the woman the appointment is actually for. Without this she only
+      // learns of it if somebody passes it on, which on the Studio's main
+      // number means she often did not learn of it at all.
+      const ownNumber = String(professional.whatsapp || '').replace(/[^0-9]/g, '');
+      if (ownNumber && notify.toNumber) {
+        const { m } = require('./notify/messages');
+        await notify.toNumber(ownNumber, m().proRequest(appt));
+      }
       if (!appt.calendarEventId) {
         const { m } = require('./notify/messages');
         await notify.owner(m().calendarFailed(appt.id), { kind: 'calendar_error', appointmentId: appt.id });

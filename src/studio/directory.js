@@ -32,6 +32,12 @@ function validateProfessional(p) {
     const age = Number(p.age);
     if (!Number.isFinite(age) || age < 18 || age > 99) return 'age must be between 18 and 99';
   }
+  // A mistyped number here is worse than an empty one: she would simply never
+  // hear about her own appointments, and nothing would look broken.
+  if (p.whatsapp !== undefined && p.whatsapp !== '' && p.whatsapp !== null) {
+    const digits = String(p.whatsapp).replace(/[^0-9]/g, '');
+    if (!/^[0-9]{8,15}$/.test(digits)) return 'whatsapp must be an international number (8-15 digits)';
+  }
   return null;
 }
 
@@ -77,6 +83,7 @@ async function createProfessional(args) {
     languages: Array.isArray(args.languages) ? args.languages : String(args.languages || '').split(',').map((s) => s.trim()).filter(Boolean),
     locationId: args.locationId || '',
     photoFileId: args.photoFileId || '',
+    whatsapp: String(args.whatsapp || '').replace(/[^0-9]/g, ''),
     workingHours: args.workingHours || '',
     createdAt: nowIso(),
     updatedAt: nowIso(),

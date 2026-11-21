@@ -14,13 +14,20 @@ const { createCalendarClient } = require('./client');
 const { checkSlot, findNextFreeOnDay, PENDING } = require('./slots');
 const { addDays, todayIn, isIsoDay } = require('./dates');
 
-function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zurich' }) {
-  const client = createCalendarClient({
+/**
+ * @param {object} deps
+ * @param {object} [deps.client] where the days are kept. Injected so the
+ *   built-in calendar and a Google one are interchangeable: both offer the same
+ *   six methods, and everything below this line is written against those.
+ */
+function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zurich', client: injected = null }) {
+  const client = injected || createCalendarClient({
     serviceAccountJsonB64,
     getCalendarId: () => settings.get('studioCalendarId'),
     settingName: 'STUDIO_CALENDAR_ID (dashboard: Studio settings -> Kalender-ID)',
   });
   if (!client) return null;
+  const isLocal = Boolean(client.local);
 
   async function eventsOnDay(date) {
     return client.listEvents({
@@ -47,7 +54,8 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
      * wording must never read as a confirmation.
      */
     async checkSlotAvailability({ professionalId, professionalName, date, startTime, durationMin }) {
-      if (!settings.get('studioCalendarId')) {
+      // The built-in calendar is always there; a Google one has to be named first.
+      if (!isLocal && !settings.get('studioCalendarId')) {
         return { ok: false, error: 'Der Kalender ist noch nicht eingerichtet. Bitte den Fall weitergeben.' };
       }
       if (!isIsoDay(date)) return { ok: false, error: `Datum muss YYYY-MM-DD sein, erhalten: "${date}".` };

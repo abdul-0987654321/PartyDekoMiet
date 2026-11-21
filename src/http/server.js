@@ -28,6 +28,14 @@ const { matchesOtherBusiness } = require('../whatsapp/router');
 const directory = require('../studio/directory');
 const faqStore = require('../faq-store');
 const { clearSession } = require('../whatsapp/auth-state');
+const { createLocalCalendarClient, overlapsWindow } = require('../calendar/local-client');
+
+/** All-day ranges end on the morning after, the way a calendar writes them. */
+function addOneDay(date) {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
@@ -112,6 +120,7 @@ function createServer({
   app.get('/settings', page('settings.html'));
   app.get('/whatsapp', page('whatsapp.html'));
   app.get('/bookings', page('bookings.html'));
+  app.get('/calendar', page('calendar.html'));
   app.get('/chats', page('chats.html'));
   app.get('/test', page('test.html'));
   app.get('/professionals', page('professionals.html'));
@@ -408,6 +417,111 @@ function createServer({
         result: c.result,
       })),
     });
+  }));
+
+  // ---- Calendar ----
+  // One month at a time, flattened into what a day cell needs. The entries are
+  // the same rows the bot checks availability against, so what the owner sees
+  // here is exactly what the bot believes - there is no second version of the
+  // truth to drift.
+  app.get('/api/calendar', (req, res) => {
+    const { biz } = pick(req);
+    const from = String(req.query.from || '').slice(0, 10);
+    const to = String(req.query.to || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return res.status(400).json({ ok: false, error: 'from and to must be YYYY-MM-DD' });
+    }
+
+    const entries = db
+      .all('calendarEvents')
+      .filter((e) => e.business === biz)
+      .filter((e) => overlapsWindow(e, `${from}T00:00:00Z`, `${to}T23:59:59Z`))
+      .map((e) => {
+        let priv = {};
+        try { priv = JSON.parse(e.privateJson || '{}'); } catch { priv = {}; }
+        const title = String(e.summary || '');
+        const status = /\[CONFIRMED\]/i.test(title) ? 'CONFIRMED'
+          : /\[PENDING\]/i.test(title) ? 'PENDING'
+          : priv.bookingStatus || null;
+        return {
+          id: e.id,
+          allDay: e.allDay === true,
+          startDate: e.allDay ? e.startDate : String(e.startDateTime || '').slice(0, 10),
+          endDate: e.allDay ? e.endDate : String(e.endDateTime || e.startDateTime || '').slice(0, 10),
+          startTime: e.allDay ? '' : String(e.startDateTime || '').slice(11, 16),
+          endTime: e.allDay ? '' : String(e.endDateTime || '').slice(11, 16),
+          // The bracketed status is for the calendar's own bookkeeping; the
+          // page shows it as a colour instead.
+          title: title.replace(/^\[(PENDING|CONFIRMED|CANCELLED|BLOCKED)\]\s*/i, '').trim(),
+          status,
+          source: e.source || 'bot',
+          professionalId: priv.professionalId || '',
+          appointmentId: priv.appointmentId || '',
+          bookingId: priv.bookingId || '',
+        };
+      })
+      .sort((a, b) => `${a.startDate}${a.startTime}`.localeCompare(`${b.startDate}${b.startTime}`));
+
+    res.json({ ok: true, entries, today: new Date().toISOString().slice(0, 10) });
+  });
+
+  /**
+   * Time the owner blocks by hand: a holiday, a closure, an hour kept free.
+   * Written as an ordinary entry, so the bot stops offering it without any
+   * further code - blocking is just something being in the way.
+   */
+  app.post('/api/calendar/block', safe(async (req, res) => {
+    const { biz } = pick(req);
+    const body = req.body || {};
+    const date = String(body.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ ok: false, error: 'date must be YYYY-MM-DD' });
+    }
+    const note = String(body.note || '').trim();
+    const start = String(body.startTime || '').trim();
+    const end = String(body.endTime || '').trim();
+    const timed = /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end);
+    if ((start || end) && !timed) {
+      return res.status(400).json({ ok: false, error: 'startTime and endTime must both be HH:MM' });
+    }
+    if (timed && end <= start) {
+      return res.status(400).json({ ok: false, error: 'endTime must be after startTime' });
+    }
+
+    // "Blocked" is one of the keywords the availability check already treats as
+    // closing a day, so an all-day block needs no new rule anywhere.
+    const summary = `[BLOCKED] ${note || 'Blockiert'}`;
+    const client = createLocalCalendarClient({ business: biz, timeZone: config.tz || 'Europe/Zurich' });
+    const event = timed
+      ? {
+          summary,
+          start: { dateTime: `${date}T${start}:00`, timeZone: config.tz || 'Europe/Zurich' },
+          end: { dateTime: `${date}T${end}:00`, timeZone: config.tz || 'Europe/Zurich' },
+          source: 'owner',
+          extendedProperties: { private: { blocked: 'true' } },
+        }
+      : {
+          summary,
+          start: { date },
+          end: { date: addOneDay(date) }, // all-day ends are exclusive
+          source: 'owner',
+          extendedProperties: { private: { blocked: 'true' } },
+        };
+    const created = await client.createEvent(event);
+    res.json({ ok: true, id: created.id });
+  }));
+
+  app.delete('/api/calendar/block/:id', safe(async (req, res) => {
+    const { biz } = pick(req);
+    const row = db.get('calendarEvents', String(req.params.id));
+    if (!row || row.business !== biz) return res.status(404).json({ ok: false, error: 'not found' });
+    // Only what the owner put there by hand. An appointment is cancelled on its
+    // own card, where the customer is told - not quietly deleted off a grid.
+    if ((row.source || 'bot') !== 'owner') {
+      return res.status(400).json({ ok: false, error: 'Only blocked time can be removed here.' });
+    }
+    await createLocalCalendarClient({ business: biz }).deleteEvent(row.id);
+    res.json({ ok: true });
   }));
 
   // ---- Bookings (Party) / Appointments (Studio) ----

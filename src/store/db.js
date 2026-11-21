@@ -162,6 +162,30 @@ const TABLES = {
   // are not in here - those two are built in and cannot be deleted. Each row is
   // one more number the process connects, with its own session, its own chats
   // and its own customers; see src/lines.js.
+  // The calendar itself, now that it is ours rather than Google's. Shaped like
+  // a Google event on purpose: the availability maths in calendar/ reads these
+  // unchanged, so nothing above it had to be rewritten. Tagged per business so
+  // the two never see each other's days.
+  calendarEvents: {
+    key: 'id',
+    view: (e) => ({
+      id: e.id,
+      business: e.business || 'party',
+      allDay: e.allDay === true || e.allDay === 'true',
+      startDate: e.startDate || '',
+      endDate: e.endDate || '',
+      startDateTime: e.startDateTime || '',
+      endDateTime: e.endDateTime || '',
+      timeZone: e.timeZone || '',
+      summary: e.summary || '',
+      description: e.description || '',
+      transparency: e.transparency || 'opaque',
+      privateJson: e.privateJson || '{}',
+      source: e.source || 'bot', // bot | owner
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    }),
+  },
   lines: {
     key: 'id',
     view: (l) => ({

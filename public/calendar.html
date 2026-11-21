@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1420" media="(prefers-color-scheme: dark)">
+<title>Kalender</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><div class="shell"><main class="content" id="content">
+  <div class="pagehead">
+    <div class="grow">
+      <h1 id="h1"></h1>
+      <p class="muted" id="intro"></p>
+    </div>
+    <button class="primary" id="blockbtn"></button>
+  </div>
+  <div id="alerts"></div>
+  <div class="card" id="formcard" hidden></div>
+
+  <div class="calhead">
+    <button class="ghost" id="prev">‹</button>
+    <b id="monthname"></b>
+    <button class="ghost" id="next">›</button>
+    <button class="ghost" id="todaybtn"></button>
+  </div>
+
+  <div class="card calcard">
+    <div class="calgrid head" id="weekdays"></div>
+    <div class="calgrid" id="grid"></div>
+  </div>
+
+  <h2 id="dayhead"></h2>
+  <div id="daylist"></div>
+</main></div>
+<script src="/app.js"></script>
+<script>
+renderNav('/calendar');
+$('h1').textContent = t('cal_title');
+$('intro').textContent = t('cal_intro');
+$('blockbtn').textContent = '+ ' + t('cal_block');
+$('todaybtn').textContent = t('b_today');
+
+let entries = [];
+let cursor = new Date();      // any day inside the month on screen
+let selected = todayIso();
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const LOCALE = () => (LANG === 'en' ? 'en-GB' : 'de-CH');
+
+/** Every day shown in the grid: the month, padded to whole weeks from Monday. */
+function monthDays(ref) {
+  const first = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - ((first.getDay() + 6) % 7)); // Monday first
+  const days = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push(d);
+  }
+  // Drop a trailing week that belongs entirely to the next month.
+  return days[35].getMonth() === ref.getMonth() || days[35] <= new Date(ref.getFullYear(), ref.getMonth() + 1, 0)
+    ? days
+    : days.slice(0, 35);
+}
+
+/** Entries touching one day. A rental spans its whole window, so it is on each. */
+function entriesOn(iso) {
+  return entries.filter((e) => {
+    if (!e.allDay) return e.startDate === iso;
+    const end = e.endDate || e.startDate; // exclusive
+    return e.startDate <= iso && iso < end;
+  });
+}
+
+const KIND = (e) => (e.source === 'owner' ? 'blocked' : e.status === 'CONFIRMED' ? 'ok' : 'pending');
+
+function render() {
+  $('monthname').textContent = cursor.toLocaleDateString(LOCALE(), { month: 'long', year: 'numeric' });
+
+  const names = [];
+  const ref = new Date(2024, 0, 1); // a Monday
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ref);
+    d.setDate(ref.getDate() + i);
+    names.push(d.toLocaleDateString(LOCALE(), { weekday: 'short' }));
+  }
+  $('weekdays').innerHTML = names.map((n) => `<div class="wd">${esc(n)}</div>`).join('');
+
+  const today = todayIso();
+  $('grid').innerHTML = monthDays(cursor).map((d) => {
+    const iso = isoOf(d);
+    const list = entriesOn(iso);
+    const cls = [
+      'cell',
+      d.getMonth() === cursor.getMonth() ? '' : 'other',
+      iso === today ? 'today' : '',
+      iso === selected ? 'sel' : '',
+    ].filter(Boolean).join(' ');
+    // At most three dots - beyond that the count says more than the dots do.
+    const dots = list.slice(0, 3).map((e) => `<i class="dot ${KIND(e)}"></i>`).join('');
+    return `<button class="${cls}" onclick="pickDay('${iso}')">
+      <span class="n">${d.getDate()}</span>
+      <span class="dots">${dots}${list.length > 3 ? `<i class="more">+${list.length - 3}</i>` : ''}</span>
+    </button>`;
+  }).join('');
+
+  renderDay();
+}
+
+function renderDay() {
+  const d = new Date(selected + 'T12:00:00');
+  $('dayhead').textContent = d.toLocaleDateString(LOCALE(), { weekday: 'long', day: '2-digit', month: 'long' });
+
+  const list = entriesOn(selected);
+  if (!list.length) {
+    $('daylist').innerHTML = `<div class="card"><p class="muted" style="margin:0">${esc(t('cal_free'))}</p></div>`;
+    return;
+  }
+  $('daylist').innerHTML = `<div class="card">${list.map((e) => `
+    <div class="row calrow">
+      <span>
+        <i class="dot ${KIND(e)}"></i>
+        <b>${e.allDay ? esc(t('cal_allday')) : esc(e.startTime + (e.endTime ? '–' + e.endTime : ''))}</b>
+        <span class="calttl">${esc(e.title || '–')}</span>
+      </span>
+      <span>${e.source === 'owner'
+        ? `<button class="ghost" onclick="unblock('${esc(e.id)}')">${esc(t('delete'))}</button>`
+        : pill(t(e.status === 'CONFIRMED' ? 'st_confirmed' : 'st_pending'), e.status === 'CONFIRMED' ? 'ok' : 'warn')}</span>
+    </div>`).join('')}</div>`;
+}
+
+function pickDay(iso) {
+  selected = iso;
+  render();
+}
+
+$('prev').onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1); load(); };
+$('next').onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1); load(); };
+$('todaybtn').onclick = () => { cursor = new Date(); selected = todayIso(); load(); };
+
+// ---- blocking time ----
+$('blockbtn').onclick = () => {
+  const card = $('formcard');
+  card.hidden = false;
+  card.innerHTML = `
+    <div class="field"><label>${t('cal_date')}</label>
+      <input type="date" id="b_date" value="${esc(selected)}"></div>
+    <div class="field"><label>${t('cal_whole_day')}</label>
+      <label class="check"><input type="checkbox" id="b_allday" checked> ${t('cal_whole_day_help')}</label></div>
+    <div class="field" id="timesrow" hidden>
+      <label>${t('cal_from_to')}</label>
+      <div class="inline">
+        <input type="time" id="b_start" value="09:00">
+        <input type="time" id="b_end" value="12:00">
+      </div>
+    </div>
+    <div class="field"><label>${t('cal_note')}</label>
+      <input type="text" id="b_note" placeholder="${esc(t('cal_note_ph'))}"></div>
+    <div class="actions inline">
+      <button class="primary" id="b_save">${t('save')}</button>
+      <button class="ghost" id="b_cancel">${t('reset')}</button>
+      <span id="b_msg" class="muted"></span>
+    </div>`;
+  $('b_allday').onchange = () => { $('timesrow').hidden = $('b_allday').checked; };
+  $('b_cancel').onclick = () => { card.hidden = true; card.innerHTML = ''; };
+  $('b_save').onclick = saveBlock;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+async function saveBlock() {
+  $('b_msg').textContent = t('saving');
+  const body = { date: $('b_date').value, note: $('b_note').value };
+  if (!$('b_allday').checked) { body.startTime = $('b_start').value; body.endTime = $('b_end').value; }
+  const res = await api('/api/calendar/block', { method: 'POST', body });
+  if (!res.ok) {
+    $('b_msg').textContent = '';
+    $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`;
+    return;
+  }
+  $('alerts').innerHTML = '';
+  $('formcard').hidden = true;
+  $('formcard').innerHTML = '';
+  selected = body.date;
+  cursor = new Date(body.date + 'T12:00:00');
+  load();
+}
+
+async function unblock(id) {
+  if (!(await ask(t('cal_unblock_confirm')))) return;
+  const res = await api(`/api/calendar/block/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) { $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+  load();
+}
+
+async function load() {
+  // A month plus a margin, so a rental starting in the previous month still
+  // draws its bar across the days that are on screen.
+  const from = isoOf(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1));
+  const to = isoOf(new Date(cursor.getFullYear(), cursor.getMonth() + 2, 0));
+  const d = await api(`/api/calendar?from=${from}&to=${to}`);
+  entries = d.entries || [];
+  render();
+}
+load();
+</script>
+</body></html>

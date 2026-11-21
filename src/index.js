@@ -23,6 +23,7 @@ const studioTools = require('./agent/tools/studio');
 const catalog = require('./catalog');
 const { createCalendarService } = require('./calendar');
 const { createStudioCalendarService } = require('./calendar/studio-service');
+const { createLocalCalendarClient } = require('./calendar/local-client');
 const { createBookings } = require('./bookings');
 const { createAppointments } = require('./appointments');
 const directory = require('./studio/directory');
@@ -150,29 +151,30 @@ async function boot() {
     log.error(`Catalog could not be initialised: ${err.message}`);
   }
 
-  // 4. Calendar (optional: without it the bot hands availability questions over).
-  if (config.calendar.serviceAccountJsonB64) {
+  // 4. Calendar. Ours by default, kept in the dashboard and needing no setup at
+  //    all. A Google calendar is used instead only where one is actually named,
+  //    so an installation already running on Google keeps its entries until
+  //    GOOGLE_CALENDAR_ID is cleared.
+  {
+    const useGoogle = Boolean(config.calendar.serviceAccountJsonB64 && settings.get('calendarId'));
     try {
       runtime.calendar = createCalendarService({
         serviceAccountJsonB64: config.calendar.serviceAccountJsonB64,
         timeZone: config.tz,
         getStock: () => settings.get('defaultStock'),
+        client: useGoogle ? null : createLocalCalendarClient({ business: 'party', timeZone: config.tz }),
       });
-      if (settings.get('calendarId')) {
+      if (useGoogle) {
         const info = await runtime.calendar.check();
         log.info(`Calendar connected: "${info.calendar}" (${info.timeZone})`);
-        state.calendarError = null;
       } else {
-        state.calendarError = 'GOOGLE_CALENDAR_ID is not set yet.';
-        log.warn(state.calendarError);
+        log.info('Calendar: using the built-in calendar (no Google calendar configured).');
       }
+      state.calendarError = null;
     } catch (err) {
       state.calendarError = err.message;
       log.error(`Calendar not usable: ${err.message}`);
     }
-  } else {
-    state.calendarError = 'GOOGLE_SERVICE_ACCOUNT_JSON_B64 is not set - availability checks are disabled.';
-    log.warn(state.calendarError);
   }
 
   // 5. WhatsApp side.
@@ -275,29 +277,27 @@ async function bootStudio() {
       log.warn('[studio] OPENAI_API_KEY is not set - the Studio bot cannot answer customers.');
     }
 
-    // Calendar: reuses the same Google service account as Party (shared infra),
-    // pointed at the Studio's own calendar ID once the client provides it.
-    if (config.calendar.serviceAccountJsonB64) {
+    // Calendar: the Studio's own, kept in the dashboard. A Google calendar is
+    // used instead only where STUDIO_CALENDAR_ID actually names one.
+    {
+      const useGoogle = Boolean(config.calendar.serviceAccountJsonB64 && settings.get('studioCalendarId'));
       try {
         studioRuntime.calendar = createStudioCalendarService({
           serviceAccountJsonB64: config.calendar.serviceAccountJsonB64,
           timeZone: config.tz,
+          client: useGoogle ? null : createLocalCalendarClient({ business: 'studio', timeZone: config.tz }),
         });
-        if (settings.get('studioCalendarId')) {
+        if (useGoogle) {
           const info = await studioRuntime.calendar.check();
           log.info(`[studio] Calendar connected: "${info.calendar}" (${info.timeZone})`);
-          studioState.calendarError = null;
         } else {
-          studioState.calendarError = 'studioCalendarId is not set yet (dashboard: Studio settings).';
-          log.warn(`[studio] ${studioState.calendarError}`);
+          log.info('[studio] Calendar: using the built-in calendar.');
         }
+        studioState.calendarError = null;
       } catch (err) {
         studioState.calendarError = err.message;
         log.error(`[studio] Calendar not usable: ${err.message}`);
       }
-    } else {
-      studioState.calendarError = 'GOOGLE_SERVICE_ACCOUNT_JSON_B64 is not set - availability checks are disabled.';
-      log.warn(`[studio] ${studioState.calendarError}`);
     }
 
     studioRuntime.notify = createNotifier({ client: studioWhatsapp, business: 'studio' });

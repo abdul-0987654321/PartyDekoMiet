@@ -13,8 +13,14 @@ const { createCalendarClient } = require('./client');
 const { checkWindow, findNextFree, PENDING } = require('./availability');
 const { rentalWindow, addDays, todayIn, isIsoDay } = require('./dates');
 
-function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zurich', getStock }) {
-  const client = createCalendarClient({
+/**
+ * @param {object} deps
+ * @param {object} [deps.client] where the days are kept. Injected so the
+ *   built-in calendar and a Google one are interchangeable: both offer the same
+ *   six methods, and everything below this line is written against those.
+ */
+function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zurich', getStock, client: injected = null }) {
+  const client = injected || createCalendarClient({
     serviceAccountJsonB64,
     getCalendarId: () => settings.get('calendarId'),
   });
@@ -50,7 +56,8 @@ function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zuric
      * not be able to read this as a confirmation.
      */
     async checkAvailability({ productId, productHandle, start }) {
-      if (!settings.get('calendarId')) {
+      // The built-in calendar is always there; a Google one has to be named first.
+      if (!client.local && !settings.get('calendarId')) {
         return { ok: false, error: 'Der Kalender ist noch nicht eingerichtet. Bitte den Fall weitergeben.' };
       }
       if (!isIsoDay(start)) {

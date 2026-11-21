@@ -9,6 +9,14 @@
 const T = {
   de: {
     nav_status: 'Status', nav_settings: 'Einstellungen', nav_whatsapp: 'WhatsApp', nav_bookings: 'Buchungen',
+    nav_calendar: 'Kalender',
+    cal_title: 'Kalender', cal_block: 'Zeit blockieren', cal_free: 'Nichts an diesem Tag.',
+    cal_allday: 'Ganzer Tag', cal_date: 'Datum', cal_whole_day: 'Ganzer Tag',
+    cal_whole_day_help: 'Den ganzen Tag blockieren', cal_from_to: 'Von – bis',
+    cal_note: 'Notiz', cal_note_ph: 'z.B. Ferien, privat, geschlossen',
+    cal_unblock_confirm: 'Diese Blockierung aufheben?',
+    cal_intro: 'Alle Termine und blockierte Zeiten. Was hier steht, sieht auch der Bot - er bietet belegte Zeiten nicht an.',
+    st_pending: 'Offen', st_confirmed: 'Bestätigt',
     nav_more: 'Mehr',
     nav_numbers: 'Nummern',
     biz_pick: 'Nummer wählen',
@@ -154,6 +162,14 @@ const T = {
   },
   en: {
     nav_status: 'Status', nav_settings: 'Settings', nav_whatsapp: 'WhatsApp', nav_bookings: 'Bookings',
+    nav_calendar: 'Calendar',
+    cal_title: 'Calendar', cal_block: 'Block time', cal_free: 'Nothing on this day.',
+    cal_allday: 'All day', cal_date: 'Date', cal_whole_day: 'Whole day',
+    cal_whole_day_help: 'Block the whole day', cal_from_to: 'From – to',
+    cal_note: 'Note', cal_note_ph: 'e.g. holiday, private, closed',
+    cal_unblock_confirm: 'Remove this block?',
+    cal_intro: 'Every appointment and every blocked time. What is here is what the bot sees - it never offers a time that is taken.',
+    st_pending: 'Pending', st_confirmed: 'Confirmed',
     nav_more: 'More',
     nav_numbers: 'Numbers',
     biz_pick: 'Choose a number',
@@ -422,6 +438,7 @@ const NAV_LINKS = {
     ['/', 'nav_status', 'status'],
     ['/chats', 'nav_chats', 'chats'],
     ['/bookings', 'nav_bookings', 'calendar'],
+    ['/calendar', 'nav_calendar', 'calendar'],
     ['/whatsapp', 'nav_whatsapp', 'link'],
     ['/faq', 'nav_faq', 'help'],
     ['/settings', 'nav_settings', 'settings'],
@@ -430,6 +447,7 @@ const NAV_LINKS = {
     ['/', 'nav_status', 'status'],
     ['/chats', 'nav_chats', 'chats'],
     ['/bookings', 'nav_appointments', 'calendar'],
+    ['/calendar', 'nav_calendar', 'calendar'],
     ['/professionals', 'nav_professionals', 'person'],
     ['/services', 'nav_services', 'list'],
     // No WhatsApp entry and no Locations entry on the Studio's menu.
@@ -451,6 +469,7 @@ const NAV_LINKS = {
     ['/', 'nav_status', 'status'],
     ['/chats', 'nav_chats', 'chats'],
     ['/bookings', 'nav_appointments', 'calendar'],
+    ['/calendar', 'nav_calendar', 'calendar'],
     ['/whatsapp', 'nav_whatsapp', 'link'],
     ['/settings', 'nav_settings', 'settings'],
   ],
@@ -595,7 +614,12 @@ syncLangFromServer();
  * calls api('/api/status') and never has to know BIZ exists. Paths that are
  * not business-specific (settings, catalog) simply ignore the extra param.
  */
-const BIZ_AWARE_PREFIXES = ['/api/status', '/api/whatsapp', '/api/chats', '/api/bookings', '/api/test/chat'];
+// Every endpoint that answers differently per number. Forgetting one here does
+// not fail loudly - it quietly serves PartyDekoMiet's data on the Studio's
+// page, which is the one kind of mistake this dashboard must not make.
+const BIZ_AWARE_PREFIXES = [
+  '/api/status', '/api/whatsapp', '/api/chats', '/api/bookings', '/api/calendar', '/api/test/chat',
+];
 function withBiz(path) {
   if (BIZ === 'party') return path; // party is the default on every endpoint - no param needed
   if (!BIZ_AWARE_PREFIXES.some((p) => path.startsWith(p))) return path;

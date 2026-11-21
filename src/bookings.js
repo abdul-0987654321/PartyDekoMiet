@@ -90,6 +90,11 @@ function createBookings({ catalog, calendar, notify }) {
     });
 
     const jid = args.chatId || '';
+    // A reference photo the customer sent earlier is on their record. This line
+    // read a variable that was never declared, so every single booking threw a
+    // ReferenceError before it was written: the customer was told there was a
+    // technical problem and the request reached nobody.
+    const customer = customers.get('party', jid);
 
     const booking = {
       id: newId(),

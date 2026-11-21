@@ -135,7 +135,36 @@ function findNextFree({ events, productId, productHandle, from, days = 45, count
   return found;
 }
 
+/**
+ * Free pickup days around a wanted date, nearest first, the day before coming
+ * before the day after.
+ *
+ * Walking forward only was wrong for the case it was used in most: a party on a
+ * Sunday, when nobody is there to hand the set over on a Sunday. The customer
+ * was offered Monday and Tuesday - after the party was over. You collect the
+ * decoration before the party, so the Saturday is the answer, and this looks
+ * both ways to find it.
+ *
+ * `notBefore` is today: a pickup date in the past helps nobody.
+ *
+ * @returns {string[]} up to `count` dates, nearest to `wanted` first
+ */
+function findFreeAround({ events, productId, productHandle, wanted, notBefore, days = 45, count = 3, ...opts }) {
+  const free = (day) =>
+    day >= notBefore && checkWindow({ events, productId, productHandle, pickup: day, ...opts }).available;
+
+  const found = [];
+  for (let step = 1; step <= days && found.length < count; step++) {
+    const earlier = addDays(wanted, -step);
+    if (free(earlier)) found.push(earlier);
+    if (found.length >= count) break;
+    const later = addDays(wanted, step);
+    if (free(later)) found.push(later);
+  }
+  return found;
+}
+
 module.exports = {
-  checkWindow, findNextFree, statusOf, matchesProduct, isBlockingDay, parseKeywords,
+  checkWindow, findNextFree, findFreeAround, statusOf, matchesProduct, isBlockingDay, parseKeywords,
   PENDING, CONFIRMED,
 };

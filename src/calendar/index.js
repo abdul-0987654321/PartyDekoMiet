@@ -10,7 +10,7 @@
 const log = require('../log');
 const settings = require('../settings');
 const { createCalendarClient } = require('./client');
-const { checkWindow, findNextFree, PENDING } = require('./availability');
+const { checkWindow, findNextFree, findFreeAround, PENDING } = require('./availability');
 const { rentalWindow, addDays, todayIn, isIsoDay } = require('./dates');
 
 /**
@@ -84,9 +84,12 @@ function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zuric
         };
       }
 
-      const alternatives = findNextFree({
+      // Both directions, nearest first. The day before a party is usually the
+      // answer when the party's own day cannot work - offering only later dates
+      // means offering dates after the event.
+      const alternatives = findFreeAround({
         events, productId, productHandle,
-        from: addDays(start, 1), days: 45, count: 3, stock, ...opts,
+        wanted: start, notBefore: today, days: 45, count: 3, stock, ...opts,
       });
 
       return {
@@ -100,7 +103,7 @@ function createCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zuric
           res.reason === 'blocked_day'
             ? 'An diesem Datum ist generell geschlossen.'
             : res.reason === 'closed_day'
-              ? 'An diesem Wochentag ist geschlossen, Abholung nicht moeglich. Biete eines der freien Daten an.'
+              ? 'An diesem Wochentag ist keine Abholung moeglich. Die Deko wird VOR dem Fest abgeholt - biete zuerst den naechstfrueheren Tag an, nicht einen Tag nach dem Fest.'
               : 'Das Set ist in diesem Zeitraum schon vergeben.',
       };
     },

@@ -59,7 +59,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'takeoverPauseHours', group: 'bot', type: 'number', default: 12, min: 1, max: 168,
+    key: 'takeoverPauseHours', group: 'bot', type: 'number', default: 12, min: 1, max: 168, hidden: true,
     env: 'TAKEOVER_PAUSE_HOURS',
     label: { de: 'Pause nach manueller Antwort (Std.)', en: 'Pause after a manual reply (hours)' },
     help: {
@@ -68,7 +68,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'ownerVoicePreview', group: 'bot', type: 'boolean', default: true,
+    key: 'ownerVoicePreview', group: 'bot', type: 'boolean', default: true, hidden: true,
     label: { de: 'Sprachbefehl: erst Vorschau zeigen', en: 'Voice command: show a preview first' },
     help: {
       de: 'Ein diktierter Text geht erst nach "ok" an den Kunden. Aus = sofort senden (Tippfehler der Spracherkennung gehen dann direkt raus).',
@@ -76,7 +76,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'maxMsgsPerChatPerHour', advanced: true, group: 'bot', type: 'number', default: 0, min: 0, max: 500,
+    key: 'maxMsgsPerChatPerHour', advanced: true, group: 'bot', type: 'number', default: 0, min: 0, max: 500, hidden: true,
     env: 'MAX_MSGS_PER_CHAT_PER_HOUR',
     label: { de: 'Max. Nachrichten pro Chat / Stunde', en: 'Max messages per chat / hour' },
     help: {
@@ -85,7 +85,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 1000, min: 0, max: 10000,
+    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 1000, min: 0, max: 10000, hidden: true,
     env: 'READ_DELAY_MS',
     label: { de: 'Warten bis "gelesen" (ms)', en: 'Wait before marking as read (ms)' },
     help: {
@@ -94,7 +94,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'typingMinMs', advanced: true, group: 'bot', type: 'number', default: 3000, min: 0, max: 15000,
+    key: 'typingMinMs', advanced: true, group: 'bot', type: 'number', default: 3000, min: 0, max: 15000, hidden: true,
     env: 'TYPING_MIN_MS',
     label: { de: 'Tippdauer min. (ms)', en: 'Typing delay min (ms)' },
     help: {
@@ -103,14 +103,14 @@ const SCHEMA = [
     },
   },
   {
-    key: 'typingMaxMs', advanced: true, group: 'bot', type: 'number', default: 4000, min: 0, max: 30000,
+    key: 'typingMaxMs', advanced: true, group: 'bot', type: 'number', default: 4000, min: 0, max: 30000, hidden: true,
     env: 'TYPING_MAX_MS',
     label: { de: 'Tippdauer max. (ms)', en: 'Typing delay max (ms)' },
   },
 
   // ── Contacts ─────────────────────────────────────────────────────────────
   {
-    key: 'ownerWhatsapp', group: 'contacts', type: 'string', default: '', env: 'OWNER_WHATSAPP',
+    key: 'ownerWhatsapp', group: 'contacts', type: 'string', default: '', env: 'OWNER_WHATSAPP', hidden: true,
     placeholder: '41791234567',
     label: { de: 'WhatsApp des Inhabers', en: 'Owner WhatsApp number' },
     help: {
@@ -128,7 +128,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'handoffPhone', group: 'contacts', type: 'string', default: '', env: 'HANDOFF_PHONE',
+    key: 'handoffPhone', group: 'contacts', type: 'string', default: '', env: 'HANDOFF_PHONE', hidden: true,
     label: { de: 'Telefon für Übergaben', en: 'Phone for handovers' },
     help: {
       de: 'Optional. Wird dem Kunden genannt, wenn ein Mensch übernehmen muss.',
@@ -137,7 +137,7 @@ const SCHEMA = [
   },
 
   {
-    key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '',
+    key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '', hidden: true,
     placeholder: 'hochzeitsplanung, eventplanung, catering',
     label: { de: 'Stichwörter für andere Betriebe', en: 'Keywords for other businesses' },
     help: {
@@ -146,12 +146,12 @@ const SCHEMA = [
     },
   },
   {
-    key: 'otherBusinessReplyDe', advanced: true, group: 'bot', type: 'string',
+    key: 'otherBusinessReplyDe', advanced: true, group: 'bot', type: 'string', hidden: true,
     default: 'Hoi! Hier bin ich nur fuer die Partydeko-Vermietung zustaendig. Deine Frage gebe ich direkt an jemanden aus dem Team weiter, du hoerst gleich von uns.',
     label: { de: 'Antwort bei anderem Betrieb (DE)', en: 'Reply for the other business (DE)' },
   },
   {
-    key: 'otherBusinessReplyEn', advanced: true, group: 'bot', type: 'string',
+    key: 'otherBusinessReplyEn', advanced: true, group: 'bot', type: 'string', hidden: true,
     default: 'Hi! I only handle the party decoration rental here. I am passing your question to a colleague, you will hear from us shortly.',
     label: { de: 'Antwort bei anderem Betrieb (EN)', en: 'Reply for the other business (EN)' },
   },
@@ -172,13 +172,13 @@ const SCHEMA = [
     },
   },
   {
-    key: 'rentalDays', group: 'business', type: 'number', default: 3, min: 1, max: 30,
+    key: 'rentalDays', group: 'business', type: 'number', default: 3, min: 1, max: 30, hidden: true,
     env: 'RENTAL_DAYS',
     label: { de: 'Mietdauer (Tage)', en: 'Rental period (days)' },
     help: { de: 'Laut AGB: drei aufeinanderfolgende Tage.', en: 'Per the AGB: three consecutive days.' },
   },
   {
-    key: 'returnDayOffset', advanced: true, group: 'business', type: 'number', default: 2, min: 1, max: 29,
+    key: 'returnDayOffset', advanced: true, group: 'business', type: 'number', default: 2, min: 1, max: 29, hidden: true,
     env: 'RETURN_DAY_OFFSET',
     label: { de: 'Rückgabe = Abholung + X Tage', en: 'Return = pickup + X days' },
     help: {
@@ -187,7 +187,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'closedWeekdays', group: 'business', type: 'string', default: 'sun', env: 'CLOSED_WEEKDAYS',
+    key: 'closedWeekdays', group: 'business', type: 'string', default: 'sun', env: 'CLOSED_WEEKDAYS', hidden: true,
     placeholder: 'sun',
     label: { de: 'Ruhetage (keine Abholung/Rückgabe)', en: 'Closed days (no pickup or return)' },
     help: {
@@ -196,7 +196,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'bufferDays', group: 'business', type: 'number', default: 1, min: 0, max: 7,
+    key: 'bufferDays', group: 'business', type: 'number', default: 1, min: 0, max: 7, hidden: true,
     env: 'BUFFER_DAYS',
     label: { de: 'Puffertage nach Rückgabe', en: 'Buffer days after return' },
     help: {
@@ -205,7 +205,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'defaultStock', group: 'business', type: 'number', default: 1, min: 1, max: 50,
+    key: 'defaultStock', group: 'business', type: 'number', default: 1, min: 1, max: 50, hidden: true,
     label: { de: 'Exemplare pro Set (Standard)', en: 'Copies per set (default)' },
     help: {
       de: 'Wie oft ein Set gleichzeitig vermietet werden kann. Einzelne Sets können abweichen.',
@@ -213,17 +213,17 @@ const SCHEMA = [
     },
   },
   {
-    key: 'depositChf', group: 'business', type: 'number', default: 50, min: 0, max: 1000,
+    key: 'depositChf', group: 'business', type: 'number', default: 50, min: 0, max: 1000, hidden: true,
     env: 'DEPOSIT_CHF',
     label: { de: 'Kaution (CHF)', en: 'Deposit (CHF)' },
   },
   {
-    key: 'lateFeeChf', group: 'business', type: 'number', default: 50, min: 0, max: 1000,
+    key: 'lateFeeChf', group: 'business', type: 'number', default: 50, min: 0, max: 1000, hidden: true,
     env: 'LATE_FEE_CHF',
     label: { de: 'Verspätungsgebühr pro Tag (CHF)', en: 'Late fee per started day (CHF)' },
   },
   {
-    key: 'depositMode', group: 'business', type: 'enum', default: 'separate',
+    key: 'depositMode', group: 'business', type: 'enum', default: 'separate', hidden: true,
     options: ['included', 'separate', 'manual'],
     optionLabels: {
       included: { de: 'Im Shop-Preis enthalten', en: 'Included in the shop price' },
@@ -237,7 +237,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'depositProductUrl', group: 'business', type: 'string', default: '', env: 'DEPOSIT_PRODUCT_URL',
+    key: 'depositProductUrl', group: 'business', type: 'string', default: '', env: 'DEPOSIT_PRODUCT_URL', hidden: true,
     label: { de: 'Link zum Kautions-Produkt', en: 'Deposit product link' },
     help: {
       de: 'Optional. Gibt es im Shop ein Kautions-Produkt, hier den Link eintragen - der Bot schickt ihn dann mit. Leer: der Bot sagt, dass die Kaution dazukommt und ihr den Zahlungsweg mitteilt.',
@@ -245,12 +245,12 @@ const SCHEMA = [
     },
   },
   {
-    key: 'pickupAddress', group: 'business', type: 'string', default: 'Langstrasse 175, 8004 Zürich (SBB-Bürogebäude, Erdgeschoss)',
+    key: 'pickupAddress', group: 'business', type: 'string', default: 'Langstrasse 175, 8004 Zürich (SBB-Bürogebäude, Erdgeschoss)', hidden: true,
     env: 'PICKUP_ADDRESS',
     label: { de: 'Abholadresse', en: 'Pickup address' },
   },
   {
-    key: 'pickupHours', group: 'business', type: 'string', default: '', env: 'PICKUP_HOURS',
+    key: 'pickupHours', group: 'business', type: 'string', default: '', env: 'PICKUP_HOURS', hidden: true,
     placeholder: 'Mo-Fr 17:00-19:00, Sa 10:00-14:00',
     label: { de: 'Mögliche Abholzeiten', en: 'Possible pickup times' },
     help: {
@@ -265,14 +265,14 @@ const SCHEMA = [
     label: { de: 'Shop-Adresse', en: 'Shop URL' },
   },
   {
-    key: 'catalogRefreshHours', advanced: true, group: 'shop', type: 'number', default: 6, min: 1, max: 168,
+    key: 'catalogRefreshHours', advanced: true, group: 'shop', type: 'number', default: 6, min: 1, max: 168, hidden: true,
     env: 'CATALOG_REFRESH_HOURS',
     label: { de: 'Katalog neu laden alle (Std.)', en: 'Reload catalog every (hours)' },
   },
 
   // ── Calendar ─────────────────────────────────────────────────────────────
   {
-    key: 'calendarId', group: 'calendar', type: 'string', default: '', env: 'GOOGLE_CALENDAR_ID',
+    key: 'calendarId', group: 'calendar', type: 'string', default: '', env: 'GOOGLE_CALENDAR_ID', hidden: true,
     placeholder: 'xxxx@group.calendar.google.com',
     label: { de: 'Kalender-ID', en: 'Calendar ID' },
     help: {
@@ -281,7 +281,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'blockedKeywords', advanced: true, group: 'calendar', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub',
+    key: 'blockedKeywords', advanced: true, group: 'calendar', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub', hidden: true,
     label: { de: 'Stichwörter für Sperrtage', en: 'Keywords for blocked days' },
     help: {
       de: 'Ganztägige Termine mit einem dieser Wörter im Titel sperren alle Sets an dem Tag.',
@@ -303,7 +303,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '', env: 'STUDIO_OWNER_WHATSAPP',
+    key: 'studioOwnerWhatsapp', group: 'studio', type: 'string', default: '', env: 'STUDIO_OWNER_WHATSAPP', hidden: true,
     placeholder: '41791234567',
     label: { de: 'WhatsApp des Inhabers (Studio)', en: 'Owner WhatsApp number (Studio)' },
     help: {
@@ -321,7 +321,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioPriceGuard', group: 'studio', type: 'enum', default: 'warn', env: 'STUDIO_PRICE_GUARD',
+    key: 'studioPriceGuard', group: 'studio', type: 'enum', default: 'warn', env: 'STUDIO_PRICE_GUARD', hidden: true,
     options: ['warn', 'block'],
     optionLabels: {
       warn: {
@@ -340,7 +340,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioCalendarId', group: 'studio', type: 'string', default: '', env: 'STUDIO_CALENDAR_ID',
+    key: 'studioCalendarId', group: 'studio', type: 'string', default: '', env: 'STUDIO_CALENDAR_ID', hidden: true,
     placeholder: 'xxxx@group.calendar.google.com',
     label: { de: 'Kalender-ID (Studio)', en: 'Calendar ID (Studio)' },
     help: {
@@ -382,7 +382,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioConfirmationExample', advanced: true, group: 'studio', type: 'string', default: '', env: 'STUDIO_CONFIRMATION_EXAMPLE',
+    key: 'studioConfirmationExample', advanced: true, group: 'studio', type: 'string', default: '', env: 'STUDIO_CONFIRMATION_EXAMPLE', hidden: true,
     label: { de: 'Beispiel-Bestätigung (Studio)', en: 'Example confirmation message (Studio)' },
     help: {
       de: 'Ein Beispiel, wie das Team normalerweise einen Termin bestaetigt. Der Bot uebernimmt diesen Ton.',
@@ -390,7 +390,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioBlockedKeywords', advanced: true, group: 'studio', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub', env: 'STUDIO_BLOCKED_KEYWORDS',
+    key: 'studioBlockedKeywords', advanced: true, group: 'studio', type: 'string', default: 'blocked,geschlossen,ferien,closed,urlaub', env: 'STUDIO_BLOCKED_KEYWORDS', hidden: true,
     label: { de: 'Stichwörter für Sperrtage (Studio)', en: 'Keywords for blocked days (Studio)' },
   },
 
@@ -429,6 +429,14 @@ function coerce(def, raw) {
   }
 }
 
+/**
+ * Settings that hold WhatsApp numbers. Both businesses are listed on purpose:
+ * every one of these is a field where a typo means an alert reaches nobody,
+ * and silence is exactly what nobody notices.
+ */
+const SINGLE_NUMBER_KEYS = new Set(['ownerWhatsapp', 'studioOwnerWhatsapp']);
+const NUMBER_LIST_KEYS = new Set(['alertNumbers', 'studioAlertNumbers']);
+
 /** @returns {{ok:true,value:any}|{ok:false,error:string}} */
 function validate(def, raw) {
   const value = coerce(def, raw);
@@ -440,18 +448,22 @@ function validate(def, raw) {
   // Phone numbers are cleaned rather than rejected: people paste "+41 79 123 45 67"
   // and a dashboard that refuses that over a plus sign is just annoying. Only a
   // number that cannot be a phone number at all is an error.
-  if (def.key === 'ownerWhatsapp' && value) {
+  // Both businesses, not just PartyDekoMiet: the Studio's own fields were not
+  // checked at all, so a mistyped number saved without complaint and then
+  // silently dropped at send time - an appointment request reaching nobody,
+  // with the dashboard showing a number that looks fine.
+  if (SINGLE_NUMBER_KEYS.has(def.key) && value) {
     const digits = String(value).replace(/[^0-9]/g, '');
     if (!/^[0-9]{8,15}$/.test(digits)) {
-      return { ok: false, error: 'ownerWhatsapp: not a valid international number (8-15 digits)' };
+      return { ok: false, error: `${def.key}: not a valid international number (8-15 digits)` };
     }
     return { ok: true, value: digits };
   }
-  if (def.key === 'alertNumbers' && value) {
+  if (NUMBER_LIST_KEYS.has(def.key) && value) {
     const parts = String(value).split(',').map((n) => n.replace(/[^0-9]/g, '')).filter(Boolean);
     const bad = parts.filter((n) => !/^[0-9]{8,15}$/.test(n));
     if (bad.length) {
-      return { ok: false, error: `alertNumbers: not a valid international number: ${bad.join(', ')}` };
+      return { ok: false, error: `${def.key}: not a valid international number: ${bad.join(', ')}` };
     }
     return { ok: true, value: parts.join(', ') };
   }

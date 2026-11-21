@@ -25,14 +25,10 @@
   <div class="quick" id="quick"></div>
   <div id="alerts"></div>
 
-  <!-- Studio only: what still has to be filled in, in the order it matters. -->
-  <section id="setupwrap" hidden>
-    <h2 id="h_setup"></h2>
-    <div class="card setup" id="setup"></div>
-  </section>
-
-  <h2 id="h_todo"></h2>
-  <div class="card" id="todo"></div>
+  <!-- No checklist and no to-do list here, on either business: the owner asked
+       for this page to answer one question - is it running - and anything that
+       is actually broken says so in the banner above, where it cannot be
+       mistaken for homework. -->
 
   <!-- Folded away: the owner needs "is it running" and "what needs doing".
        Pending writes and the model name are for us, and a page that opens with
@@ -69,7 +65,6 @@
 <script src="/app.js"></script>
 <script>
 renderNav('/');
-$('h_todo').textContent = t('problems');
 $('h_tech').textContent = t('tech_details');
 for (const [id, key] of [
   ['l_wa','whatsapp'],['l_storage','storage'],['l_catalog','catalog'],['l_calendar','calendar'],
@@ -78,8 +73,11 @@ for (const [id, key] of [
   ['l_flushed','last_saved'],['l_started','started'],
 ]) $(id).textContent = t(key);
 
+// The Studio and every professional's number book appointments, not rentals,
+// so the link is named for what it opens.
 $('quick').innerHTML = [
-  ['/test','q_test','play'], ['/chats','q_chats','chats'], ['/bookings','q_book','calendar'], ['/settings','q_set','settings'],
+  ['/test','q_test','play'], ['/chats','q_chats','chats'],
+  ['/bookings', BIZ === 'party' ? 'q_book' : 'q_appt','calendar'], ['/settings','q_set','settings'],
 ].map(([href,key,ic]) => `<a href="${href}">${icon(ic)}${t(key)}</a>`).join('');
 
 let saving = false;
@@ -100,61 +98,17 @@ $('toggle').onchange = async (e) => {
 };
 
 /**
- * The Studio starts completely empty, and an empty directory does not look
- * broken - the bot just answers "I'll check with the team" to everything,
- * which reads like a bug. This lists what is still missing, in the order it
- * has to be done, each step linking to the page that does it.
- *
- * Steps are ordered by dependency, not by importance: a professional cannot be
- * given a location that does not exist yet.
+ * The checklist is gone, so the few things that genuinely stop the bot
+ * answering have to be stated here instead - a missing key or a rejected one
+ * means every customer gets silence, and that must never be something the
+ * owner has to go looking for. Anything that is merely not filled in yet is
+ * not listed: that was the homework this page was asked to drop.
  */
-function setupSteps(d) {
-  const dir = d.directory || {};
-  const connected = d.whatsapp.status === 'connected';
-  return [
-    { key: 'su_location',  done: dir.locations > 0,     href: '/locations',     count: dir.locations },
-    { key: 'su_service',   done: dir.services > 0,      href: '/services',      count: dir.services },
-    { key: 'su_details',   done: dir.services > 0 && dir.servicesWithDetails === dir.services, href: '/services', optional: true },
-    { key: 'su_pro',       done: dir.professionals > 0, href: '/professionals', count: dir.professionals },
-    { key: 'su_photo',     done: dir.photos > 0,        href: '/professionals', optional: true },
-    { key: 'su_hours',     done: Boolean(d.config.calendarConfigured && !d.calendarError), href: '/settings' },
-    { key: 'su_alert',     done: !d.alertError && Boolean(d.config.ownerNumber), href: '/settings' },
-    { key: 'su_wa',        done: connected,             href: '/whatsapp' },
-    { key: 'su_faq',       done: dir.faq > 0,           href: '/faq', optional: true },
-  ];
-}
-
-function renderSetup(d) {
-  const wrap = $('setupwrap');
-  if (d.biz !== 'studio' || !d.directory) { wrap.hidden = true; return; }
-  wrap.hidden = false;
-
-  const steps = setupSteps(d);
-  const required = steps.filter((s) => !s.optional);
-  const left = required.filter((s) => !s.done).length;
-
-  $('h_setup').textContent = left
-    ? `${t('setup')} · ${required.length - left}/${required.length}`
-    : t('setup_done_title');
-
-  $('setup').innerHTML = steps.map((s) => `
-    <a class="step ${s.done ? 'done' : ''}" href="${s.href}">
-      <span class="mark">${s.done ? '✓' : '○'}</span>
-      <span class="lbl">${esc(t(s.key))}${s.optional ? ` <em>${esc(t('su_optional'))}</em>` : ''}</span>
-      <span class="val">${s.count !== undefined && s.count > 0 ? esc(String(s.count)) : ''}</span>
-    </a>`).join('');
-}
-
-function todoList(d) {
-  const items = [];
-  if (!d.config.hasSheet) items.push([t('fix_sheet'), '/settings']);
-  if (!d.config.hasOpenAiKey) items.push([t('fix_key'), null]);
-  // A key that is set but rejected looks fine above, so call it out separately.
-  else if (d.ai && d.ai.lastError && /^401/.test(d.ai.lastError)) items.push([t('fix_ai'), null]);
-  if (d.whatsapp.status !== 'connected') items.push([t('fix_wa'), '/whatsapp']);
-  if (!d.config.calendarConfigured || d.calendarError) items.push([t('fix_cal'), '/settings']);
-  if (!d.config.ownerNumber) items.push([t('fix_owner'), '/settings']);
-  return items;
+function faults(d) {
+  const out = [];
+  if (!d.config.hasOpenAiKey) out.push(t('fix_key'));
+  else if (d.ai && d.ai.lastError && /^401/.test(d.ai.lastError)) out.push(t('fix_ai'));
+  return out;
 }
 
 async function refresh() {
@@ -181,19 +135,10 @@ async function refresh() {
 
   // ---- alerts ----
   const al = [];
+  for (const msg of faults(d)) al.push(`<p class="banner err">${esc(msg)}</p>`);
   for (const [msg, kind] of [[d.bootError,'err'],[d.storageError,'err'],[d.storageWarning,'warn'],[d.calendarError,'warn']])
     if (msg) al.push(`<p class="banner ${kind}">${esc(msg)}</p>`);
   $('alerts').innerHTML = al.join('');
-
-  // ---- setup checklist (Studio) ----
-  renderSetup(d);
-
-  // ---- to do ----
-  const todo = todoList(d);
-  $('todo').innerHTML = todo.length
-    ? todo.map(([label, href]) => `<div class="row attn"><span>${esc(label)}</span>
-        <span>${href ? `<a href="${href}">→</a>` : pill(t('src_env'),'warn')}</span></div>`).join('')
-    : `<p class="muted" style="margin:0">${t('all_good')}</p>`;
 
   // ---- system ----
   $('wa').innerHTML = connected ? pill(t('connected'),'ok')

@@ -181,9 +181,19 @@ button.link:hover { color: var(--text); }
 .field { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .field:first-child { padding-top: 0; }
 .field:last-child { border-bottom: 0; padding-bottom: 0; }
-.field label { display: block; font-weight: 600; margin-bottom: 3px; font-size: 14px; }
+/* Label and its ENV / DASHBOARD tag used to be a block with a floated span.
+   A float is outside the flow, so a label long enough to reach it - which is
+   most of them on a phone, and several on a laptop - ran its last words
+   straight under the tag. Two flex items cannot overlap. */
+.field label {
+  display: flex; align-items: baseline; gap: 10px;
+  font-weight: 600; margin-bottom: 3px; font-size: 14px;
+}
 .field .help { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
-.field .src { float: right; font-size: 10.5px; color: var(--muted); font-weight: 400; text-transform: uppercase; letter-spacing: .04em; }
+.field .src {
+  margin-left: auto; flex: none; font-size: 10.5px; color: var(--muted);
+  font-weight: 400; text-transform: uppercase; letter-spacing: .04em;
+}
 .actions {
   position: sticky; bottom: 12px; z-index: 5; margin-top: 8px;
   padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line);
@@ -242,7 +252,12 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 .chatitem:hover { background: var(--panel); }
 .chatitem.on { background: var(--accent-soft); }
 .chatitem .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.chatitem .who { font-weight: 600; font-size: 14px; }
+/* A WhatsApp display name can be any length, and a long one pushed the time
+   out of the row instead of being cut short. */
+.chatitem .who {
+  font-weight: 600; font-size: 14px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .chatitem .when { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .chatitem .prev { color: var(--muted); font-size: 12.5px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -288,6 +303,12 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 .bk.CONFIRMED { border-left: 3px solid var(--ok); }
 .bk.CANCELLED { opacity: .7; }
 .bk .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/* The right-hand side of the header shrinks before the status pill does, and
+   it is cut rather than pushed into it. */
+.bk .top .when { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk .dates .chip { margin-top: 5px; }
+.chip.now { background: var(--warn-soft); border-color: transparent; color: var(--warn); font-weight: 700; }
+.chip.soon { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .bk .set { font-weight: 600; font-size: 15px; line-height: 1.35; }
 .bk .set a { color: var(--text); text-decoration: none; }
 .bk .set a:hover { color: var(--accent); }
@@ -348,9 +369,6 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 .quick a:hover { border-color: var(--accent); color: var(--accent); }
 .quick a svg.ic { display: block; margin: 0 auto 7px; color: var(--accent); }
 
-/* A row that needs attention gets a left edge, not a whole red card */
-.row.attn { border-left: 3px solid var(--warn); padding-left: 11px; margin-left: -14px; }
-
 /* Phones already show the page name in the top bar - no second heading */
 @media (max-width: 860px) { .content > h1 { display: none; } }
 
@@ -403,29 +421,6 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
   .lb-actions button { width: 100%; }
 }
 
-/* ---- Setup checklist: what a new owner still has to fill in -------------- */
-.card.setup { padding: 8px 10px; }
-.setup .step {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 10px; border-radius: 10px;
-  text-decoration: none; color: var(--text); font-size: 14.5px;
-  border-bottom: 1px solid var(--line);
-}
-.setup .step:last-child { border-bottom: 0; }
-.setup .step:hover { background: var(--panel); }
-.setup .step .mark {
-  flex: none; width: 24px; height: 24px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 13px; font-weight: 700;
-  background: rgba(251,191,36,.15); color: var(--warn);
-}
-.setup .step.done .mark { background: rgba(52,211,153,.15); color: var(--ok); }
-/* A finished step steps back visually - what is left should be what stands out */
-.setup .step.done .lbl { color: var(--muted); }
-.setup .step .lbl { flex: 1; min-width: 0; }
-.setup .step .lbl em { font-style: normal; color: var(--muted); font-size: 12px; }
-.setup .step .val { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-.setup .step::after { content: '›'; color: var(--muted); font-size: 18px; line-height: 1; }
-
 /* ---- Empty state: never a dead end, always the way out ------------------- */
 .emptybox { text-align: center; padding: 34px 20px; }
 .emptybox .ic { font-size: 30px; opacity: .55; }
@@ -443,7 +438,16 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 .chatsearch input { padding: 9px 12px; font-size: 14px; border-radius: 99px; }
 .chatlist > #list { flex: 1; overflow-y: auto; }
 
+.chatsearch .filters.tight { margin: 9px 0 0; gap: 6px; }
+.filters.tight button { padding: 5px 11px; font-size: 12px; }
+.filters button .n { opacity: .65; font-variant-numeric: tabular-nums; }
+
 .chatitem { display: flex; align-items: center; gap: 11px; }
+/* The customer spoke last: somebody still has to answer. A left edge, not a
+   colour over the whole row - the row is still just a row. */
+.chatitem.waiting { border-left: 3px solid var(--accent); padding-left: 11px; }
+.chatitem .tags { display: flex; gap: 6px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
+.chatitem .tags:empty { display: none; }
 .chatitem .ava {
   flex: none; width: 38px; height: 38px; border-radius: 50%;
   display: grid; place-items: center;

@@ -301,7 +301,11 @@ async function bootStudio() {
     }
 
     studioRuntime.notify = createNotifier({ client: studioWhatsapp, business: 'studio' });
-    studioRuntime.appointments = createAppointments({ calendar: studioRuntime.calendar, notify: studioRuntime.notify });
+    studioRuntime.appointments = createAppointments({
+      calendar: studioRuntime.calendar,
+      notify: studioRuntime.notify,
+      business: 'studio',
+    });
 
     // Say who alerts go to, at boot. An appointment request that reaches nobody
     // looks exactly like a working bot from the customer's side - they are told
@@ -319,7 +323,7 @@ async function bootStudio() {
       log.warn(`[studio] ${studioState.alertError}`);
     }
 
-    studioRuntime.photos = createPhotos({ client: studioWhatsapp });
+    studioRuntime.photos = createPhotos({ client: studioWhatsapp, business: 'studio' });
 
     studioRuntime.services = {
       directory,
@@ -414,8 +418,9 @@ async function bootLine(line) {
     entry.runtime.appointments = createAppointments({
       calendar: studioRuntime.calendar,
       notify: entry.runtime.notify,
+      business: line.id,
     });
-    entry.runtime.photos = createPhotos({ client: entry.whatsapp });
+    entry.runtime.photos = createPhotos({ client: entry.whatsapp, business: line.id });
 
     entry.runtime.services = {
       directory: scoped,

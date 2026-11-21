@@ -34,7 +34,16 @@ function validateAppointmentArgs(args) {
   return null;
 }
 
-function createAppointments({ calendar, notify }) {
+/**
+ * @param {object} deps
+ * @param {object} [deps.calendar]
+ * @param {object} [deps.notify]
+ * @param {string} [deps.business] which number took the request. The customer
+ *   record lives under that number, so looking the phone up as 'studio' on a
+ *   professional's line found nothing and the alert showed a raw WhatsApp id
+ *   the owner cannot call - the exact problem contacts.js exists to prevent.
+ */
+function createAppointments({ calendar, notify, business = 'studio' }) {
   /**
    * @returns {object} tool result; the wording is read by the model, so it must
    *                   never sound like a confirmation.
@@ -58,7 +67,7 @@ function createAppointments({ calendar, notify }) {
       id: newId(),
       status: 'PENDING',
       jid,
-      phone: require('./contacts').phoneOf('studio', jid) || '',
+      phone: require('./contacts').phoneOf(business, jid) || '',
       customerName: args.customer_name,
       professionalId: professional.id,
       professionalName: professional.name,

@@ -23,13 +23,43 @@ describe('defaults', () => {
 
   test('describe() reports where each value came from', () => {
     const rows = settings.describe();
-    const row = rows.find((r) => r.key === 'rentalDays');
+    const row = rows.find((r) => r.key === 'alertNumbers');
+    assert.ok(row, 'the alert numbers are on the form');
     assert.ok(['env', 'default'].includes(row.source));
-    assert.ok(row.label.de && row.label.en, 'every setting needs both languages');
     for (const r of rows) {
       assert.ok(r.label.de, `${r.key} is missing a German label`);
       assert.ok(r.label.en, `${r.key} is missing an English label`);
     }
+  });
+
+  /**
+   * The owner asked for a dashboard holding only what the client himself
+   * changes. The rest - rental rules, addresses, calendar ids, timings - is set
+   * from Render's environment variables, so it comes off the form without
+   * coming out of the app: still read by the code, still settable through the
+   * API, just not a field the client can be confused by.
+   */
+  test('the form holds only the fields the client edits himself', () => {
+    const shown = settings.describe().map((r) => r.key).sort();
+    assert.deepStrictEqual(shown, [
+      'aboutText',
+      'alertNumbers',
+      'botLanguage',
+      'dashboardLanguage',
+      'shopUrl',
+      'studioAboutText',
+      'studioAlertNumbers',
+      'studioBufferMin',
+      'studioCancellationRule',
+      'studioMinNoticeHours',
+      'studioPaymentMode',
+    ]);
+  });
+
+  test('a setting taken off the form still works', () => {
+    assert.strictEqual(settings.get('rentalDays'), 3);
+    assert.strictEqual(settings.get('pickupAddress').length > 0, true);
+    assert.ok(!settings.describe().some((r) => r.key === 'rentalDays'));
   });
 });
 

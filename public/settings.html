@@ -85,7 +85,11 @@ function render() {
   $('form').innerHTML = groups.map(g => {
     const all = schema.filter(s => s.group === g);
     const main = all.filter(s => !s.advanced), adv = all.filter(s => s.advanced);
-    const hint = (g === 'calendar' || g === 'studio') ? calendarHint() : '';
+    // Only beside an actual calendar field. The calendar ids are set from
+    // Render now and are off this page, so the sharing hint would otherwise
+    // stand in the Studio group explaining a field that is not there.
+    const hasCalendarField = all.some((s) => s.key === 'calendarId' || s.key === 'studioCalendarId');
+    const hint = hasCalendarField ? calendarHint() : '';
     return `<section class="group" id="g_${g}"><h2>${t('g_'+g)}</h2>
       ${hint}
       <div class="card">

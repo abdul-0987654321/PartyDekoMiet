@@ -253,17 +253,24 @@ function createServer({
   // dashboard also pauses the bot in that chat, so the two never talk at once.
   app.get('/api/chats', (req, res) => {
     const { biz, runtime: rt } = pick(req);
+    // One entry per chat, built in its own object. The count used to be written
+    // onto the chat row itself and reset every time a newer message replaced
+    // the one being held, so it was both wrong and a stray field on a stored
+    // record.
     const byJid = new Map();
     for (const m of db.all('chat')) {
       if ((m.business || 'party') !== biz) continue;
-      const prev = byJid.get(m.jid);
-      if (!prev || String(m.at) > String(prev.at)) byJid.set(m.jid, m);
-      const entry = byJid.get(m.jid);
-      entry.count = (entry.count || 0) + 1;
+      let entry = byJid.get(m.jid);
+      if (!entry) {
+        entry = { last: m, count: 0 };
+        byJid.set(m.jid, entry);
+      }
+      entry.count += 1;
+      if (String(m.at) > String(entry.last.at)) entry.last = m;
     }
     const paused = new Set((rt.router ? rt.router.listPaused() : []).map((p) => p.jid));
     const chats = [...byJid.entries()]
-      .map(([jid, last]) => {
+      .map(([jid, { last, count }]) => {
         const customer = require('../customers').get(biz, jid);
         return {
           jid,
@@ -272,7 +279,7 @@ function createServer({
           lastAt: last.at,
           lastText: String(last.text || '').slice(0, 120),
           lastDirection: last.direction,
-          messages: last.count || 0,
+          messages: count,
           paused: paused.has(jid),
         };
       })
@@ -503,6 +510,20 @@ function createServer({
         try { await entry.whatsapp.stop(); } catch (err) { log.warn(`[${id}] stop failed: ${err.message}`); }
       } else if (!wasActive && result.line.active && lines.boot) {
         await lines.boot(result.line);
+      } else if (
+        entry &&
+        result.line.active !== false &&
+        lines.boot &&
+        String(before?.professionalId || '') !== String(result.line.professionalId || '')
+      ) {
+        // Which professional a number belongs to is baked into the filter its
+        // agent reads the directory through, and that filter is built when the
+        // line boots. Without this the number kept answering as the woman it
+        // used to belong to until the next deploy - the dashboard said one
+        // thing and the bot said another. Rebuilt in place: the socket stays
+        // up, so nobody has to scan a QR again.
+        await lines.boot(result.line);
+        log.info(`[${id}] Professional changed - agent and filter rebuilt for the running number.`);
       }
       res.json({ ok: true, line: withStatus(result.line) });
     }));

@@ -23,11 +23,11 @@ const log = require('../log');
  * The dashboard serves the file from its own endpoint rather than a public
  * URL, which is also where the professionals page reads it from.
  */
-function record(chatId, text, photoFileId) {
+function record(chatId, text, photoFileId, business = 'studio') {
   try {
     db.put('chat', {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      business: 'studio',
+      business,
       at: new Date().toISOString(),
       jid: chatId,
       direction: 'out',
@@ -46,14 +46,23 @@ function record(chatId, text, photoFileId) {
  * the history is what the picture was written into and it survives a restart.
  * Only used to avoid sending the same photo twice in one conversation.
  */
-function alreadySent(chatId, photoFileId) {
+function alreadySent(chatId, photoFileId, business = 'studio') {
   const needle = `/api/studio/photo/${encodeURIComponent(photoFileId)}`;
   return db
     .all('chat')
-    .some((m) => m.jid === chatId && (m.business || 'party') === 'studio' && m.image === needle);
+    .some((m) => m.jid === chatId && (m.business || 'party') === business && m.image === needle);
 }
 
-function createPhotos({ client }) {
+/**
+ * @param {object} deps
+ * @param {object} deps.client
+ * @param {string} [deps.business] which number this is sending - the Studio's
+ *   own, or one professional's line. Every photo was written into the chat
+ *   table as 'studio' regardless, so a picture sent on her number showed up in
+ *   the Studio's conversation list instead of hers, and the "already sent"
+ *   check read the wrong number's history.
+ */
+function createPhotos({ client, business = 'studio' }) {
   /**
    * @param {string} chatId
    * @param {object} professional record from the directory
@@ -64,15 +73,15 @@ function createPhotos({ client }) {
    */
   async function sendProfessional(chatId, professional, note, { once = false } = {}) {
     if (!professional?.photoFileId) throw new Error('no photo on file');
-    if (once && alreadySent(chatId, professional.photoFileId)) {
+    if (once && alreadySent(chatId, professional.photoFileId, business)) {
       return { ok: true, skipped: 'already sent in this chat' };
     }
     const file = await db.getFile(professional.photoFileId);
     if (!file?.buffer?.length) throw new Error('the stored photo is empty');
     const caption = String(note || professional.name || '').trim();
     await client.forwardImage(chatId, file.buffer, caption, file.mimeType);
-    record(chatId, caption, professional.photoFileId);
-    log.info(`[studio] Photo sent for ${professional.name} to ${chatId}`);
+    record(chatId, caption, professional.photoFileId, business);
+    log.info(`[${business}] Photo sent for ${professional.name} to ${chatId}`);
     return { ok: true };
   }
 

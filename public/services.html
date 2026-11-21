@@ -43,12 +43,8 @@ function profName(id) {
   return p ? p.name : '';
 }
 
-function render() {
-  if (!rows.length) {
-    $('wrap').innerHTML = emptyState({ icon: '📋', title: t('no_services'), text: t('s_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
-    return;
-  }
-  $('wrap').innerHTML = `<div class="tiles">${rows.map((s) => `
+function tileHtml(s) {
+  return `
     <div class="tile ${s.active ? '' : 'off'}">
       <div class="head">
         <div class="title">
@@ -68,7 +64,40 @@ function render() {
         <button class="ghost" onclick="startEdit('${esc(s.id)}')">${t('edit')}</button>
         <button class="ghost" onclick="remove('${esc(s.id)}')">${t('delete')}</button>
       </div>
-    </div>`).join('')}</div>`;
+    </div>`;
+}
+
+const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
+
+/**
+ * Grouped by who offers it, because that is the one thing about this page
+ * nobody could see: a flat grid of tiles gave no hint that a service either
+ * belongs to the whole studio or to one person, which is exactly what decides
+ * what each professional's own number is allowed to offer.
+ */
+function render() {
+  if (!rows.length) {
+    $('wrap').innerHTML = emptyState({ icon: '📋', title: t('no_services'), text: t('s_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' });
+    return;
+  }
+
+  const shared = rows.filter((s) => !s.professionalId).sort(byName);
+  const own = new Map(); // professionalId -> services
+  for (const s of rows.filter((x) => x.professionalId)) {
+    if (!own.has(s.professionalId)) own.set(s.professionalId, []);
+    own.get(s.professionalId).push(s);
+  }
+
+  const section = (heading, list) =>
+    `<h2>${esc(heading)} <span class="muted">· ${list.length}</span></h2>
+     <div class="tiles">${list.map(tileHtml).join('')}</div>`;
+
+  const groups = [];
+  if (shared.length) groups.push(section(t('s_g_all'), shared));
+  for (const [id, list] of [...own.entries()].sort((a, b) => String(profName(a[0])).localeCompare(String(profName(b[0])))))
+    groups.push(section(profName(id) || t('s_g_own'), list.sort(byName)));
+
+  $('wrap').innerHTML = groups.join('');
 }
 
 function formHtml(s) {

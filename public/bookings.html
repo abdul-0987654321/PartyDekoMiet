@@ -33,6 +33,46 @@ function day(iso) {
   return d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 
+/** Days from today, for a date like 2026-10-17. Negative is in the past. */
+function daysOff(iso) {
+  if (!iso) return null;
+  const d = new Date(iso + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+
+/**
+ * "Heute" / "Morgen" beside the date, because that is the thing being looked
+ * for. Reading a weekday and working out whether it is today is exactly the
+ * small bit of work a dashboard should do for you.
+ */
+function whenLabel(iso) {
+  const n = daysOff(iso);
+  if (n === 0) return `<span class="chip now">${esc(t('b_today'))}</span>`;
+  if (n === 1) return `<span class="chip soon">${esc(t('b_tomorrow'))}</span>`;
+  if (n !== null && n < 0) return `<span class="chip">${esc(t('b_past'))}</span>`;
+  return '';
+}
+
+/** The date this row is about, whichever business it belongs to. */
+const rowDate = (b) => (isStudio ? b.date : b.pickupDate) || '';
+
+/**
+ * Still to be dealt with first, then soonest first. The list used to arrive in
+ * whatever order the sheet held, so a request for tomorrow could sit below one
+ * from last month.
+ */
+function sortRows(list) {
+  const rank = { PENDING: 0, CONFIRMED: 1, CANCELLED: 2 };
+  return list.slice().sort((a, b) =>
+    (rank[a.status] ?? 3) - (rank[b.status] ?? 3)
+    || String(rowDate(a)).localeCompare(String(rowDate(b)))
+    || String(a.startTime || '').localeCompare(String(b.startTime || ''))
+  );
+}
+
 function renderFilters() {
   const count = (f) => rows.filter((b) => matches(b, f)).length;
   $('filters').innerHTML = FILTERS.map(([f, key]) =>
@@ -44,12 +84,12 @@ const matches = (b, f) => f === 'all' || (f === 'open' ? b.status === 'PENDING' 
 function datesBlock(b) {
   if (isStudio) {
     return `<div class="dates">
-        <div><small>${t('a_date')}</small><b>${esc(day(b.date))}</b></div>
+        <div><small>${t('a_date')}</small><b>${esc(day(b.date))}</b>${whenLabel(b.date)}</div>
         <div><small>${t('a_time')}</small><b>${esc(b.startTime || '')}${b.endTime ? '–' + esc(b.endTime) : ''}</b></div>
       </div>`;
   }
   return `<div class="dates">
-      <div><small>${t('b_pickup')}</small><b>${esc(day(b.pickupDate))}</b></div>
+      <div><small>${t('b_pickup')}</small><b>${esc(day(b.pickupDate))}</b>${whenLabel(b.pickupDate)}</div>
       <div><small>${t('b_return')}</small><b>${esc(day(b.returnDate))}</b></div>
     </div>`;
 }
@@ -66,14 +106,16 @@ function subjectBlock(b) {
 
 function render() {
   renderFilters();
-  const list = rows.filter((b) => matches(b, filter));
+  const list = sortRows(rows.filter((b) => matches(b, filter)));
   const emptyMsg = isStudio ? t('no_appointments') : t('no_bookings');
   if (!list.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${emptyMsg}</p></div>`; return; }
   $('wrap').innerHTML = `<div class="bk-list">${list.map((b) => `
     <div class="bk ${esc(b.status)}">
       <div class="top">
         ${pill(t(STATUS_TXT[b.status]) || b.status, b.status === 'CONFIRMED' ? 'ok' : b.status === 'CANCELLED' ? 'err' : 'warn')}
-        <span class="muted">${esc(b.id)} · ${esc(fmtDate(b.createdAt))}</span>
+        <!-- The reference id is for us, not for the person reading the card:
+             it is on the row for a copy/paste, not taking up a line. -->
+        <span class="muted when" title="${esc(b.id)}">${esc(fmtDate(b.createdAt))}</span>
       </div>
       ${subjectBlock(b)}
       ${datesBlock(b)}

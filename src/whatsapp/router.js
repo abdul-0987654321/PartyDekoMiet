@@ -315,8 +315,10 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
     let composed;
     try {
+      // This number's own last incoming message - another number's chat with
+      // the same person is none of this line's business.
       const lastIn = db.all('chat')
-        .filter((c) => c.jid === target && c.direction === 'in')
+        .filter((c) => c.jid === target && c.direction === 'in' && (c.business || 'party') === business)
         .sort((a, b) => String(a.at).localeCompare(String(b.at)))
         .pop();
       composed = await voice.composeOwnerReply(instruction, { lastCustomerText: lastIn?.text });
@@ -560,10 +562,18 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     db.put('chat', { id, business, at: new Date().toISOString(), jid, direction, text: String(text).slice(0, 4000) });
   }
 
+  /**
+   * This number's own history with this person, never another number's.
+   *
+   * The business filter is the point: all six numbers write into one chat
+   * table, and the same person can write to several of them. Filtering on the
+   * jid alone handed one professional's conversation to the next one's model,
+   * which is exactly the separation the client asked for by name.
+   */
   function recentHistory(jid) {
     return db
       .all('chat')
-      .filter((m) => m.jid === jid)
+      .filter((m) => m.jid === jid && (m.business || 'party') === business)
       .sort((a, b) => String(a.at).localeCompare(String(b.at)))
       .slice(-MAX_TURNS)
       .map((m) => ({ role: m.direction === 'in' ? 'user' : 'assistant', content: m.text }));

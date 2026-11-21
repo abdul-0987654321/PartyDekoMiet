@@ -12,7 +12,12 @@
   <p class="muted" id="note"></p>
   <div class="chatwrap" id="wrap">
     <div class="chatlist" id="listwrap">
-      <div class="chatsearch"><input type="text" id="search" autocomplete="off"></div>
+      <div class="chatsearch">
+        <input type="text" id="search" autocomplete="off">
+        <!-- Which chats need a person. On a busy day the list is long and the
+             two that are waiting are the only reason to open this page. -->
+        <div class="filters tight" id="filters"></div>
+      </div>
       <div id="list"><p class="empty" id="loading"></p></div>
     </div>
     <div class="thread" id="thread">
@@ -47,6 +52,7 @@ $('search').placeholder = t('chat_search');
 
 let current = null;
 let chats = [];
+let filter = 'all';
 
 /** First letter of the name, or of the number - enough to tell rows apart. */
 function initial(c) {
@@ -54,18 +60,43 @@ function initial(c) {
   return (s.match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();
 }
 
+/**
+ * The customer spoke last, so nobody has answered yet. On a paused chat that
+ * is the whole point - the bot has stepped aside and is waiting for a person.
+ */
+const waiting = (c) => c.lastDirection === 'in';
+
+const FILTERS = [
+  ['all', (c) => c],
+  ['waiting', waiting],
+  ['paused', (c) => c.paused],
+];
+
+function renderFilters() {
+  $('filters').innerHTML = FILTERS.map(([key, fn]) => {
+    const n = key === 'all' ? chats.length : chats.filter(fn).length;
+    return `<button class="${filter === key ? 'on' : ''}" onclick="setFilter('${key}')">${esc(t('chat_f_' + key))}${n ? ` <span class="n">${n}</span>` : ''}</button>`;
+  }).join('');
+}
+
+function setFilter(key) {
+  filter = key;
+  renderList();
+}
+
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
-  const shown = q
-    ? chats.filter((c) => `${c.name || ''} ${c.phone || ''} ${c.lastText || ''}`.toLowerCase().includes(q))
-    : chats;
+  const match = FILTERS.find(([k]) => k === filter)?.[1] || (() => true);
+  let shown = chats.filter((c) => match(c));
+  if (q) shown = shown.filter((c) => `${c.name || ''} ${c.phone || ''} ${c.lastText || ''}`.toLowerCase().includes(q));
 
+  renderFilters();
   if (!shown.length) {
-    $('list').innerHTML = `<p class="empty">${esc(q ? t('chat_no_match') : t('chat_none'))}</p>`;
+    $('list').innerHTML = `<p class="empty">${esc(q ? t('chat_no_match') : filter === 'all' ? t('chat_none') : t('chat_f_empty'))}</p>`;
     return;
   }
   $('list').innerHTML = shown.map((c) => `
-    <div class="chatitem ${c.jid === current ? 'on' : ''}" onclick="openChat('${esc(c.jid)}')">
+    <div class="chatitem ${c.jid === current ? 'on' : ''} ${waiting(c) ? 'waiting' : ''}" onclick="openChat('${esc(c.jid)}')">
       <span class="ava">${esc(initial(c))}</span>
       <div class="meta">
         <div class="top">
@@ -73,8 +104,11 @@ function renderList() {
           <span class="when">${esc(shortTime(c.lastAt))}</span>
         </div>
         <div class="prev">${c.lastDirection === 'out' ? '↩ ' : ''}${esc(String(c.lastText || '').replace(/\*/g, '').split('\n')[0])}</div>
+        <div class="tags">
+          ${c.paused ? pill(t('chat_paused'), 'warn') : ''}
+          ${c.messages ? `<span class="chip">${c.messages} ${esc(t('chat_msgs'))}</span>` : ''}
+        </div>
       </div>
-      ${c.paused ? pill(t('chat_paused'), 'warn') : ''}
     </div>`).join('');
 }
 
@@ -111,8 +145,10 @@ async function openChat(jid) {
   $('wrap').classList.add('open');
   const d = await api('/api/chats/' + encodeURIComponent(jid));
   const c = chats.find((x) => x.jid === jid);
-  $('who').textContent = d.customer?.name || c?.name || d.phone;
-  $('sub').textContent = d.phone;
+  const who = d.customer?.name || c?.name || d.phone;
+  $('who').textContent = who;
+  // Without a name the header read as the same number twice.
+  $('sub').textContent = who === d.phone ? '' : d.phone;
   $('resume').hidden = !d.paused;
   $('wipe').hidden = !(d.messages || []).length;
   $('resume').textContent = t('resume_bot');
@@ -183,7 +219,11 @@ $('msg').addEventListener('keydown', (e) => {
 loadList().then(() => {
   const want = decodeURIComponent(location.hash.slice(1)).replace(/[^0-9]/g, '');
   const hit = want && chats.find((c) => c.phone === want);
-  if (hit) openChat(hit.jid);
+  if (hit) return openChat(hit.jid);
+  // On a wide screen the thread pane is there whether or not a chat is picked,
+  // so it may as well hold the newest conversation instead of "pick a chat".
+  // On a phone the list IS the page, so nothing is opened over it.
+  if (window.innerWidth > 860 && chats.length) openChat(chats[0].jid);
 });
 setInterval(() => { loadList(); if (current) openChat(current); }, 15000);
 </script>

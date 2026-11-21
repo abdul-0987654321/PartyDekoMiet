@@ -106,6 +106,14 @@ describe('an appointment request taken on her own number', () => {
     assert.strictEqual(db.all('appointments')[0].phone, '41791234567');
   });
 
+  test('saves the customer under her own number, not the Studio', async () => {
+    const appointments = createAppointments({ business: 'pro-sofia', notify: null, calendar: null });
+    await appointments.create({ ...args, customer_name: 'Anna' });
+
+    assert.strictEqual(customers.get('pro-sofia', LID)?.name, 'Anna');
+    assert.strictEqual(customers.get('studio', LID), null, 'the Studio keeps no record of her customer');
+  });
+
   test("does not read the Studio's record for the same person", async () => {
     customers.save('studio', LID, { phone: '41760000000' });
     const appointments = createAppointments({ business: 'pro-sofia', notify: null, calendar: null });

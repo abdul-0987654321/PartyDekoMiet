@@ -98,7 +98,11 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     }
 
     db.put('appointments', appt);
-    customers.save('studio', jid, { phone: appt.phone, name: appt.customerName });
+    // Under the number that took the request, not under the Studio: saving it
+    // as 'studio' put her customer's name and phone into the Studio's records
+    // and left her own empty, so the next time he wrote to her the bot did not
+    // know him.
+    customers.save(business, jid, { phone: appt.phone, name: appt.customerName });
     await db.flush();
 
     if (notify) {

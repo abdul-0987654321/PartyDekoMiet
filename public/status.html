@@ -123,7 +123,11 @@ async function refresh() {
   if (!d.ready) { $('hstate').textContent = t('hero_boot'); $('hsub').textContent = t('hero_boot_sub'); }
   else if (!connected) {
     $('hstate').textContent = t('hero_nowa');
-    $('hsub').innerHTML = `${esc(t('hero_nowa_sub'))} <a href="/whatsapp">${esc(t('link_wa'))}</a>`;
+    // The Studio links its numbers on the Nummern page, where you choose which
+    // one you are linking. Everything else has exactly one number, so it goes
+    // straight to the QR.
+    const linkHref = BIZ === 'studio' ? '/numbers' : '/whatsapp';
+    $('hsub').innerHTML = `${esc(t('hero_nowa_sub'))} <a href="${linkHref}">${esc(t('link_wa'))}</a>`;
   } else {
     $('hstate').textContent = d.config.botEnabled ? t('hero_on') : t('hero_off');
     $('hsub').textContent = d.config.botEnabled ? t('hero_on_sub') : t('hero_off_sub');

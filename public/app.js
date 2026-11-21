@@ -19,7 +19,7 @@ const T = {
     n_for_none: 'Noch niemandem zugeordnet',
     n_for_help: 'Der Bot auf dieser Nummer spricht nur über sie und über die Services, die alle anbieten.',
     n_alerts: 'Benachrichtigungen an',
-    n_alerts_help: 'Wer Terminanfragen von dieser Nummer bekommt. Leer = die Studio-Nummern aus den Einstellungen.',
+    n_alerts_help: 'Wer Terminanfragen von dieser Nummer bekommt. Leer = die Nummer, mit der diese Linie verbunden ist - also das Handy, das den QR gescannt hat.',
     n_connect: 'Verbinden',
     n_open: 'QR-Code öffnen',
     n_connected: 'Verbunden',
@@ -131,7 +131,9 @@ const T = {
     nav_appointments: 'Termine', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Standorte',
     add: 'Hinzufügen', edit: 'Bearbeiten', delete: 'Löschen', delete_confirm: 'Wirklich löschen?',
     active: 'Aktiv', inactive: 'Inaktiv', name: 'Name', photo: 'Foto', upload_photo: 'Foto hochladen',
-    p_age: 'Alter', p_languages: 'Sprachen (Komma-getrennt)', p_lang_short: 'Sprachen', p_hours: 'Arbeitszeiten', p_location: 'Standort',
+    p_age: 'Alter', p_languages: 'Sprachen (Komma-getrennt)', p_lang_short: 'Sprachen', p_hours: 'Arbeitszeiten', p_location: 'Standort', p_address: 'Adresse',
+    p_location_help: 'Einfach eintippen. Ein neuer Standort wird angelegt, ein bekannter wiederverwendet.',
+    p_location_ph: 'z.B. Studio Zürich',
     p_none_lang: 'keine', p_none_hours: 'noch nicht eingetragen',
     // Three pages, three different things, and it was never written down which
     // is which. Each intro now says what the page is FOR and how it hangs
@@ -162,7 +164,7 @@ const T = {
     n_for_none: 'Not assigned to anyone yet',
     n_for_help: 'The bot on this number talks about her only, plus the services everyone offers.',
     n_alerts: 'Send alerts to',
-    n_alerts_help: 'Who gets appointment requests from this number. Empty = the Studio numbers from Settings.',
+    n_alerts_help: 'Who gets appointment requests from this number. Empty = the number this line is linked to - the phone that scanned the QR.',
     n_connect: 'Connect',
     n_open: 'Open QR code',
     n_connected: 'Connected',
@@ -274,7 +276,9 @@ const T = {
     nav_appointments: 'Appointments', nav_professionals: 'Professionals', nav_services: 'Services', nav_locations: 'Locations',
     add: 'Add', edit: 'Edit', delete: 'Delete', delete_confirm: 'Really delete this?',
     active: 'Active', inactive: 'Inactive', name: 'Name', photo: 'Photo', upload_photo: 'Upload photo',
-    p_age: 'Age', p_languages: 'Languages (comma-separated)', p_lang_short: 'Languages', p_hours: 'Working hours', p_location: 'Location',
+    p_age: 'Age', p_languages: 'Languages (comma-separated)', p_lang_short: 'Languages', p_hours: 'Working hours', p_location: 'Location', p_address: 'Address',
+    p_location_help: 'Just type it. A new location is created, a known one is reused.',
+    p_location_ph: 'e.g. Studio Zurich',
     p_none_lang: 'none', p_none_hours: 'not entered yet',
     p_intro: 'Who takes appointments: name, languages, photo, working hours and the location she works at. Each person can have her own WhatsApp number (see "Numbers").',
     no_professionals: 'No professionals yet.',
@@ -428,8 +432,13 @@ const NAV_LINKS = {
     ['/bookings', 'nav_appointments', 'calendar'],
     ['/professionals', 'nav_professionals', 'person'],
     ['/services', 'nav_services', 'list'],
-    ['/locations', 'nav_locations', 'pin'],
-    ['/whatsapp', 'nav_whatsapp', 'link'],
+    // No WhatsApp entry and no Locations entry on the Studio's menu.
+    // The Studio has several numbers, so linking one belongs on Nummern, where
+    // you pick which number you are linking; a single WhatsApp page could only
+    // ever mean the main one, which is what confused people. Locations are now
+    // typed straight into the professional's own form - they exist only to
+    // answer "where do I come to", so a page of their own was a trip away from
+    // the only form that uses them.
     ['/numbers', 'nav_numbers', 'person'],
     ['/faq', 'nav_faq', 'help'],
     ['/settings', 'nav_settings', 'settings'],

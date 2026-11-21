@@ -23,6 +23,24 @@ const { m } = require('./messages');
  */
 function createNotifier({ client, business = 'party', ownNumbers = null }) {
   /**
+   * The number this line is linked to - the phone that scanned the QR.
+   *
+   * Used only when nothing at all is configured. Somebody is holding that
+   * phone, and it is the one person certain to be connected to this number, so
+   * an alert reaching it is always better than an alert reaching nobody. For a
+   * professional's own line that is her, which is what you would expect
+   * without having to fill anything in.
+   */
+  function selfNumber() {
+    try {
+      const me = client.getStatus?.()?.me?.id || '';
+      return String(me).split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
+    } catch {
+      return '';
+    }
+  }
+
+  /**
    * Who gets alerts. Her own list wins, then the dedicated alert list, then the
    * owner number, so a fresh install still notifies someone. Everything that is
    * not PartyDekoMiet reads the Studio's settings.
@@ -37,7 +55,12 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
       .split(',')
       .map((n) => n.replace(/[^0-9]/g, ''))
       .filter((n) => n.length >= 8);
-    return [...new Set(list)]; // the same number listed twice would send twice
+    const unique = [...new Set(list)]; // the same number listed twice would send twice
+    if (unique.length) return unique;
+
+    // Nothing filled in anywhere: the linked phone rather than nobody.
+    const self = selfNumber();
+    return self.length >= 8 ? [self] : [];
   }
 
   async function owner(text, meta = {}, imageBuffer = null) {

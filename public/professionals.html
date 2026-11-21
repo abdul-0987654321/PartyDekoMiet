@@ -38,6 +38,34 @@ async function refresh() {
   render();
 }
 
+function locationAddress(id) {
+  return locations.find((x) => x.id === id)?.address || '';
+}
+
+/**
+ * Turns what was typed into a location id: the existing one when the name is
+ * already known (so a studio is not duplicated by a second spelling), a newly
+ * created one otherwise. An address typed against a known name updates it.
+ *
+ * @returns {Promise<{ok: true, id: string}|{ok: false, error: string}>}
+ */
+async function resolveLocation(name, address) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return { ok: true, id: '' };
+
+  const existing = locations.find((l) => l.name.toLowerCase() === wanted.toLowerCase());
+  if (existing) {
+    if (address && address !== existing.address) {
+      await api(`/api/studio/locations/${encodeURIComponent(existing.id)}`, { method: 'PATCH', body: { address } });
+    }
+    return { ok: true, id: existing.id };
+  }
+
+  const res = await api('/api/studio/locations', { method: 'POST', body: { name: wanted, address } });
+  if (!res.ok) return { ok: false, error: res.error || t('save_err') };
+  return { ok: true, id: res.location.id };
+}
+
 function locationName(id) {
   const l = locations.find((x) => x.id === id);
   return l ? l.name : '';
@@ -45,11 +73,12 @@ function locationName(id) {
 
 function render() {
   if (!rows.length) {
-    // Without a location first, a professional cannot be given one - so point
-    // at that page rather than opening a form with a dead dropdown in it.
-    $('wrap').innerHTML = locations.length
-      ? emptyState({ icon: '👤', title: t('no_professionals'), text: t('p_intro'), actionLabel: '+ ' + t('add'), onclick: 'addNew' })
-      : emptyState({ icon: '📍', title: t('no_locations_yet'), text: t('l_intro'), actionLabel: t('su_location'), href: '/locations' });
+    // The location is typed into the same form now, so there is nothing to do
+    // first and nowhere else to be sent.
+    $('wrap').innerHTML = emptyState({
+      icon: '👤', title: t('no_professionals'), text: t('p_intro'),
+      actionLabel: '+ ' + t('add'), onclick: 'addNew',
+    });
     return;
   }
   $('wrap').innerHTML = `<div class="tiles">${rows.map((p) => {
@@ -86,15 +115,19 @@ function formHtml(p) {
     <div class="field"><label>${t('name')}</label><input type="text" id="f_name" value="${esc(p?.name || '')}"></div>
     <div class="field"><label>${t('p_age')}</label><input type="number" id="f_age" value="${esc(p?.age || '')}" min="18" max="99"></div>
     <div class="field"><label>${t('p_languages')}</label><input type="text" id="f_languages" value="${esc(langs)}"></div>
+    <!-- Typed here, not picked from a page of its own. A location is only ever
+         needed while filling in a professional, and a location that does not
+         exist yet is the normal case the first time - so it is created from
+         what is typed. Existing ones are offered while typing, so the same
+         studio is not entered twice under two spellings. -->
     <div class="field"><label>${t('p_location')}</label>
-      ${pickerWithLink({
-        id: 'f_locationId',
-        items: locations,
-        selected: p?.locationId || '',
-        href: '/locations',
-        addLabel: t('su_location'),
-        emptyText: t('no_locations_yet'),
-      })}
+      <p class="help">${t('p_location_help')}</p>
+      <input type="text" id="f_locationName" list="loclist" autocomplete="off"
+             value="${esc(p?.locationId ? locationName(p.locationId) : '')}" placeholder="${esc(t('p_location_ph'))}">
+      <datalist id="loclist">${locations.map((l) => `<option value="${esc(l.name)}">`).join('')}</datalist>
+    </div>
+    <div class="field"><label>${t('p_address')}</label>
+      <input type="text" id="f_locationAddress" value="${esc(locationAddress(p?.locationId))}" placeholder="Langstrasse 175, 8004 Zürich">
     </div>
     <div class="field"><label>${t('p_hours')}</label><input type="text" id="f_workingHours" value="${esc(p?.workingHours || '')}" placeholder="Mo-Fr 10-18"></div>
     <div class="field"><label class="check"><input type="checkbox" id="f_active" ${p?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
@@ -134,11 +167,19 @@ async function fileToBase64(file) {
 
 async function save() {
   $('f_msg').textContent = t('saving');
+
+  const loc = await resolveLocation($('f_locationName').value, $('f_locationAddress').value.trim());
+  if (!loc.ok) {
+    $('f_msg').textContent = '';
+    $('alerts').innerHTML = `<p class="banner err">${esc(loc.error)}</p>`;
+    return;
+  }
+
   const patch = {
     name: $('f_name').value.trim(),
     age: $('f_age').value ? Number($('f_age').value) : '',
     languages: $('f_languages').value,
-    locationId: $('f_locationId').value,
+    locationId: loc.id,
     workingHours: $('f_workingHours').value,
     active: $('f_active').checked,
   };

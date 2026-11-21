@@ -85,18 +85,21 @@ function render() {
   $('form').innerHTML = groups.map(g => {
     const all = schema.filter(s => s.group === g);
     const main = all.filter(s => !s.advanced), adv = all.filter(s => s.advanced);
-    // Only beside an actual calendar field. The calendar ids are set from
-    // Render now and are off this page, so the sharing hint would otherwise
-    // stand in the Studio group explaining a field that is not there.
-    const hasCalendarField = all.some((s) => s.key === 'calendarId' || s.key === 'studioCalendarId');
-    const hint = hasCalendarField ? calendarHint() : '';
+    // The calendar ids are set in Render now, so this no longer explains a
+    // field on the page - but the address still has to be findable somewhere,
+    // and a key file is not somewhere. It stays, at the end of the last group.
+    const hint = '';
     return `<section class="group" id="g_${g}"><h2>${t('g_'+g)}</h2>
       ${hint}
       <div class="card">
       ${main.map(fieldHtml).join('')}
       ${adv.length ? `<details class="adv"><summary>${esc(t('s_adv'))} (${adv.length})</summary>${adv.map(fieldHtml).join('')}</details>` : ''}
     </div></section>`;
-  }).join('') + `<div class="actions inline">
+  }).join('')
+    // Needed exactly once per calendar, but needed from somewhere: the client
+    // has to share his calendar with this address before the bot can read it.
+    + `<h2>${esc(t('g_calendar_access'))}</h2>${calendarHint()}`
+    + `<div class="actions inline">
       <button class="primary" type="button" id="save">${t('save')}</button>
       <button class="ghost" type="button" id="reload">${t('refresh')}</button>
       <span id="msg" class="muted"></span></div>`;

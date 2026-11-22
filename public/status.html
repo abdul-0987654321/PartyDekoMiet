@@ -25,6 +25,15 @@
   <div class="quick" id="quick"></div>
   <div id="alerts"></div>
 
+  <!-- Studio only: who is in a room right now. The owner and his partner are
+       not in the building, and before this they found out by asking on
+       WhatsApp - or did not find out, and sent the next client into an
+       occupied room. -->
+  <section id="rosterwrap" hidden>
+    <h2 id="h_roster"></h2>
+    <div class="card" id="roster"></div>
+  </section>
+
   <!-- No checklist and no to-do list here, on either business: the owner asked
        for this page to answer one question - is it running - and anything that
        is actually broken says so in the banner above, where it cannot be
@@ -66,6 +75,49 @@
 <script>
 renderNav('/');
 $('h_tech').textContent = t('tech_details');
+$('h_roster').textContent = t('roster_title');
+
+/** "seit 14:20" - how long she has been in there, which is the useful part. */
+function sinceLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  const clock = d.toLocaleTimeString(LANG === 'en' ? 'en-GB' : 'de-CH', { hour: '2-digit', minute: '2-digit' });
+  return `${t('roster_since')} ${clock} · ${mins} min`;
+}
+
+async function renderRoster() {
+  if (BIZ !== 'studio') { $('rosterwrap').hidden = true; return; }
+  const d = await api('/api/studio/roster');
+  const list = d.roster || [];
+  if (!list.length) { $('rosterwrap').hidden = true; return; }
+  $('rosterwrap').hidden = false;
+
+  $('roster').innerHTML = list.map((p) => `
+    <div class="row">
+      <span>
+        <i class="dot ${p.busy ? 'pending' : 'ok'}"></i>
+        <b>${esc(p.name)}</b>
+        ${p.busy ? `<span class="muted">${esc(sinceLabel(p.since))}</span>` : ''}
+        ${p.hasOwnNumber ? '' : `<span class="chip">${esc(t('roster_no_number'))}</span>`}
+      </span>
+      <span>
+        ${p.busy ? pill(t('roster_busy'), 'warn') : pill(t('roster_free'), 'ok')}
+        <button class="ghost" onclick="setBusy('${esc(p.id)}', ${p.busy ? 'false' : 'true'})">
+          ${esc(p.busy ? t('roster_set_free') : t('roster_set_busy'))}
+        </button>
+      </span>
+    </div>`).join('');
+}
+
+/** The owner correcting it by hand, for when she forgot to say "frei". */
+async function setBusy(id, busy) {
+  await api(`/api/studio/professionals/${encodeURIComponent(id)}/availability`, {
+    method: 'PATCH', body: { availability: busy ? 'busy' : 'free' },
+  });
+  renderRoster();
+}
 for (const [id, key] of [
   ['l_wa','whatsapp'],['l_storage','storage'],['l_catalog','catalog'],['l_calendar','calendar'],
   ['l_key','openai_key'],['l_owner','owner_number'],['l_paused','paused_chats'],
@@ -193,6 +245,9 @@ async function refresh() {
   $('flushed').textContent = fmtDate(d.storage.lastFlushAt);
   $('started').textContent = fmtDate(d.startedAt);
 }
-refresh(); setInterval(refresh, 10000);
+// Both on the same beat: a status that is ten minutes stale is worse than
+// none, because it gets believed.
+async function tick() { await refresh(); await renderRoster(); }
+tick(); setInterval(tick, 10000);
 </script>
 </body></html>

@@ -181,6 +181,83 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     return { ok: true, appointment: appt, previous, calendarWarning };
   }
 
+  /**
+   * The appointment a professional is in right now, as far as the calendar
+   * knows: today, not cancelled, already started or starting within the hour.
+   *
+   * "Starting within the hour" is there because she usually speaks a minute or
+   * two before the client is on the table, and refusing her then would teach
+   * her that the thing does not work.
+   */
+  function currentFor(professionalId, { now = new Date(), timeZone = 'Europe/Zurich' } = {}) {
+    const today = now.toLocaleDateString('en-CA', { timeZone });
+    const clock = now.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
+    const inAnHour = new Date(now.getTime() + 60 * 60000)
+      .toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
+
+    const todays = db
+      .all('appointments')
+      .filter((a) => a.professionalId === professionalId && a.date === today && a.status !== 'CANCELLED')
+      .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+    // Running now, or the next one about to start.
+    return (
+      todays.find((a) => a.startTime <= clock && (!a.endTime || a.endTime > clock))
+      || todays.find((a) => a.startTime > clock && a.startTime <= inAnHour)
+      || null
+    );
+  }
+
+  /**
+   * The client is staying longer. Moves the end of the appointment and the
+   * calendar entry with it, so the next person is not sent into an occupied
+   * room - which is the whole reason this exists.
+   *
+   * @param {string} id
+   * @param {number} minutes
+   */
+  async function extend(id, minutes) {
+    const appt = db.get('appointments', id);
+    if (!appt) return { ok: false, error: `appointment ${id} not found` };
+    const extra = Number(minutes);
+    if (!Number.isFinite(extra) || extra <= 0 || extra > 240) {
+      return { ok: false, error: 'minutes must be between 1 and 240' };
+    }
+
+    const from = appt.endTime || appt.startTime;
+    const [h, min] = String(from).split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(min)) {
+      return { ok: false, error: 'appointment has no usable time' };
+    }
+    const total = h * 60 + min + extra;
+    // Past midnight the appointment would need a second day, which no treatment
+    // here ever does - so it stops at the end of the day rather than wrapping
+    // round to the morning.
+    const capped = Math.min(total, 23 * 60 + 59);
+    const endTime = `${String(Math.floor(capped / 60)).padStart(2, '0')}:${String(capped % 60).padStart(2, '0')}`;
+
+    let calendarWarning = null;
+    if (calendar && appt.calendarEventId) {
+      try {
+        await calendar.patchEvent(appt.calendarEventId, {
+          end: { dateTime: `${appt.date}T${endTime}:00`, timeZone: calendar.timeZone || 'Europe/Zurich' },
+        });
+      } catch (err) {
+        calendarWarning = err.message;
+        log.error(`Appointment ${id}: calendar not extended (${err.message})`);
+      }
+    }
+
+    const previousEnd = appt.endTime;
+    appt.endTime = endTime;
+    appt.updatedAt = new Date().toISOString();
+    db.put('appointments', appt);
+    await db.flush();
+    log.info(`Appointment ${id}: extended by ${extra} min (${previousEnd} -> ${endTime})`);
+
+    return { ok: true, appointment: appt, previousEnd, minutes: extra, calendarWarning };
+  }
+
   function list({ status = null, limit = 100 } = {}) {
     return db
       .all('appointments')
@@ -189,7 +266,7 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
       .slice(0, limit);
   }
 
-  return { create, list, setStatus };
+  return { create, list, setStatus, extend, currentFor };
 }
 
 module.exports = { createAppointments, newId, validateAppointmentArgs };

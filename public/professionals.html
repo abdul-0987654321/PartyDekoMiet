@@ -94,10 +94,15 @@ function render() {
           <span>${esc(p.locationId ? locationName(p.locationId) : t('p_no_location'))}</span>
         </div>
         ${p.active ? '' : pill(t('inactive'), 'warn')}
+        <!-- What she last said about herself. Shown beside her name because
+             "is she free right now" is the question this page gets opened
+             for on a working afternoon. -->
+        ${p.active && p.availability === 'busy' ? pill(t('roster_busy'), 'warn') : ''}
       </div>
       <div class="facts">
         <div><dt>${t('p_lang_short')}</dt><dd>${langs ? esc(langs) : `<span class="muted">${t('p_none_lang')}</span>`}</dd></div>
         <div><dt>${t('p_hours')}</dt><dd>${p.workingHours ? esc(p.workingHours) : `<span class="muted">${t('p_none_hours')}</span>`}</dd></div>
+        <div><dt>${t('p_whatsapp')}</dt><dd>${p.whatsapp ? esc(p.whatsapp) : `<span class="muted">${t('p_no_number')}</span>`}</dd></div>
         ${p.age ? `<div><dt>${t('p_age')}</dt><dd>${esc(p.age)}</dd></div>` : ''}
       </div>
       ${p.photoFileId ? '' : `<div class="note"><span class="pill warn">${t('p_no_photo')}</span></div>`}

@@ -13,6 +13,8 @@ const settings = require('../settings');
 const { createCalendarClient } = require('./client');
 const { checkSlot, findNextFreeOnDay, PENDING } = require('./slots');
 const { addDays, todayIn, isIsoDay } = require('./dates');
+const db = require('../store/db');
+const { isBusy } = require('../studio/availability-status');
 
 /**
  * @param {object} deps
@@ -61,6 +63,23 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
       if (!isIsoDay(date)) return { ok: false, error: `Datum muss YYYY-MM-DD sein, erhalten: "${date}".` };
       const today = todayIn(timeZone);
       if (date < today) return { ok: false, error: `Das Datum ${date} liegt in der Vergangenheit.` };
+
+      // She said she is busy, right now, from her own phone. That beats the
+      // calendar for today: the calendar holds what was agreed, she holds what
+      // is happening in the room, and a client who stayed longer only exists in
+      // the second one. Only for today - being busy this afternoon says nothing
+      // about next Tuesday.
+      if (date === today && professionalId && isBusy(db.get('professionals', professionalId), { timeZone })) {
+        return {
+          ok: true,
+          available: false,
+          date,
+          start_time: startTime,
+          reason: 'professional_busy',
+          alternative_times: [],
+          note: `${professionalName || 'Die Kollegin'} ist gerade im Termin und heute nicht sicher planbar. Biete einen anderen Tag an oder gib den Fall weiter - sag NICHT, dass sie frei ist.`,
+        };
+      }
 
       const events = await eventsOnDay(date);
       const res = checkSlot({ events, professionalId, professionalName, date, startTime, durationMin, ...opts() });

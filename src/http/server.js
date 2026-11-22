@@ -29,6 +29,7 @@ const directory = require('../studio/directory');
 const faqStore = require('../faq-store');
 const { clearSession } = require('../whatsapp/auth-state');
 const { createLocalCalendarClient, overlapsWindow } = require('../calendar/local-client');
+const { roster, setAvailability } = require('../studio/availability-status');
 
 /** All-day ranges end on the morning after, the way a calendar writes them. */
 function addOneDay(date) {
@@ -417,6 +418,32 @@ function createServer({
         result: c.result,
       })),
     });
+  }));
+
+  /**
+   * Who is in a room right now, as the professionals themselves last said.
+   *
+   * Its own endpoint rather than a field on the status page, because this is
+   * the thing the owner refreshes: it answers "can I send somebody to her" and
+   * the answer changes every few minutes.
+   */
+  app.get('/api/studio/roster', (req, res) => {
+    res.json({ ok: true, roster: roster({ timeZone: config.tz || 'Europe/Zurich' }) });
+  });
+
+  /** The owner correcting a status by hand, when she forgot to say it. */
+  app.patch('/api/studio/professionals/:id/availability', safe(async (req, res) => {
+    const id = String(req.params.id);
+    const professional = db.get('professionals', id);
+    if (!professional) return res.status(404).json({ ok: false, error: 'not found' });
+
+    const state = String(req.body?.availability || '').toLowerCase();
+    if (state !== 'busy' && state !== 'free') {
+      return res.status(400).json({ ok: false, error: 'availability must be busy or free' });
+    }
+    const updated = setAvailability(professional, state, { note: req.body?.note || '' });
+    await db.flush();
+    res.json({ ok: true, professional: updated });
   }));
 
   // ---- Calendar ----

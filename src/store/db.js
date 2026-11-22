@@ -115,6 +115,13 @@ const TABLES = {
       // when the customer wrote to the Studio's main number. Digits only.
       whatsapp: String(p.whatsapp || '').replace(/[^0-9]/g, ''),
       workingHours: p.workingHours || '', // free text per day, owner-edited
+      // What she last said about herself, from her own phone. 'busy' holds
+      // until she says otherwise - a client who stays an hour longer is exactly
+      // the case where a timer would have expired and lied.
+      availability: p.availability === 'busy' ? 'busy' : 'free',
+      busySince: p.busySince || '',
+      busyUntil: p.busyUntil || '', // only when she said how long
+      busyNote: p.busyNote || '',
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }),

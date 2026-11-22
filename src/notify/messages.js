@@ -59,6 +59,22 @@ const T = {
     proCancelled: (a) => `Abgesagt: ${a.serviceName}, ${a.date} um ${a.startTime}. Das Team wird informiert.`,
     proNothingOpen: 'Du hast gerade keine offene Anfrage.',
     proConfirmedWord: 'bestaetigt', proCancelledWord: 'abgesagt',
+
+    // Busy / free, said by voice between clients. Short on purpose: she is
+    // holding the phone with one hand.
+    proNowBusy: (min) =>
+      min ? `Alles klar - du bist als besetzt eingetragen (ca. ${min} Min.). Sag Bescheid, wenn du frei bist.`
+          : 'Alles klar - du bist als besetzt eingetragen. Sag "frei", wenn du wieder kannst.',
+    proNowFree: 'Alles klar - du bist wieder als frei eingetragen.',
+    proExtended: (a, min) =>
+      `Verlaengert um ${min} Min. - der Termin geht jetzt bis ${a.endTime}. Das Team ist informiert.`,
+    proNoRunningAppointment: 'Ich finde gerade keinen laufenden Termin von dir. Sag "besetzt", dann weiss das Team Bescheid.',
+    proStatusUnclear: 'Das habe ich nicht sicher verstanden. Sag einfach "besetzt" oder "frei".',
+    proStatusHelp: 'Sag "besetzt", "frei", oder z.B. "der Kunde bleibt noch eine halbe Stunde".',
+    proToldTeamBusy: (p) => `${p.name} ist jetzt besetzt.`,
+    proToldTeamFree: (p) => `${p.name} ist wieder frei.`,
+    proToldTeamExtended: (p, a, min) =>
+      `${p.name}: der Kunde bleibt ${min} Min. laenger.\n\n${a.serviceName}\nKunde: ${a.customerName}\nNeu bis ${a.endTime}`,
     proWhich: (list) =>
       'Du hast mehrere offene Anfragen. Antworte mit J oder N und dem Code:\n\n' +
       list.map((a) => `${a.id} - ${a.serviceName}, ${a.date} ${a.startTime}`).join('\n'),
@@ -140,6 +156,20 @@ const T = {
     proCancelled: (a) => `Declined: ${a.serviceName}, ${a.date} at ${a.startTime}. The team has been told.`,
     proNothingOpen: 'You have no open request right now.',
     proConfirmedWord: 'confirmed', proCancelledWord: 'declined',
+
+    proNowBusy: (min) =>
+      min ? `Got it - you are marked busy (about ${min} min). Tell me when you are free.`
+          : 'Got it - you are marked busy. Say "free" when you can take someone again.',
+    proNowFree: 'Got it - you are marked free again.',
+    proExtended: (a, min) =>
+      `Extended by ${min} min - the appointment now runs until ${a.endTime}. The team has been told.`,
+    proNoRunningAppointment: 'I cannot find a running appointment for you. Say "busy" and the team will know.',
+    proStatusUnclear: 'I did not catch that for certain. Just say "busy" or "free".',
+    proStatusHelp: 'Say "busy", "free", or for example "the client stays another half hour".',
+    proToldTeamBusy: (p) => `${p.name} is now busy.`,
+    proToldTeamFree: (p) => `${p.name} is free again.`,
+    proToldTeamExtended: (p, a, min) =>
+      `${p.name}: the client stays ${min} min longer.\n\n${a.serviceName}\nCustomer: ${a.customerName}\nNow until ${a.endTime}`,
     proWhich: (list) =>
       'You have several open requests. Reply with Y or N and the code:\n\n' +
       list.map((a) => `${a.id} - ${a.serviceName}, ${a.date} ${a.startTime}`).join('\n'),

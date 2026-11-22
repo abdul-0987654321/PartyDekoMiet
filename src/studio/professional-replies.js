@@ -20,6 +20,8 @@
  */
 
 const db = require('../store/db');
+const { parseStatus } = require('./professional-status');
+const { setAvailability } = require('./availability-status');
 
 const YES = new Set(['j', 'ja', 'y', 'yes', 'ok', 'okay', 'jap', 'jo', 'si', 'oui', '✅', '👍']);
 const NO = new Set(['n', 'nein', 'no', 'nope', 'nee', 'non', '❌', '👎']);
@@ -102,4 +104,60 @@ async function applyReply({ professional, text, appointments, m }) {
   };
 }
 
-module.exports = { parseReply, openFor, applyReply, YES, NO };
+/**
+ * Everything she can say, in the order it has to be tried.
+ *
+ * Status first, appointment answers second. The reason is a real collision:
+ * "ja" is a confirmation, but "ja ich bin frei" is her saying she is free, and
+ * reading that as a confirmation of an unrelated appointment would be worse
+ * than useless. parseStatus only matches on its own vocabulary, so a bare "J"
+ * falls through to the appointment answer untouched.
+ *
+ * @returns {Promise<{reply: string, kind: string, changed: object|null}>}
+ */
+async function handleProfessionalMessage({ professional, text, appointments, m, timeZone = 'Europe/Zurich' }) {
+  const status = parseStatus(text);
+
+  if (status.ambiguous) {
+    return { reply: m.proStatusUnclear, kind: 'unclear', changed: null };
+  }
+
+  if (status.command === 'longer') {
+    const appt = appointments.currentFor(professional.id, { timeZone });
+    if (!appt) {
+      return { reply: m.proNoRunningAppointment, kind: 'no_appointment', changed: null };
+    }
+    // No length said: half an hour is the one people mean when they do not say.
+    const minutes = status.minutes || 30;
+    const res = await appointments.extend(appt.id, minutes);
+    if (!res.ok) return { reply: m.proStatusHelp, kind: 'error', changed: null };
+
+    // Still with a client, by definition.
+    setAvailability(professional, 'busy', { note: String(text).slice(0, 200) });
+    return {
+      reply: m.proExtended(res.appointment, minutes),
+      kind: 'extended',
+      changed: res.appointment,
+      minutes,
+    };
+  }
+
+  if (status.command === 'busy') {
+    const updated = setAvailability(professional, 'busy', {
+      minutes: status.minutes,
+      note: String(text).slice(0, 200),
+    });
+    return { reply: m.proNowBusy(status.minutes), kind: 'busy', changed: updated };
+  }
+
+  if (status.command === 'free') {
+    const updated = setAvailability(professional, 'free');
+    return { reply: m.proNowFree, kind: 'free', changed: updated };
+  }
+
+  // Not about her status: it is an answer to an appointment alert, or nothing.
+  const res = await applyReply({ professional, text, appointments, m });
+  return { reply: res.reply, kind: res.action || 'help', changed: res.changed };
+}
+
+module.exports = { parseReply, openFor, applyReply, handleProfessionalMessage, YES, NO };

@@ -20,7 +20,7 @@ const settings = require('../settings');
 const { m } = require('../notify/messages');
 const contacts = require('../contacts');
 const customers = require('../customers');
-const { applyReply } = require('../studio/professional-replies');
+const { handleProfessionalMessage } = require('../studio/professional-replies');
 
 /**
  * Both bots share the `state` table/sheet, so each needs its own pause-state key
@@ -378,26 +378,54 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
    * Her J or N. Recorded in the chat like any other message, so the dashboard
    * shows what happened, but answered from a fixed script.
    */
-  async function handleProfessionalReply(professional, jid, text) {
-    remember(jid, 'in', text);
+  async function handleProfessionalReply(professional, jid, text, spoken = false) {
+    remember(jid, 'in', `${spoken ? '\u{1F3A4} ' : ''}${text}`);
     const texts = m();
-    const { reply, changed, action } = await applyReply({
+    const { reply, changed, kind, minutes } = await handleProfessionalMessage({
       professional, text, appointments: services.appointments, m: texts,
     });
 
     await client.sendText(jid, reply);
     remember(jid, 'out', reply);
 
-    if (changed) {
-      log.info(`[${business}] ${professional.name} ${action}ed appointment ${changed.id} by WhatsApp.`);
-      // The team still needs to know: she answered on her phone, and nobody
-      // else was in that conversation.
-      if (notify) {
-        const what = action === 'confirm'
-          ? (texts.proConfirmedWord || 'bestaetigt')
-          : (texts.proCancelledWord || 'abgesagt');
-        await notify.owner(texts.proToldTeam(changed, what), { kind: 'appointment_status' });
-      }
+    if (!notify) return;
+
+    // The team is told whenever something changed. The point of all of this is
+    // that two people who are not in the room find out without having to ask.
+    if (kind === 'busy') await notify.owner(texts.proToldTeamBusy(professional), { kind: 'pro_busy' });
+    else if (kind === 'free') await notify.owner(texts.proToldTeamFree(professional), { kind: 'pro_free' });
+    else if (kind === 'extended') {
+      await notify.owner(texts.proToldTeamExtended(professional, changed, minutes), { kind: 'pro_extended' });
+    } else if (changed) {
+      log.info(`[${business}] ${professional.name} ${kind}ed appointment ${changed.id} by WhatsApp.`);
+      const what = kind === 'confirm'
+        ? (texts.proConfirmedWord || 'bestaetigt')
+        : (texts.proCancelledWord || 'abgesagt');
+      await notify.owner(texts.proToldTeam(changed, what), { kind: 'appointment_status' });
+    }
+  }
+
+  /**
+   * A voice note, as words.
+   *
+   * @returns {Promise<string|null>} null when it could not be understood - the
+   *   sender has then already been told, and the caller should stop. Silence
+   *   after a voice note is indistinguishable from the bot being broken.
+   */
+  async function transcribe(msg, jid) {
+    try {
+      if (!voice) throw new Error('voice is not set up');
+      const buffer = await client.downloadMedia(msg);
+      const text = await voice.transcribe(buffer, msg.message.audioMessage?.mimetype);
+      log.info(`[${business}] Voice note from ${jid} transcribed (${text.length} chars)`);
+      return text;
+    } catch (err) {
+      log.error(`[${business}] Voice note from ${jid} could not be transcribed: ${err.message}`);
+      await client.sendText(jid, VOICE_UNREADABLE);
+      remember(jid, 'in', '[Sprachnachricht]');
+      remember(jid, 'out', VOICE_UNREADABLE);
+      if (notify) await notify.owner(m().customerVoiceFailed(jid), { kind: 'voice_failed', jid });
+      return null;
     }
   }
 
@@ -420,11 +448,26 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     // 2. A message from the owner's own number: commands and dictated replies.
     if (isOwner(jid)) return handleOwnerInput(msg, jid, text);
 
-    // 2b. A professional answering an alert about her own appointment. She is
-    //     not a customer: her J or N changes the appointment and is answered by
-    //     one line, never by the model and never forwarded to anybody.
+    // 2b. A professional on her own number. She is not a customer: she confirms
+    //     her appointments and says when she is busy, and none of it ever goes
+    //     to the model or to anybody else.
+    //
+    //     Her voice notes are transcribed here rather than further down,
+    //     because the customer path below is where that used to happen and she
+    //     never reaches it. Between clients, speaking is the only practical way
+    //     for her to tell us anything - typing means putting the phone in front
+    //     of somebody who is lying on the table.
     const pro = professionalFor(jid);
-    if (pro) return handleProfessionalReply(pro, jid, text);
+    if (pro) {
+      let spoken = false;
+      if (hasAudio(msg)) {
+        const heard = await transcribe(msg, jid);
+        if (heard === null) return; // she has already been told it was unreadable
+        text = heard;
+        spoken = true;
+      }
+      return handleProfessionalReply(pro, jid, text, spoken);
+    }
 
     // 3. Everything else is a customer.
     //
@@ -440,20 +483,10 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     // A voice note: transcribe it and carry on as if the customer had typed it.
     let voiceMark = '';
     if (hasAudio(msg)) {
-      try {
-        if (!voice) throw new Error('voice is not set up');
-        const buffer = await client.downloadMedia(msg);
-        text = await voice.transcribe(buffer, msg.message.audioMessage?.mimetype);
-        voiceMark = '\u{1F3A4} '; // tells the model (and the dashboard) it was spoken
-        log.info(`Voice note from ${jid} transcribed (${text.length} chars)`);
-      } catch (err) {
-        log.error(`Voice note from ${jid} could not be transcribed: ${err.message}`);
-        await client.sendText(jid, VOICE_UNREADABLE);
-        remember(jid, 'in', '[Sprachnachricht]');
-        remember(jid, 'out', VOICE_UNREADABLE);
-        await notify.owner(m().customerVoiceFailed(jid), { kind: 'voice_failed', jid });
-        return;
-      }
+      const heard = await transcribe(msg, jid);
+      if (heard === null) return;
+      text = heard;
+      voiceMark = '\u{1F3A4} '; // tells the model (and the dashboard) it was spoken
     }
 
     // Belongs to the other business on this number: answer honestly, hand over,

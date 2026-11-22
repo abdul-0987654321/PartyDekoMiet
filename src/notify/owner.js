@@ -149,12 +149,31 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
       booking.referencePhotoFileId ? `${pad(f.photo)}${t.photoYes}` : null,
       '',
       booking.productUrl ? `${f.shop}: ${booking.productUrl}` : null,
+      // The dashboard, not a Google event. The calendar lives in the dashboard
+      // now, and the alert used to end by telling the owner to go and edit an
+      // event title by hand - a workflow that no longer exists and that read,
+      // to him, like an instruction to confirm a payment himself.
+      dashboardLink('/bookings') ? `${f.open}: ${dashboardLink('/bookings')}` : null,
       extra.calendarLink ? `${f.calendar}: ${extra.calendarLink}` : null,
       '',
       t.bookingFooter,
     ].filter((l) => l !== null);
 
     return owner(lines.join('\n'), { kind: 'booking_request', bookingId: booking.id });
+  }
+
+  /**
+   * A link straight to the page where this is dealt with.
+   *
+   * Render sets RENDER_EXTERNAL_URL by itself, so this normally works with
+   * nothing configured. Without either variable the line is simply left out -
+   * a message saying "open the dashboard" with no address is noise.
+   */
+  function dashboardLink(path) {
+    const base = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+    if (!base) return '';
+    const biz = business === 'party' ? '' : '?biz=studio';
+    return `${base}${path}${biz}`;
   }
 
   /** The message the owner gets for a new Studio appointment request. */
@@ -174,6 +193,7 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
       `${pad(f.time)}${appt.startTime}${appt.endTime ? `-${appt.endTime}` : ''}`,
       appt.sourcePortal ? `${pad(f.source)}${appt.sourcePortal}` : null,
       '',
+      dashboardLink('/bookings') ? `${f.open}: ${dashboardLink('/bookings')}` : null,
       extra.calendarLink ? `${f.calendar}: ${extra.calendarLink}` : null,
       '',
       t.appointmentFooter,

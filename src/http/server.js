@@ -180,6 +180,10 @@ function createServer({
         hasServiceAccount: Boolean(config.calendar?.serviceAccountJsonB64),
         hasSheet: Boolean(config.storage?.webhookUrl && config.storage?.secret),
         calendarConfigured: Boolean(isStudio ? s.studioCalendarId : s.calendarId),
+        // Which calendar the entries actually go into. Without this the only
+        // way to find out is to make a booking and go looking for it in two
+        // different places - which is exactly how the question came up.
+        calendarSource: (isStudio ? s.studioCalendarId : s.calendarId) ? 'google' : 'dashboard',
         serviceAccountEmail: rt.calendar?.serviceAccountEmail || null,
         botEnabled: isStudio ? s.studioBotEnabled : s.botEnabled,
         botLanguage: s.botLanguage,

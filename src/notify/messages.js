@@ -36,17 +36,17 @@ const T = {
     bookingFields: {
       customer: 'Kunde', whatsapp: 'WhatsApp', set: 'Set', pickup: 'Abholung',
       ret: 'Rueckgabe', price: 'Preis', occasion: 'Anlass', age: 'Alter',
-      theme: 'Motto', photo: 'Referenzbild', shop: 'Shop', calendar: 'Kalender',
+      theme: 'Motto', photo: 'Referenzbild', shop: 'Shop', calendar: 'Kalender', open: 'Dashboard',
     },
     photoYes: 'ja',
-    bookingFooter: 'Status [PENDING]. Nach Zahlungseingang im Kalender auf [CONFIRMED] aendern.',
+    bookingFooter: 'Noch nicht bestaetigt. Wenn die Zahlung da ist: im Dashboard unter Buchungen auf "Bestaetigen" tippen - der Kalender wird automatisch nachgefuehrt.',
 
     appointmentTitle: 'NEUE TERMINANFRAGE',
     appointmentFields: {
       customer: 'Kunde', whatsapp: 'WhatsApp', professional: 'Professional', service: 'Leistung',
-      price: 'Preis', date: 'Datum', time: 'Zeit', source: 'Quelle', calendar: 'Kalender',
+      price: 'Preis', date: 'Datum', time: 'Zeit', source: 'Quelle', calendar: 'Kalender', open: 'Dashboard',
     },
-    appointmentFooter: 'Status [PENDING]. Nach Bestaetigung im Kalender auf [CONFIRMED] aendern.',
+    appointmentFooter: 'Noch nicht bestaetigt. Im Dashboard unter Termine auf "Bestaetigen" tippen - der Kalender wird automatisch nachgefuehrt.',
 
     // What the professional herself gets, on her own number. Deliberately
     // short: she is reading it between clients, and the only thing she has to
@@ -136,17 +136,17 @@ const T = {
     bookingFields: {
       customer: 'Customer', whatsapp: 'WhatsApp', set: 'Set', pickup: 'Pickup',
       ret: 'Return', price: 'Price', occasion: 'Occasion', age: 'Age',
-      theme: 'Theme', photo: 'Reference photo', shop: 'Shop', calendar: 'Calendar',
+      theme: 'Theme', photo: 'Reference photo', shop: 'Shop', calendar: 'Calendar', open: 'Dashboard',
     },
     photoYes: 'yes',
-    bookingFooter: 'Status [PENDING]. Once the payment arrives, change it to [CONFIRMED] in the calendar.',
+    bookingFooter: 'Not confirmed yet. Once the payment arrives, tap "Confirm" under Bookings in the dashboard - the calendar follows automatically.',
 
     appointmentTitle: 'NEW APPOINTMENT REQUEST',
     appointmentFields: {
       customer: 'Customer', whatsapp: 'WhatsApp', professional: 'Professional', service: 'Service',
-      price: 'Price', date: 'Date', time: 'Time', source: 'Source', calendar: 'Calendar',
+      price: 'Price', date: 'Date', time: 'Time', source: 'Source', calendar: 'Calendar', open: 'Dashboard',
     },
-    appointmentFooter: 'Status [PENDING]. Once confirmed, change it to [CONFIRMED] in the calendar.',
+    appointmentFooter: 'Not confirmed yet. Tap "Confirm" under Appointments in the dashboard - the calendar follows automatically.',
 
     proRequest: (a) =>
       `NEW REQUEST FOR YOU\n\n${a.serviceName}\nCustomer: ${a.customerName}\n` +

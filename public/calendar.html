@@ -198,6 +198,19 @@ async function unblock(id) {
   load();
 }
 
+/**
+ * Which calendar these entries live in. A one-liner, but it answers the
+ * question that cost an evening: a booking was made, nothing appeared in
+ * Google Calendar, and there was no way to tell that nothing was supposed to.
+ */
+async function showSource() {
+  try {
+    const st = await api('/api/status');
+    const google = st.config?.calendarSource === 'google';
+    $('intro').textContent = `${t('cal_intro')} ${google ? t('cal_src_google') : t('cal_src_here')}`;
+  } catch { /* the page works without this line */ }
+}
+
 async function load() {
   // A month plus a margin, so a rental starting in the previous month still
   // draws its bar across the days that are on screen.
@@ -208,5 +221,6 @@ async function load() {
   render();
 }
 load();
+showSource();
 </script>
 </body></html>

@@ -21,17 +21,26 @@ const { createLocalCalendarClient } = require('../src/calendar/local-client');
 
 const TZ = 'Europe/Zurich';
 
-/** The next Sunday at least a week out, so "too soon" never interferes. */
-function nextSunday() {
-  const d = new Date(Date.now() + 8 * 86400000);
-  while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
+/**
+ * Dates are handled as calendar days throughout, never as instants: building a
+ * Date from `Date.now()` and reading it back with toISOString mixes the host's
+ * zone with UTC, and an earlier version of these helpers quietly produced the
+ * Saturday when it meant the Sunday - so the test failed on one host and passed
+ * on another, which is worse than failing everywhere.
+ */
 const shift = (iso, n) => {
   const d = new Date(`${iso}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+const weekdayOf = (iso) => new Date(`${iso}T12:00:00Z`).getUTCDay();
+
+/** The next Sunday at least a week out, so "too soon" never interferes. */
+function nextSunday() {
+  let iso = shift(new Date().toLocaleDateString('en-CA', { timeZone: TZ }), 8);
+  while (weekdayOf(iso) !== 0) iso = shift(iso, 1);
+  return iso;
+}
 
 beforeEach(async () => {
   await db.init(createMemoryBackend());
@@ -42,7 +51,7 @@ describe('alternatives around a closed day', () => {
   test('the Saturday before is offered first, not the Monday after', () => {
     const sunday = nextSunday();
     const dates = findFreeAround({
-      events: [], productId: 'SKU-1', wanted: sunday, notBefore: new Date().toISOString().slice(0, 10),
+      events: [], productId: 'SKU-1', wanted: sunday, notBefore: new Date().toLocaleDateString('en-CA', { timeZone: TZ }),
       closedWeekdays: 'sun', stock: 1, count: 3,
     });
 
@@ -51,7 +60,7 @@ describe('alternatives around a closed day', () => {
   });
 
   test('a date in the past is never offered', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
     const dates = findFreeAround({
       events: [], productId: 'SKU-1', wanted: today, notBefore: today,
       closedWeekdays: '', stock: 1, count: 5,
@@ -60,7 +69,7 @@ describe('alternatives around a closed day', () => {
   });
 
   test('tomorrow is offered when the wanted day is taken and tomorrow is open', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
     const dates = findFreeAround({
       events: [], productId: 'SKU-1', wanted: shift(today, 3), notBefore: today,
       closedWeekdays: '', stock: 1, count: 2,

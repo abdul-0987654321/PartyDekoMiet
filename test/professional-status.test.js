@@ -176,6 +176,10 @@ describe('the bot stops offering her while she is busy', () => {
     assert.strictEqual(res.available, true);
   });
 
+  // These two assert on the reason rather than on availability. A slot later
+  // today can also be refused for being too soon, which depends on what time
+  // the suite happens to run - and a test that passes in the morning and fails
+  // at night teaches people to ignore it.
   test('another professional is unaffected', async () => {
     const mia = (await directory.createProfessional({ name: 'Mia' })).professional;
     await say('besetzt');
@@ -183,7 +187,7 @@ describe('the bot stops offering her while she is busy', () => {
       professionalId: mia.id, professionalName: 'Mia',
       date: todayIn(), startTime: '23:00', durationMin: 60,
     });
-    assert.strictEqual(res.available, true);
+    assert.notStrictEqual(res.reason, 'professional_busy', 'Sofia being busy says nothing about Mia');
   });
 
   test('once she says free, she can be booked again', async () => {
@@ -193,7 +197,7 @@ describe('the bot stops offering her while she is busy', () => {
       professionalId: sofia.id, professionalName: 'Sofia',
       date: todayIn(), startTime: '23:00', durationMin: 60,
     });
-    assert.strictEqual(res.available, true);
+    assert.notStrictEqual(res.reason, 'professional_busy');
   });
 });
 

@@ -12,6 +12,7 @@
     <div class="grow">
       <h1 id="h1"></h1>
       <p class="muted" id="intro"></p>
+      <div id="srcswitch"></div>
     </div>
     <button class="primary" id="blockbtn"></button>
   </div>
@@ -208,7 +209,30 @@ async function showSource() {
     const st = await api('/api/status');
     const google = st.config?.calendarSource === 'google';
     $('intro').textContent = `${t('cal_intro')} ${google ? t('cal_src_google') : t('cal_src_here')}`;
+    // Switching away from Google has to be possible from here. The calendar id
+    // can be saved in the dashboard as well as set in Render, and a saved value
+    // wins - so deleting the variable in Render looked like it did nothing, and
+    // the field itself is no longer on the settings page to clear.
+    $('srcswitch').innerHTML = google
+      ? `<button class="ghost" id="useLocal">${esc(t('cal_use_local'))}</button>`
+      : '';
+    if (google) $('useLocal').onclick = useLocalCalendar;
   } catch { /* the page works without this line */ }
+}
+
+async function useLocalCalendar() {
+  if (!(await ask(t('cal_use_local_confirm')))) return;
+  const key = BIZ === 'studio' ? 'studioCalendarId' : 'calendarId';
+  // reset drops the value saved here; with the Render variable gone too, the
+  // dashboard calendar takes over.
+  const res = await api('/api/settings/reset', { method: 'POST', body: { key } });
+  if (!res.ok) {
+    $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`;
+    return;
+  }
+  $('alerts').innerHTML = `<p class="banner ok">${esc(t('cal_use_local_done'))}</p>`;
+  showSource();
+  load();
 }
 
 async function load() {

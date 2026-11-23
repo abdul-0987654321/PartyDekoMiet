@@ -31,6 +31,7 @@ const GROUPS = BIZ === 'party'
   : ['bot', 'studio', 'dashboard'];
 let schema = [];
 let serviceAccountEmail = null;
+let usingGoogle = false;
 
 /**
  * The calendar field alone is not enough to connect a calendar: the client
@@ -98,7 +99,11 @@ function render() {
   }).join('')
     // Needed exactly once per calendar, but needed from somewhere: the client
     // has to share his calendar with this address before the bot can read it.
-    + `<h2>${esc(t('g_calendar_access'))}</h2>${calendarHint()}`
+    // Only while a Google calendar is actually in use. Once the calendar runs
+    // in the dashboard there is nothing to share with anybody, and a section
+    // headed "Kalender-Zugang" sitting there afterwards reads as something
+    // still to be done.
+    + (usingGoogle ? `<h2>${esc(t('g_calendar_access'))}</h2>${calendarHint()}` : '')
     + `<div class="actions inline">
       <button class="primary" type="button" id="save">${t('save')}</button>
       <button class="ghost" type="button" id="reload">${t('refresh')}</button>
@@ -137,6 +142,7 @@ async function load() {
   const [s, st] = await Promise.all([api('/api/settings'), api('/api/status')]);
   schema = s.settings || [];
   serviceAccountEmail = st.config?.serviceAccountEmail || null;
+  usingGoogle = st.config?.calendarSource === 'google';
   render();
 }
 load();

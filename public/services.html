@@ -30,10 +30,14 @@ $('addbtn').textContent = '+ ' + t('add');
 let rows = [];
 let professionals = [];
 let editingId = null;
+// Set when this is one professional's own number: a service added from her
+// page is hers by default, not something the whole studio suddenly offers.
+let forProfessional = null;
 
 async function refresh() {
   const [s, p] = await Promise.all([api('/api/studio/services'), api('/api/studio/professionals')]);
   rows = s.services || [];
+  forProfessional = s.forProfessional || null;
   professionals = p.professionals || [];
   render();
 }
@@ -116,8 +120,10 @@ function formHtml(s) {
   return `
     <div class="field"><label>${t('s_name')}</label><input type="text" id="f_name" value="${esc(s?.name || '')}"></div>
     <div class="field"><label>${t('s_for')}</label>
-      <select id="f_professionalId"><option value="">${t('s_for_all')}</option>${professionals.map((p) =>
-        `<option value="${esc(p.id)}" ${p.id === s?.professionalId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+      <select id="f_professionalId"><option value="">${t('s_for_all')}</option>${professionals.map((p) => {
+        const chosen = s ? s.professionalId : forProfessional;
+        return `<option value="${esc(p.id)}" ${p.id === chosen ? 'selected' : ''}>${esc(p.name)}</option>`;
+      }).join('')}</select>
     </div>
     <div class="field"><label>${t('s_duration')}</label><input type="number" id="f_durationMin" value="${esc(s?.durationMin || '')}" min="1" max="480"></div>
     <div class="field"><label>${t('s_price')}</label><input type="number" id="f_priceChf" value="${esc(s?.priceChf || '')}" min="0" step="0.05"></div>

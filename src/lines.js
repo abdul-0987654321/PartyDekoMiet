@@ -31,18 +31,17 @@ const PRO_PREFIX = 'pro-';
 const PRO_ID = /^pro-[a-z0-9][a-z0-9-]*$/;
 
 /**
- * Five numbers on the Numbers page, and not a sixth.
+ * Seven numbers on the Numbers page, and not an eighth.
  *
- * Counted the way the page counts them, PartyDekoMiet and the Studio included:
- * the owner looked at a page showing those two and said two are made and three
- * more should fit, to five. So three professionals can have their own number.
- * The page prints the count next to the button, so if he meant five on top of
- * the built-in two he can see that at a glance and say so.
+ * Counted the way the page counts them: PartyDekoMiet and the Studio are two
+ * of the seven, so five professionals can have their own number. The owner
+ * set the number himself and checks it, and the page prints the count beside
+ * the Add button so a missing button always has a reason on screen.
  *
  * More numbers in one process also means more memory, and the whole thing runs
- * in one 512 MB box.
+ * in one 512 MB box. Seven is comfortable; this is not an invitation to twenty.
  */
-const MAX_LINES = 5;
+const MAX_LINES = 7;
 
 const BUILT_IN = Object.freeze([
   Object.freeze({ id: 'party', name: 'PartyDekoMiet', kind: 'party', builtIn: true, active: true, professionalId: '' }),

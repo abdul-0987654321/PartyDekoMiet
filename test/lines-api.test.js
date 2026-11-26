@@ -149,7 +149,7 @@ describe('the numbers page', () => {
 
   test('the limit is on the list, so the page can say how many are left', async () => {
     const d = await get('/api/lines');
-    assert.strictEqual(d.max, 5);
+    assert.strictEqual(d.max, 7, 'two built-in plus five professionals');
   });
 
   test('removing logs the device out first, then drops the row', async () => {

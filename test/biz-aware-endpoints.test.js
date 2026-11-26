@@ -41,9 +41,13 @@ function prefixes() {
  */
 function bizAwareRoutes() {
   const found = new Set();
-  const route = /app\.(?:get|post|patch|delete)\(\s*'([^']+)'([\s\S]*?)(?=\n {2}app\.(?:get|post|patch|delete)\(|\n {2}\/\/ ----)/g;
-  for (const m of serverSrc.matchAll(route)) {
-    if (/\bpick\(req\)/.test(m[2])) found.add(m[1]);
+  // Routes are nested at different indents (some sit inside `if (lines)`), so
+  // a handler runs from its own app.<verb>( to the next one at any indent.
+  const starts = [...serverSrc.matchAll(/app\.(?:get|post|patch|delete)\(\s*'([^']+)'/g)];
+  for (let i = 0; i < starts.length; i += 1) {
+    const from = starts[i].index;
+    const to = i + 1 < starts.length ? starts[i + 1].index : serverSrc.length;
+    if (/\bpick\(req\)/.test(serverSrc.slice(from, to))) found.add(starts[i][1]);
   }
   return [...found];
 }

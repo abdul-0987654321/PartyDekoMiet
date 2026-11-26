@@ -31,12 +31,12 @@ $('addbtn').textContent = '+ ' + t('add');
 let rows = [];
 let professionals = [];
 let editingId = null;
-let maxLines = 5;
+let maxLines = 7;
 
 async function refresh() {
   const [l, p] = await Promise.all([api('/api/lines'), api('/api/studio/professionals')]);
   rows = l.lines || [];
-  maxLines = l.max || 5;
+  maxLines = l.max || 7;
   professionals = p.professionals || [];
   render();
 }

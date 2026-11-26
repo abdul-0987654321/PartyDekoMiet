@@ -90,6 +90,42 @@ function createServer({
     return { biz: 'party', state, runtime, whatsapp };
   }
 
+  /**
+   * The professional a number belongs to, or '' for the Studio's own number
+   * and PartyDekoMiet.
+   *
+   * Her pages show her work and nobody else's. The Studio's number stays the
+   * total - every appointment, the whole calendar, every service - because
+   * that is the one place where the whole studio can be seen at once.
+   *
+   * Read from the registry rather than from the captured line on the running
+   * entry, so reassigning a number in the dashboard takes effect on the next
+   * request instead of the next restart.
+   */
+  function professionalFor(biz) {
+    if (!biz || biz === 'party' || biz === 'studio') return '';
+    const fromRegistry = lines?.registry?.get(biz)?.professionalId;
+    if (fromRegistry !== undefined) return String(fromRegistry || '');
+    return String(lines?.running?.get(biz)?.line?.professionalId || '');
+  }
+
+  /**
+   * Does this appointment belong to her?
+   *
+   * By id, which is what every appointment the bot writes carries. The name is
+   * a fallback for a row that somehow has no id on it - typed straight into
+   * the sheet, or written by a version that did not set one. Without the
+   * fallback such a row belongs to nobody: it would still be on the Studio's
+   * page, but it would be missing from the page of the only person who needs
+   * to know about it, and nothing would say so.
+   */
+  function belongsTo(appointment, professionalId) {
+    if (!professionalId) return true;
+    if (appointment.professionalId) return appointment.professionalId === professionalId;
+    const name = directory?.getProfessional?.(professionalId)?.name;
+    return Boolean(name) && String(appointment.professionalName || '') === name;
+  }
+
   // ---- Health: open, and carries nothing secret. ----
   app.get('/health', (req, res) => {
     res.status(200).json({
@@ -139,10 +175,43 @@ function createServer({
     // and its directory, and none of them has a Shopify catalog.
     const isStudio = biz !== 'party';
     const line = lines?.running?.get(biz)?.line || null;
+
+    /**
+     * Who this number belongs to, filled in for her own page.
+     *
+     * Her name, where she works, when she works and the number clients write
+     * to. All of it was already in the dashboard, on the Professionals page,
+     * behind a switch to the Studio and a scroll - which is one journey too
+     * many for the first thing anybody wants to know when they open her
+     * number: whose number is this.
+     */
+    const herId = professionalFor(biz);
+    const her = herId && directory ? directory.getProfessional(herId) : null;
+
     res.json({
       ok: true,
       biz,
       line: line ? { id: line.id, name: line.name, professionalId: line.professionalId || '' } : null,
+      professional: her
+        ? {
+            id: her.id,
+            name: her.name,
+            active: her.active !== false,
+            languages: Array.isArray(her.languages) ? her.languages.join(', ') : (her.languages || ''),
+            workingHours: her.workingHours || '',
+            whatsapp: her.whatsapp || '',
+            availability: her.availability === 'busy' ? 'busy' : 'free',
+            busySince: her.busySince || '',
+            busyNote: her.busyNote || '',
+            photoFileId: her.photoFileId || '',
+            locationName: her.locationId
+              ? (directory.getLocation(her.locationId)?.name || '')
+              : '',
+            locationAddress: her.locationId
+              ? (directory.getLocation(her.locationId)?.address || '')
+              : '',
+          }
+        : null,
       ready: st.ready,
       startedAt: st.startedAt,
       uptimeSeconds: Math.round(process.uptime()),
@@ -512,8 +581,11 @@ function createServer({
         });
       }
     } else {
+      // Her number shows her days. The Studio's shows all of them.
+      const her = professionalFor(biz);
       for (const a of db.all('appointments')) {
         if (a.status === 'CANCELLED') continue;
+        if (!belongsTo(a, her)) continue;
         if (!a.date || !within(a.date, a.date)) continue;
         entries.push({
           id: `appointment:${a.id}`,
@@ -623,10 +695,11 @@ function createServer({
     // own number - they all book time, not rental sets.
     if (biz !== 'party') {
       let rows = rt.appointments ? rt.appointments.list({ status: req.query.status || null }) : [];
-      // On a professional's own number, her appointments only. The Studio's
-      // number still sees everyone's.
-      const her = lines?.running?.get(biz)?.line?.professionalId;
-      if (her) rows = rows.filter((a) => a.professionalId === her);
+      // On a professional's own number, her appointments only - wherever they
+      // were booked. A customer who writes to the Studio's main number and
+      // books her is still her afternoon.
+      const her = professionalFor(biz);
+      if (her) rows = rows.filter((a) => belongsTo(a, her));
       return res.json({ ok: true, appointments: rows });
     }
     const rows = rt.bookings ? rt.bookings.list({ status: req.query.status || null }) : [];
@@ -784,7 +857,14 @@ function createServer({
     }));
 
     app.get('/api/studio/services', (req, res) => {
-      res.json({ ok: true, services: dir.listServices() });
+      const { biz } = pick(req);
+      // Her number lists what she can actually be booked for: her own services
+      // and the ones the whole studio offers. The Studio's number lists them
+      // all, which is where a service is added or moved between people.
+      const her = professionalFor(biz);
+      const services = dir.listServices()
+        .filter((s2) => !her || !s2.professionalId || s2.professionalId === her);
+      res.json({ ok: true, services, forProfessional: her || null });
     });
     app.post('/api/studio/services', safe(async (req, res) => {
       const result = await dir.createService(req.body || {});

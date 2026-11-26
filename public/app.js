@@ -145,6 +145,7 @@ const T = {
     s_m_price: 'Preis', s_m_duration: 'Dauer', s_m_notes: 'Beschreibung', s_m_photo: 'Bild',
     s_photo_help: 'Ein Bild zu diesem Service - der Raum, die Liege, ein Beispiel. Der Bot schickt es mit, wenn jemand nach diesem Service fragt. Kein Foto einer Person: das gehoert auf ihr eigenes Profil.',
     p_no_location: 'Kein Standort', p_no_photo: 'Kein Foto',
+    her_number: 'Diese Nummer gehoert ihr',
     s_notes_help: 'Was dieser Service beinhaltet. Genau das erzaehlt der Bot, wenn ein Kunde nach Details fragt - bleibt das Feld leer, sagt er, dass er dazu nichts weiss.',
     f_intro: 'Eigene Fragen und Antworten. Der Bot benutzt sie woertlich - er formuliert sie nicht um.',
     no_faq: 'Noch keine Fragen hinterlegt.',
@@ -315,6 +316,7 @@ const T = {
     s_m_price: 'Price', s_m_duration: 'Duration', s_m_notes: 'Description', s_m_photo: 'Picture',
     s_photo_help: 'A picture of this service - the room, the table, an example. The bot sends it along when somebody asks about this service. Not a photo of a person: that belongs on her own profile.',
     p_no_location: 'No location', p_no_photo: 'No photo',
+    her_number: 'This number is hers',
     s_notes_help: 'What this service includes. This is exactly what the bot tells a customer who asks for details - leave it empty and it will say it does not know.',
     f_intro: 'Your own questions and answers. The bot uses them word for word - it does not rewrite them.',
     no_faq: 'No questions added yet.',
@@ -504,15 +506,18 @@ const NAV_LINKS = {
     ['/faq', 'nav_faq', 'help'],
     ['/settings', 'nav_settings', 'settings'],
   ],
-  // A professional's own number. She has no team, no service list and no
-  // locations of her own - those are the Studio's, edited once on the Studio's
-  // side. What belongs to her number is its connection, its chats and its
-  // appointments.
+  // A professional's own number: everything about her, in one place, so
+  // nobody has to switch back to the Studio to answer a question about her.
+  // Her status with her details, her chats, her appointments, her calendar,
+  // and what she can be booked for - her own services plus the ones the whole
+  // studio offers. The team list and the locations stay on the Studio's side,
+  // because they are the studio's and are edited once.
   pro: [
     ['/', 'nav_status', 'status'],
     ['/chats', 'nav_chats', 'chats'],
     ['/bookings', 'nav_appointments', 'calendar'],
     ['/calendar', 'nav_calendar', 'calendar'],
+    ['/services', 'nav_services', 'list'],
     ['/whatsapp', 'nav_whatsapp', 'link'],
     ['/settings', 'nav_settings', 'settings'],
   ],
@@ -530,7 +535,9 @@ const NAV_LINKS = {
 const PHONE_TABS = {
   party: ['/', '/chats', '/bookings', '/settings'],
   studio: ['/', '/chats', '/bookings', '/services'],
-  pro: ['/', '/chats', '/bookings', '/whatsapp'],
+  // Same four as the Studio. Connecting the number is a one-off job, not a
+  // daily page, so WhatsApp moves behind "More" where the rest of the setup is.
+  pro: ['/', '/chats', '/bookings', '/services'],
 };
 
 /** The selected number's own name. Every place the brand is shown reads this. */
@@ -671,7 +678,7 @@ syncLangFromServer();
  */
 const BIZ_AWARE_PREFIXES = [
   '/api/status', '/api/whatsapp', '/api/chats', '/api/bookings', '/api/calendar', '/api/test/chat',
-  '/api/alerts/where',
+  '/api/alerts/where', '/api/studio/services',
 ];
 function withBiz(path) {
   if (BIZ === 'party') return path; // party is the default on every endpoint - no param needed

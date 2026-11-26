@@ -513,7 +513,18 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 .tile .note { color: var(--muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 
 .tile .acts { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
-.tile .acts button { flex: 1; padding: 9px 10px; font-size: 13.5px; }
+/* Links in here are actions too - "Edit" that happens to go to another page
+   has no business looking different from the button beside it. */
+.tile .acts button, .tile .acts a.ghost { flex: 1; padding: 9px 10px; font-size: 13.5px; text-align: center; }
+.tile .acts a.ghost {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  color: var(--fg); text-decoration: none; font-weight: 600;
+}
+.tile .acts a.ghost:hover { border-color: var(--accent); }
+
+/* The "whose number is this" tile stands alone above the page rather than in
+   a grid of others, so it spans the column instead of being card-width. */
+#hercard { margin-bottom: 18px; }
 
 /* A chip for a short fact that reads better inline than in a row */
 .chip {

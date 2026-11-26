@@ -68,24 +68,24 @@ describe('the registry', () => {
     assert.deepStrictEqual(lines.all().map((l) => l.id), ['party', 'studio']);
   });
 
-  test('five numbers on the page, and not a sixth', async () => {
-    // Counted the way the Numbers page shows them, so PartyDekoMiet and the
-    // Studio are two of the five and three professionals can have their own.
-    assert.strictEqual(lines.MAX_LINES, 5, 'the owner set this number and checks it');
-    const room = 5 - lines.all().length;
-    assert.strictEqual(room, 3, 'two are built in');
+  test('seven numbers on the page, and not an eighth', async () => {
+    // Counted the way the Numbers page shows them: PartyDekoMiet and the
+    // Studio are two of the seven, so five professionals get their own.
+    assert.strictEqual(lines.MAX_LINES, 7, 'the owner set this number and checks it');
+    const room = lines.MAX_LINES - lines.all().length;
+    assert.strictEqual(room, 5, 'two are built in, five are for professionals');
     for (let n = 0; n < room; n += 1) {
       assert.strictEqual((await lines.create({ name: `Nr ${n}` })).ok, true, `number ${n + 1}`);
     }
     const over = await lines.create({ name: 'one too many' });
     assert.strictEqual(over.ok, false);
-    assert.match(over.error, /5/, 'the message names the limit');
-    assert.strictEqual(lines.all().length, 5, 'and nothing was added');
+    assert.match(over.error, /7/, 'the message names the limit');
+    assert.strictEqual(lines.all().length, 7, 'and nothing was added');
   });
 
   test('deleting one makes room for another', async () => {
     const made = [];
-    while (lines.all().length < 5) made.push((await lines.create({ name: `Nr ${made.length}` })).line);
+    while (lines.all().length < lines.MAX_LINES) made.push((await lines.create({ name: `Nr ${made.length}` })).line);
     assert.strictEqual((await lines.create({ name: 'one more' })).ok, false);
     await lines.remove(made[0].id);
     assert.strictEqual((await lines.create({ name: 'one more' })).ok, true);

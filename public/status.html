@@ -22,6 +22,15 @@
     </label>
   </div>
 
+  <!-- Only on a professional's own number: whose number this is. Her name,
+       where she works, when, and the number clients write to. All of it lived
+       on the Professionals page, behind a switch back to the Studio - one
+       journey too many for the first question anybody has when they open her
+       number. -->
+  <section id="herwrap" hidden>
+    <div class="tile" id="hercard"></div>
+  </section>
+
   <div class="quick" id="quick"></div>
   <div id="alerts"></div>
 
@@ -111,12 +120,57 @@ async function renderRoster() {
     </div>`).join('');
 }
 
+/**
+ * The card naming who this number belongs to.
+ *
+ * Shown only when the number is somebody's. The Studio's own number and
+ * PartyDekoMiet are nobody's, and a card saying so would be noise.
+ */
+function renderHer(p) {
+  if (!p) { $('herwrap').hidden = true; return; }
+  $('herwrap').hidden = false;
+
+  const facts = [
+    [t('p_location'), [p.locationName, p.locationAddress].filter(Boolean).join(', '), t('p_no_location')],
+    [t('p_hours'), p.workingHours, t('p_none_hours')],
+    [t('p_whatsapp'), p.whatsapp, t('p_no_number')],
+    [t('p_lang_short'), p.languages, t('p_none_lang')],
+  ];
+
+  $('hercard').innerHTML = `
+    <div class="head">
+      ${p.photoFileId
+        ? `<img class="shot" src="/api/studio/photo/${esc(p.photoFileId)}" alt="">`
+        : `<span class="shot">${esc(String(p.name || '?').trim().charAt(0).toUpperCase() || '?')}</span>`}
+      <div class="title">
+        <b>${esc(p.name)}</b>
+        <span>${esc(t('her_number'))}</span>
+      </div>
+      ${p.availability === 'busy' ? pill(t('roster_busy'), 'warn') : pill(t('roster_free'), 'ok')}
+    </div>
+    <div class="facts">
+      ${facts.map(([label, value, empty]) =>
+        `<div><dt>${esc(label)}</dt><dd>${value ? esc(value) : `<span class="muted">${esc(empty)}</span>`}</dd></div>`
+      ).join('')}
+    </div>
+    ${p.availability === 'busy' && p.busyNote ? `<div class="note">${esc(p.busyNote)}</div>` : ''}
+    <div class="acts">
+      <button class="ghost" onclick="setBusy('${esc(p.id)}', ${p.availability === 'busy' ? 'false' : 'true'})">
+        ${esc(p.availability === 'busy' ? t('roster_set_free') : t('roster_set_busy'))}
+      </button>
+      <a class="ghost" href="/professionals">${esc(t('edit'))}</a>
+    </div>`;
+}
+
 /** The owner correcting it by hand, for when she forgot to say "frei". */
 async function setBusy(id, busy) {
   await api(`/api/studio/professionals/${encodeURIComponent(id)}/availability`, {
     method: 'PATCH', body: { availability: busy ? 'busy' : 'free' },
   });
+  // Both, because the same button exists on the Studio's roster strip and on
+  // her own card, and neither may be left showing the state from before.
   renderRoster();
+  refresh();
 }
 for (const [id, key] of [
   ['l_wa','whatsapp'],['l_storage','storage'],['l_catalog','catalog'],['l_calendar','calendar'],
@@ -188,6 +242,9 @@ async function refresh() {
     $('toggle').checked = Boolean(d.config.botEnabled);
     $('toggle').disabled = !d.ready;
   }
+
+  // ---- whose number is this ----
+  renderHer(d.professional);
 
   // ---- alerts ----
   const al = [];

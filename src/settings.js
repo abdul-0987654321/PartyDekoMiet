@@ -85,7 +85,7 @@ const SCHEMA = [
     },
   },
   {
-    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 1000, min: 0, max: 10000, hidden: true,
+    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 0, min: 0, max: 10000, hidden: true,
     env: 'READ_DELAY_MS',
     label: { de: 'Warten bis "gelesen" (ms)', en: 'Wait before marking as read (ms)' },
     help: {

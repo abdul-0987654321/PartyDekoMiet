@@ -13,6 +13,7 @@ const { buildSystemPrompt } = require('./prompt');
 const partyTools = require('./tools');
 const { resolveLanguage, scoreText } = require('./language');
 const settings = require('../settings');
+const { claimsRequestSent, requestWasMade } = require('./guards');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -208,7 +209,30 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
         toolCalls.push({ name: 'send_product', args: { product_id: p.id }, result: { ok: true, sent: p.title, auto: true } });
       }
 
-      const guarded = guards.enforce(cards.text, { lang });
+      let guarded = guards.enforce(cards.text, { lang });
+
+      // A claim that the request is with the team, with no tool call behind it.
+      // The customer would walk away believing a booking exists; the owner
+      // would never hear of it. Rather than send that, ask for the thing that
+      // is almost always missing - the name - or, if we have it, put a human
+      // on it, which is what the customer was promised in substance.
+      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls)) {
+        log.error(
+          `Reply claimed a request had been passed on, but no request tool ran. ` +
+            `Tools: ${toolCalls.map((c) => c.name).join(', ') || 'none'} | "${guarded.text.slice(0, 160)}"`
+        );
+        // Without a name the tool could not have run anyway, so ask for it.
+        // With a name something else went wrong, and a person should look.
+        const replacement = customerName
+          ? (lang === 'en'
+            ? 'Let me check this with a colleague - I am passing your request to the team now.'
+            : 'Das schaue ich kurz mit dem Team an - ich gebe deine Anfrage jetzt weiter.')
+          : (lang === 'en'
+            ? 'Before I pass this to the team I still need your name - what should I put on the request?'
+            : 'Bevor ich das ans Team weitergebe, brauche ich noch deinen Namen - wie heisst du?');
+        if (customerName) handoff = true;
+        guarded = { ...guarded, text: replacement };
+      }
       if (guarded.blocked) {
         log.error(
           `Guard blocked a reply: ${guarded.violations.map((v) => v.code).join(', ')} | ` +

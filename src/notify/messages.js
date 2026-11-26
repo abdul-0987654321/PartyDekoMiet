@@ -66,6 +66,23 @@ const T = {
       min ? `Alles klar - du bist als besetzt eingetragen (ca. ${min} Min.). Sag Bescheid, wenn du frei bist.`
           : 'Alles klar - du bist als besetzt eingetragen. Sag "frei", wenn du wieder kannst.',
     proNowFree: 'Alles klar - du bist wieder als frei eingetragen.',
+
+    // Sent to the CUSTOMER when the owner presses Bestaetigen. Written as a
+    // person would write it - no bell, no status codes, no internal wording.
+    bookingConfirmedCustomer: (b) =>
+      `Deine Buchung ist bestaetigt. \n\n${b.productTitle}\n` +
+      `Abholung: ${b.pickupDate}\nRueckgabe: ${b.returnDate}\n\n` +
+      'Wir melden uns mit allen Details zur Abholung. Bis bald!',
+    bookingCancelledCustomer: (b) =>
+      `Deine Anfrage fuer ${b.productTitle} konnten wir leider nicht bestaetigen. ` +
+      'Melde dich gerne, wenn du etwas anderes suchst - wir finden sicher etwas.',
+    appointmentConfirmedCustomer: (a) =>
+      `Dein Termin ist bestaetigt.\n\n${a.serviceName}\n` +
+      `${a.date} um ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n` +
+      `${a.professionalName ? `Bei: ${a.professionalName}\n` : ''}\nBis bald!`,
+    appointmentCancelledCustomer: (a) =>
+      `Dein Terminwunsch am ${a.date} um ${a.startTime} hat leider nicht geklappt. ` +
+      'Melde dich gerne fuer einen anderen Termin.',
     proExtended: (a, min) =>
       `Verlaengert um ${min} Min. - der Termin geht jetzt bis ${a.endTime}. Das Team ist informiert.`,
     proNoRunningAppointment: 'Ich finde gerade keinen laufenden Termin von dir. Sag "besetzt", dann weiss das Team Bescheid.',
@@ -161,6 +178,21 @@ const T = {
       min ? `Got it - you are marked busy (about ${min} min). Tell me when you are free.`
           : 'Got it - you are marked busy. Say "free" when you can take someone again.',
     proNowFree: 'Got it - you are marked free again.',
+
+    bookingConfirmedCustomer: (b) =>
+      `Your booking is confirmed.\n\n${b.productTitle}\n` +
+      `Pickup: ${b.pickupDate}\nReturn: ${b.returnDate}\n\n` +
+      'We will be in touch with the pickup details. See you soon!',
+    bookingCancelledCustomer: (b) =>
+      `Unfortunately we could not confirm your request for ${b.productTitle}. ` +
+      'Do get in touch if you are looking for something else - we will find something.',
+    appointmentConfirmedCustomer: (a) =>
+      `Your appointment is confirmed.\n\n${a.serviceName}\n` +
+      `${a.date} at ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n` +
+      `${a.professionalName ? `With: ${a.professionalName}\n` : ''}\nSee you soon!`,
+    appointmentCancelledCustomer: (a) =>
+      `Unfortunately your appointment request for ${a.date} at ${a.startTime} did not work out. ` +
+      'Do get in touch for another time.',
     proExtended: (a, min) =>
       `Extended by ${min} min - the appointment now runs until ${a.endTime}. The team has been told.`,
     proNoRunningAppointment: 'I cannot find a running appointment for you. Say "busy" and the team will know.',

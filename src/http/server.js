@@ -484,37 +484,83 @@ function createServer({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return res.status(400).json({ ok: false, error: 'from and to must be YYYY-MM-DD' });
     }
+    const within = (startDate, endDate) => startDate <= to && (endDate || startDate) >= from;
 
-    const entries = db
-      .all('calendarEvents')
-      .filter((e) => e.business === biz)
-      .filter((e) => overlapsWindow(e, `${from}T00:00:00Z`, `${to}T23:59:59Z`))
-      .map((e) => {
-        let priv = {};
-        try { priv = JSON.parse(e.privateJson || '{}'); } catch { priv = {}; }
-        const title = String(e.summary || '');
-        const status = /\[CONFIRMED\]/i.test(title) ? 'CONFIRMED'
-          : /\[PENDING\]/i.test(title) ? 'PENDING'
-          : priv.bookingStatus || null;
-        return {
-          id: e.id,
-          allDay: e.allDay === true,
-          startDate: e.allDay ? e.startDate : String(e.startDateTime || '').slice(0, 10),
-          endDate: e.allDay ? e.endDate : String(e.endDateTime || e.startDateTime || '').slice(0, 10),
-          startTime: e.allDay ? '' : String(e.startDateTime || '').slice(11, 16),
-          endTime: e.allDay ? '' : String(e.endDateTime || '').slice(11, 16),
-          // The bracketed status is for the calendar's own bookkeeping; the
-          // page shows it as a colour instead.
-          title: title.replace(/^\[(PENDING|CONFIRMED|CANCELLED|BLOCKED)\]\s*/i, '').trim(),
-          status,
-          source: e.source || 'bot',
-          professionalId: priv.professionalId || '',
-          appointmentId: priv.appointmentId || '',
-          bookingId: priv.bookingId || '',
-        };
-      })
-      .sort((a, b) => `${a.startDate}${a.startTime}`.localeCompare(`${b.startDate}${b.startTime}`));
+    // The bookings and appointments themselves, not the calendar entries written
+    // beside them.
+    //
+    // It used to read the calendar table, and a booking that existed on the
+    // Buchungen page was missing from the calendar because its calendar entry
+    // had not been written - a failure during the write, or an entry that went
+    // to Google before the switch. Either way the owner saw an empty December
+    // while holding a request for the 9th, and nothing told him which of the
+    // two pages was lying. A booking IS an occupied day; it does not need a
+    // second record to be one.
+    const entries = [];
 
+    if (biz === 'party') {
+      for (const b of db.all('bookings')) {
+        if ((b.business || 'party') !== 'party') continue;
+        if (b.status === 'CANCELLED') continue;
+        if (!b.pickupDate || !within(b.pickupDate, b.returnDate)) continue;
+        entries.push({
+          id: `booking:${b.id}`,
+          allDay: true,
+          startDate: b.pickupDate,
+          // A rental covers pickup to return inclusive; the grid treats the end
+          // as exclusive, the way an all-day entry is written.
+          endDate: addOneDay(b.returnDate || b.pickupDate),
+          startTime: '', endTime: '',
+          title: `${b.productTitle || 'Buchung'} - ${b.customerName || ''}`.trim(),
+          status: b.status || 'PENDING',
+          source: 'booking',
+          bookingId: b.id,
+          phone: b.phone || '',
+        });
+      }
+    } else {
+      for (const a of db.all('appointments')) {
+        if (a.status === 'CANCELLED') continue;
+        if (!a.date || !within(a.date, a.date)) continue;
+        entries.push({
+          id: `appointment:${a.id}`,
+          allDay: false,
+          startDate: a.date,
+          endDate: a.date,
+          startTime: a.startTime || '',
+          endTime: a.endTime || '',
+          title: [a.serviceName, a.customerName].filter(Boolean).join(' - '),
+          status: a.status || 'PENDING',
+          source: 'appointment',
+          appointmentId: a.id,
+          professionalId: a.professionalId || '',
+          professionalName: a.professionalName || '',
+          phone: a.phone || '',
+        });
+      }
+    }
+
+    // Time the owner blocked by hand. Bot-written calendar entries are left out
+    // here: they describe the same bookings listed above, so including them
+    // would draw everything twice.
+    for (const e of db.all('calendarEvents')) {
+      if (e.business !== biz) continue;
+      if ((e.source || 'bot') !== 'owner') continue;
+      if (!overlapsWindow(e, `${from}T00:00:00Z`, `${to}T23:59:59Z`)) continue;
+      entries.push({
+        id: e.id,
+        allDay: e.allDay === true,
+        startDate: e.allDay ? e.startDate : String(e.startDateTime || '').slice(0, 10),
+        endDate: e.allDay ? e.endDate : String(e.endDateTime || e.startDateTime || '').slice(0, 10),
+        startTime: e.allDay ? '' : String(e.startDateTime || '').slice(11, 16),
+        endTime: e.allDay ? '' : String(e.endDateTime || '').slice(11, 16),
+        title: String(e.summary || '').replace(/^\[(PENDING|CONFIRMED|CANCELLED|BLOCKED)\]\s*/i, '').trim(),
+        status: null,
+        source: 'owner',
+      });
+    }
+
+    entries.sort((a, b) => `${a.startDate}${a.startTime}`.localeCompare(`${b.startDate}${b.startTime}`));
     res.json({ ok: true, entries, today: new Date().toISOString().slice(0, 10) });
   });
 

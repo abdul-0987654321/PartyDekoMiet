@@ -248,6 +248,9 @@ function createWhatsAppClient(business = 'party') {
    */
   async function markRead(msg) {
     try {
+      // Default is now immediate. A held-back tick means the customer's phone
+      // keeps showing an unread message and plays the notification tone again -
+      // which the owner hears on his own phone every time he tests.
       const delay = Number(settings.get('readDelayMs'));
       if (delay > 0) await sleep(delay);
       await runtime.sock?.readMessages([msg.key]);
@@ -459,7 +462,10 @@ function createWhatsAppClient(business = 'party') {
           if (msg.key.fromMe && isOwnMessage(msg.key.id)) continue;
 
           void (async () => {
-            if (!msg.key.fromMe) await markRead(msg);
+            // Not awaited: the tick is a courtesy, the reply is the work.
+            // Waiting for it put the delay in front of everything that came
+            // after, so a second of politeness became a second of silence.
+            if (!msg.key.fromMe) markRead(msg);
             try {
               await messageHandler(msg);
             } catch (err) {

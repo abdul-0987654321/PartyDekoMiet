@@ -666,17 +666,102 @@ function withBiz(path) {
   return path + (path.includes('?') ? '&' : '?') + 'biz=' + BIZ;
 }
 
-async function api(path, options) {
-  const res = await fetch(withBiz(path), {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-    body: options?.body ? JSON.stringify(options.body) : undefined,
-  });
-  if (res.status === 401) {
-    location.replace('/login');
-    throw new Error('unauthorised');
+/* ---------------------------------------------------------------------------
+ * Showing that something is happening.
+ *
+ * This dashboard is real pages and real network calls, so there is always a
+ * moment between a tap and anything changing. Unmarked, that moment reads as a
+ * dead button and gets tapped again - which on a Confirm button is not a
+ * cosmetic problem.
+ *
+ * Two cues, both automatic: a thin line across the top whenever a request or a
+ * page change is in flight, and a spinner on the button that started it. No
+ * call site has to remember to do either.
+ * ------------------------------------------------------------------------- */
+
+let inFlight = 0;
+
+function progressBar() {
+  let el = document.getElementById('progress');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'progress';
+    document.body.appendChild(el);
   }
-  return res.json();
+  return el;
+}
+
+let progressTimer = null;
+
+/**
+ * The bar waits before showing itself.
+ *
+ * Several pages poll every ten seconds, and a bar that flashed on every poll
+ * would be a blinking light at the top of the screen all day - worse than no
+ * feedback at all. A call that answers in under 180ms needed no reassurance
+ * anyway; the ones worth marking are the ones that feel slow.
+ */
+function progressStart() {
+  inFlight += 1;
+  if (progressTimer) return;
+  progressTimer = setTimeout(() => {
+    progressTimer = null;
+    if (inFlight <= 0) return;
+    const el = progressBar();
+    el.classList.add('on');
+    // Creeps towards 90% - the last tenth is the answer arriving, which is the
+    // only part we cannot predict.
+    el.style.width = '20%';
+    setTimeout(() => { if (inFlight > 0) el.style.width = '90%'; }, 250);
+  }, 180);
+}
+
+function progressDone() {
+  inFlight = Math.max(0, inFlight - 1);
+  if (inFlight) return;
+  if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
+  const el = progressBar();
+  if (!el.classList.contains('on')) return; // it never became visible
+  el.style.width = '100%';
+  setTimeout(() => { el.classList.remove('on'); el.style.width = '0'; }, 220);
+}
+
+// The button under the pointer when a request starts: that is the one that
+// should show the spinner.
+let lastPressed = null;
+document.addEventListener('mousedown', (e) => { lastPressed = e.target.closest('button'); }, true);
+document.addEventListener('touchstart', (e) => { lastPressed = e.target.closest('button'); }, true);
+
+// A page change is a wait like any other, and the longest one in the app.
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a[href]');
+  if (!link || e.defaultPrevented || e.metaKey || e.ctrlKey || link.target === '_blank') return;
+  const href = link.getAttribute('href') || '';
+  if (href.startsWith('/') && !href.startsWith('//')) progressStart();
+}, true);
+
+async function api(path, options) {
+  const button = lastPressed;
+  lastPressed = null;
+  if (button) button.setAttribute('aria-busy', 'true');
+  progressStart();
+  try {
+    const res = await fetch(withBiz(path), {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+    });
+    if (res.status === 401) {
+      location.replace('/login');
+      throw new Error('unauthorised');
+    }
+    return await res.json();
+  } finally {
+    progressDone();
+    // The button may have been replaced by a re-render in the meantime; that
+    // is fine, the attribute goes with it.
+    if (button) button.removeAttribute('aria-busy');
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -92,11 +92,16 @@ const STRIP_RULES = [
   {
     code: 'CONFIRM_ON_PAYMENT',
     hint: 'Paying does not confirm anything. The team confirms, after checking.',
+    // Both orders, and every form of the verb. The first version of this rule
+    // wanted "confirmed" after "payment", and the very next reply said
+    // "they'll confirm once the payment is processed" - same promise, other
+    // word order, straight through. Confirming and paying must simply never
+    // appear in one sentence.
     patterns: [
-      /\b(booking|reservation|request)\b.{0,40}\b(confirmed|secured)\b.{0,40}\b(payment|paid)\b/i,
-      /\b(once|after|when|as soon as)\b.{0,30}\b(payment|paid|you pay)\b.{0,45}\b(confirmed|secured|booked)\b/i,
-      /\b(buchung|reservierung|anfrage)\b.{0,45}\b(best(?:ae|a)tigt|verbindlich|fix)\b.{0,45}\b(zahlung|bezahlt)\b/i,
-      /\b(sobald|wenn|nachdem)\b.{0,30}\b(zahlung|bezahlt|bezahlst)\b.{0,50}\b(best(?:ae|a)tigt|verbindlich|fix|gebucht)\b/i,
+      /\b(confirm|confirms|confirmed|confirmation|secure|secured|guarantee\w*)\b.{0,60}\b(payment|paid|pay\b)/i,
+      /\b(payment|paid|pay\b).{0,60}\b(confirm|confirms|confirmed|confirmation|secure|secured|booked)\b/i,
+      /\b(best(?:ae|a)tig\w*|verbindlich|fix|gebucht|reserviert)\b.{0,60}\b(zahlung|bezahl\w*)\b/i,
+      /\b(zahlung|bezahl\w*)\b.{0,60}\b(best(?:ae|a)tig\w*|verbindlich|fix|gebucht|reserviert)\b/i,
     ],
   },
   {
@@ -181,6 +186,35 @@ const RULES = [
  * @param {number} opts.depositChf
  * @param {number} opts.lateFeeChf
  */
+/**
+ * Does this reply tell the customer their request has been passed on?
+ *
+ * Needed because the model can simply say so without having called the tool.
+ * That happened: a customer picked a set, was told "your request is with the
+ * team", and nothing reached anybody - no alert, no entry in the calendar, no
+ * booking. From the customer's side a request was made. From the owner's side
+ * it never existed. Of everything a chatbot can get wrong, telling somebody
+ * their booking is in hand when it is not is the one that loses the customer
+ * and the day.
+ */
+const CLAIMS_REQUEST_SENT = [
+  /\b(anfrage|buchungsanfrage|anliegen)\b.{0,40}\b(weitergegeben|weitergeleitet|uebermittelt|ans team|beim team|erstellt|aufgenommen)\b/i,
+  /\b(ich habe|wir haben|hab ich)\b.{0,30}\b(die anfrage|eine anfrage|das weitergegeben)\b/i,
+  /\b(request|booking request)\b.{0,45}\b(with the team|passed on|sent to the team|forwarded|created|submitted|placed)\b/i,
+  /\b(i(?:'ve| have)|we(?:'ve| have))\b.{0,30}\b(created|sent|passed|forwarded|placed|submitted)\b.{0,30}\b(request|booking)\b/i,
+  /\b(das team|the team)\b.{0,30}\b(meldet sich|wird sich melden|will get back|will contact)\b/i,
+];
+
+const claimsRequestSent = (text) => {
+  const probe = fold(String(text || ''));
+  return CLAIMS_REQUEST_SENT.some((p) => p.test(probe));
+};
+
+/** Tool calls that actually put a request in front of a human. */
+const REQUEST_TOOLS = new Set(['create_booking_request', 'create_appointment', 'handoff_to_human']);
+const requestWasMade = (toolCalls = []) =>
+  toolCalls.some((c) => REQUEST_TOOLS.has(c.name) && c.result?.ok !== false);
+
 function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damagePrices = '' } = {}) {
   // Whitelist every sentence of every official answer. Read per check, not
   // captured here: FAQ answers are dashboard-editable while the bot runs, and
@@ -303,4 +337,4 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damag
   return { check, enforce, autofix, strip };
 }
 
-module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES };
+module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES, claimsRequestSent, requestWasMade };

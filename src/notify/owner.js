@@ -127,11 +127,13 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
    * owner() on purpose: that one is "tell whoever runs this", this one is "tell
    * exactly her", and the two must never quietly become the same thing.
    */
-  async function toNumber(number, text) {
+  async function toNumber(number, text, { plain = false } = {}) {
     const digits = String(number || '').replace(/[^0-9]/g, '');
     if (digits.length < 8) return { ok: false, error: 'no number' };
     try {
-      await client.sendText(`${digits}@s.whatsapp.net`, `\u{1F514} ${text}`);
+      // The bell marks a message as internal. A customer being told their
+      // booking is confirmed must not get one.
+      await client.sendText(`${digits}@s.whatsapp.net`, plain ? text : `\u{1F514} ${text}`);
       return { ok: true };
     } catch (err) {
       log.error(`Could not notify ${digits}: ${err.message}`);

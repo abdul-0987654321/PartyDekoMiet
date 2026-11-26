@@ -595,3 +595,51 @@ button.danger-link:hover { color: var(--err); border-color: var(--err); backgrou
   .calgrid .cell { min-height: 46px; }
   .calttl { display: block; margin: 3px 0 0 14px; }
 }
+
+/* ---- Feeling responsive -------------------------------------------------
+   Every page here is a real page load and every button waits on the network,
+   so without this a tap does nothing visible for a moment and gets tapped
+   again. None of it makes the work faster; all of it makes the waiting
+   legible, which is the part that was missing. */
+
+/* A tap answers immediately, before the network does. */
+button, .quick a, .chatitem, .tile, .calgrid .cell {
+  transition: background-color .14s ease, border-color .14s ease,
+              transform .09s cubic-bezier(.2,.8,.3,1), opacity .14s ease;
+}
+button:active:not(:disabled), .quick a:active { transform: scale(.975); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* A button that is waiting on the server says so, and cannot be pressed twice. */
+button[aria-busy="true"] {
+  position: relative; color: transparent !important; pointer-events: none;
+}
+button[aria-busy="true"]::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent;
+  color: var(--text);
+  animation: spin .6s linear infinite;
+}
+button.primary[aria-busy="true"]::after { color: #fff; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* One thin line across the top while anything is in flight, including a page
+   change - the moment between tapping a menu item and the next page arriving
+   was the emptiest moment in the app. */
+#progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0;
+  background: var(--accent); z-index: 999;
+  transition: width .2s ease, opacity .3s ease; opacity: 0;
+}
+#progress.on { opacity: 1; }
+
+/* Content arriving should not snap into place. */
+.card, .tile, .bk { animation: rise .18s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

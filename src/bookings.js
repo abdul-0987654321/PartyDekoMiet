@@ -210,7 +210,23 @@ function createBookings({ catalog, calendar, notify }) {
     await db.flush();
     log.info(`Booking ${id}: ${previous} -> ${status}`);
 
-    return { ok: true, booking, previous, calendarWarning };
+    // Tell the customer. Until now confirming was silent on their side: the
+    // owner pressed the button, the dashboard turned green, and the person
+    // waiting on WhatsApp heard nothing at all and had no way to know their
+    // set was theirs.
+    let customerTold = false;
+    if (notify?.toNumber && booking.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+      const { m } = require('./notify/messages');
+      const texts = m();
+      const text = status === 'CONFIRMED'
+        ? texts.bookingConfirmedCustomer(booking)
+        : texts.bookingCancelledCustomer(booking);
+      const res = await notify.toNumber(String(booking.jid).split('@')[0], text, { plain: true });
+      customerTold = Boolean(res?.ok);
+      if (!customerTold) log.warn(`Booking ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+    }
+
+    return { ok: true, booking, previous, calendarWarning, customerTold };
   }
 
   function list({ status = null, limit = 100 } = {}) {

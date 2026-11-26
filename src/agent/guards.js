@@ -58,6 +58,57 @@ const CONDITIONAL = /\b(sobald|wenn|erst|nachdem|falls|sofern|bevor|once|as soon
 /** A sentence that negates is denying the thing, not offering it. */
 const NEGATION = /\b(kein|keine|keinen|keinem|keiner|nicht|nein|ohne|leider|no|not|don't|do not|doesn't|cannot|can't)\b/i;
 
+/**
+ * Sentences that are removed rather than blocking the whole message.
+ *
+ * The difference matters. A hard rule means the reply was dangerous and the
+ * chat goes to a human. These are sentences that are simply not ours to say:
+ * the rest of the message is correct and useful, and replacing all of it with
+ * "I'll pass this to a colleague" would be a worse answer than the one with the
+ * sentence taken out.
+ *
+ * All of them are about money. The bot's job ends at passing the request to the
+ * team; the team checks it and sends the invoice. A bot that asks for payment
+ * is promising that paying is what secures the set, which is not true and is
+ * the one promise that costs real money when it is wrong.
+ */
+// Gaps here are written `.{0,n}` rather than `[^.!?]{0,n}`: these are matched
+// against one sentence at a time, and a price like "CHF 60.-" contains a full
+// stop, so a gap that forbids one silently fails to match the exact sentences
+// this exists to catch.
+const STRIP_RULES = [
+  {
+    code: 'PAYMENT_REQUESTED',
+    hint: 'The bot never asks for payment and never sends a payment link. The team invoices after checking the request.',
+    patterns: [
+      /\b(complete|make|process|finish)\b.{0,20}\b(the )?payment\b/i,
+      /\bpay\b.{0,25}\b(here|through this link|via this link|now|first)\b/i,
+      /\bplease (pay|complete|proceed with)\b/i,
+      /\b(zahlung|bezahlung)\b.{0,30}\b(ueber|via|hier|abschliessen|vornehmen|taetigen|durchfuehren)\b/i,
+      /\b(bezahl|bezahle|bezahlen|zahl|zahle)\b.{0,25}\b(hier|bitte|ueber diesen link|im shop|zuerst|jetzt)\b/i,
+      /\b(bitte)\b.{0,20}\b(bezahl\w*|zahlung)\b/i,
+    ],
+  },
+  {
+    code: 'CONFIRM_ON_PAYMENT',
+    hint: 'Paying does not confirm anything. The team confirms, after checking.',
+    patterns: [
+      /\b(booking|reservation|request)\b.{0,40}\b(confirmed|secured)\b.{0,40}\b(payment|paid)\b/i,
+      /\b(once|after|when|as soon as)\b.{0,30}\b(payment|paid|you pay)\b.{0,45}\b(confirmed|secured|booked)\b/i,
+      /\b(buchung|reservierung|anfrage)\b.{0,45}\b(best(?:ae|a)tigt|verbindlich|fix)\b.{0,45}\b(zahlung|bezahlt)\b/i,
+      /\b(sobald|wenn|nachdem)\b.{0,30}\b(zahlung|bezahlt|bezahlst)\b.{0,50}\b(best(?:ae|a)tigt|verbindlich|fix|gebucht)\b/i,
+    ],
+  },
+  {
+    code: 'DEPOSIT_INCLUDED',
+    hint: 'The deposit is charged on top, never included in the rental price.',
+    patterns: [
+      /\b(total|gesamt\w*|summe|preis)\b.{0,40}\b(inklusive|inkl\.?|including|includes|enthaelt)\b.{0,25}\b(kaution|deposit)\b/i,
+      /\b(kaution|deposit)\b.{0,25}\b(ist|sind|is|are)\b.{0,20}\b(inklusive|inbegriffen|included)\b/i,
+    ],
+  },
+];
+
 const RULES = [
   {
     code: 'CONFIRMED_BOOKING',
@@ -199,22 +250,57 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damag
    *
    * @returns {{text:string, violations:object[], blocked:boolean, sharpSFixed:boolean}}
    */
+  /**
+   * Takes out the sentences that are not ours to say, keeps the rest.
+   *
+   * @returns {{text: string, stripped: object[]}}
+   */
+  function strip(text) {
+    const allowed = allowedSentences();
+    const stripped = [];
+    const kept = [];
+    for (const sentence of sentences(text)) {
+      if (allowed.has(normalise(sentence))) { kept.push(sentence); continue; }
+      const probe = fold(sentence);
+      const rule = STRIP_RULES.find((r) => r.patterns.some((p) => p.test(probe)));
+      if (rule) stripped.push({ code: rule.code, hint: rule.hint, sentence });
+      else kept.push(sentence);
+    }
+    return { text: kept.join(' ').replace(/\s{2,}/g, ' ').trim(), stripped };
+  }
+
+  /** Said when stripping leaves nothing worth sending. */
+  const AFTER_STRIP = {
+    de: 'Ich habe deine Anfrage ans Team weitergegeben - sie melden sich bei dir.',
+    en: 'I have passed your request to the team - they will get back to you.',
+  };
+
   function enforce(text, { lang = 'de' } = {}) {
     const original = String(text ?? '');
-    const fixed = autofix(original);
+    let fixed = autofix(original);
+
+    // Strip first, then judge what is left: a message whose only problem was a
+    // payment sentence is a good message once that sentence is gone, and
+    // handing the whole chat to a human over it would be the wrong trade.
+    const { text: withoutPayment, stripped } = strip(fixed);
+    if (stripped.length) {
+      fixed = withoutPayment.length >= 15 ? withoutPayment : (AFTER_STRIP[lang] || AFTER_STRIP.de);
+    }
+
     const violations = check(fixed);
     if (violations.length) {
       return {
         text: FALLBACK[lang] || FALLBACK.de,
         violations,
         blocked: true,
+        stripped,
         sharpSFixed: fixed !== original,
       };
     }
-    return { text: fixed, violations: [], blocked: false, sharpSFixed: fixed !== original };
+    return { text: fixed, violations: [], blocked: false, stripped, sharpSFixed: fixed !== original };
   }
 
-  return { check, enforce, autofix };
+  return { check, enforce, autofix, strip };
 }
 
-module.exports = { createGuards, sentences, normalise, fold };
+module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES };

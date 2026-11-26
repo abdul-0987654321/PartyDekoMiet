@@ -85,15 +85,6 @@ const SCHEMA = [
     },
   },
   {
-    key: 'readDelayMs', advanced: true, group: 'bot', type: 'number', default: 0, min: 0, max: 10000, hidden: true,
-    env: 'READ_DELAY_MS',
-    label: { de: 'Warten bis "gelesen" (ms)', en: 'Wait before marking as read (ms)' },
-    help: {
-      de: 'Der Bot setzt den Haken nicht sofort. Zusammen mit der Tippdauer ergibt das einen natuerlichen Ablauf.',
-      en: 'The bot does not tick the message as read instantly. Together with the typing delay this reads as natural.',
-    },
-  },
-  {
     key: 'typingMinMs', advanced: true, group: 'bot', type: 'number', default: 3000, min: 0, max: 15000, hidden: true,
     env: 'TYPING_MIN_MS',
     label: { de: 'Tippdauer min. (ms)', en: 'Typing delay min (ms)' },
@@ -137,7 +128,7 @@ const SCHEMA = [
   },
 
   {
-    key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '', hidden: true,
+    key: 'otherBusinessKeywords', group: 'bot', type: 'string', default: '',
     placeholder: 'hochzeitsplanung, eventplanung, catering',
     label: { de: 'Stichwörter für andere Betriebe', en: 'Keywords for other businesses' },
     help: {

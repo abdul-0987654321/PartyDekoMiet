@@ -197,16 +197,32 @@ const RULES = [
  * their booking is in hand when it is not is the one that loses the customer
  * and the day.
  */
+/**
+ * Only a claim that it is DONE, never a statement of intent.
+ *
+ * The first version of this also matched "I'll send your request to the team
+ * now", which is the model announcing what it is about to do - and the tool
+ * call comes on the next turn, after the customer says yes. So a perfectly
+ * normal conversation was being torn down and handed to a human one message
+ * before the booking would have been made.
+ *
+ * The distinction is the tense. "I have passed it on" with nothing behind it
+ * is a lie the customer will act on. "I'll pass it on" is a promise about the
+ * next message, and the next message is where it gets checked.
+ */
 const CLAIMS_REQUEST_SENT = [
-  /\b(anfrage|buchungsanfrage|anliegen)\b.{0,40}\b(weitergegeben|weitergeleitet|uebermittelt|ans team|beim team|erstellt|aufgenommen)\b/i,
-  /\b(ich habe|wir haben|hab ich)\b.{0,30}\b(die anfrage|eine anfrage|das weitergegeben)\b/i,
-  /\b(request|booking request)\b.{0,45}\b(with the team|passed on|sent to the team|forwarded|created|submitted|placed)\b/i,
+  /\b(ich habe|wir haben|hab ich|habe ich)\b.{0,40}\b(weitergegeben|weitergeleitet|uebermittelt|erstellt|aufgenommen)\b/i,
+  /\b(anfrage|buchungsanfrage|anliegen)\b.{0,30}\b(ist|wurde|liegt)\b.{0,25}\b(weitergegeben|weitergeleitet|beim team|erstellt)\b/i,
   /\b(i(?:'ve| have)|we(?:'ve| have))\b.{0,30}\b(created|sent|passed|forwarded|placed|submitted)\b.{0,30}\b(request|booking)\b/i,
-  /\b(das team|the team)\b.{0,30}\b(meldet sich|wird sich melden|will get back|will contact)\b/i,
+  /\b(your |the )?(request|booking request)\b.{0,20}\b(is|has been|was)\b.{0,25}\b(with the team|passed on|sent|forwarded|created|submitted|placed)\b/i,
 ];
+
+/** Future tense: a promise about the next message, not a claim about this one. */
+const INTENDS_TO_SEND = /\b(i(?:'ll| will)|we(?:'ll| will)|ich (?:werde|gebe|leite)|wir (?:werden|geben|leiten))\b/i;
 
 const claimsRequestSent = (text) => {
   const probe = fold(String(text || ''));
+  if (INTENDS_TO_SEND.test(probe)) return false;
   return CLAIMS_REQUEST_SENT.some((p) => p.test(probe));
 };
 

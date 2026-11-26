@@ -124,14 +124,32 @@ const flatten = (s) =>
  *
  * @returns {boolean} true when the message belongs to the other business
  */
+/**
+ * Is this message for the other business?
+ *
+ * Whole words only. It used to accept a keyword anywhere inside another word,
+ * which is how "I need boling for birthday party on 16 December" was answered
+ * with "I only handle party decoration here" and handed to a human: some
+ * keyword was sitting inside "boling". A customer asking for exactly what this
+ * bot sells was told it was the wrong bot.
+ *
+ * A multi-word keyword still matches as a phrase; it is the word edges that
+ * matter, not the spaces inside it.
+ *
+ * @returns {string|false} the keyword that matched, so the log can say why
+ */
 function matchesOtherBusiness(text, keywordsRaw) {
   const keywords = String(keywordsRaw || '')
     .split(',')
     .map((k) => flatten(k))
     .filter((k) => k.length > 2);
   if (!keywords.length) return false;
-  const haystack = ` ${flatten(text)} `;
-  return keywords.some((k) => haystack.includes(` ${k} `) || haystack.includes(k));
+  const haystack = flatten(text);
+  for (const k of keywords) {
+    const edge = new RegExp(`(^|[^\\p{L}\\p{N}])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}])`, 'u');
+    if (edge.test(haystack)) return k;
+  }
+  return false;
 }
 
 /**
@@ -491,7 +509,9 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
     // Belongs to the other business on this number: answer honestly, hand over,
     // and never let the model near it.
-    if (matchesOtherBusiness(text, settings.get('otherBusinessKeywords'))) {
+    const otherBusinessHit = matchesOtherBusiness(text, settings.get('otherBusinessKeywords'));
+    if (otherBusinessHit) {
+      log.info(`[${business}] "${otherBusinessHit}" matched the other-business keywords - deflecting ${jid}.`);
       const lang = /\b(the|and|is|how|can|hello|hi|you|do|your)\b/i.test(text) ? 'en' : 'de';
       const reply = settings.get(lang === 'en' ? 'otherBusinessReplyEn' : 'otherBusinessReplyDe');
       await client.sendText(jid, reply);

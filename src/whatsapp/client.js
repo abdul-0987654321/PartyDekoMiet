@@ -248,11 +248,14 @@ function createWhatsAppClient(business = 'party') {
    */
   async function markRead(msg) {
     try {
-      // Default is now immediate. A held-back tick means the customer's phone
-      // keeps showing an unread message and plays the notification tone again -
-      // which the owner hears on his own phone every time he tests.
-      const delay = Number(settings.get('readDelayMs'));
-      if (delay > 0) await sleep(delay);
+      // Immediately, with no setting in front of it.
+      //
+      // There used to be a configurable pause here, to make the bot look less
+      // mechanical. It cost more than it bought: until the tick appears the
+      // customer's phone keeps the chat unread and re-plays the notification
+      // tone, and the owner hears that on his own phone every time he tests.
+      // The pause before the reply itself is what makes the rhythm human, and
+      // that one is still there.
       await runtime.sock?.readMessages([msg.key]);
     } catch (err) {
       log.warn(`${logTag}Could not mark message as read: ${err.message}`);

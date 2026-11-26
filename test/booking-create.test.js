@@ -122,3 +122,43 @@ describe('through the tool the model actually calls', () => {
     assert.ok(!/fehlgeschlagen: .* is not defined/.test(res.error), 'a crash here means every booking is lost');
   });
 });
+
+describe('announcing is not claiming', () => {
+  // The guard against "your request is with the team" with no tool behind it
+  // started tearing down ordinary conversations: the model announces what it
+  // is about to do, the customer says ok, and the tool runs on the next turn.
+  // Handing that to a human one message before the booking is made is worse
+  // than the problem it was built for.
+  const { claimsRequestSent, requestWasMade } = require('../src/agent/guards');
+
+  for (const said of [
+    "I'll send your request to the team now.",
+    'I will pass this on to the team.',
+    'Ich gebe deine Anfrage jetzt weiter.',
+    'Ich werde das ans Team weiterleiten.',
+  ]) {
+    test(`"${said.slice(0, 40)}" is an intention, not a claim`, () => {
+      assert.strictEqual(claimsRequestSent(said), false);
+    });
+  }
+
+  for (const said of [
+    "I've created a booking request for the Gold Ring.",
+    'Your request is with the team.',
+    'Ich habe die Anfrage ans Team weitergegeben.',
+  ]) {
+    test(`"${said.slice(0, 40)}" is a claim`, () => {
+      assert.strictEqual(claimsRequestSent(said), true);
+    });
+  }
+
+  test('a claim is fine once the tool has actually run', () => {
+    const calls = [{ name: 'create_booking_request', result: { ok: true } }];
+    assert.strictEqual(requestWasMade(calls), true);
+  });
+
+  test('a failed tool call does not count as a request', () => {
+    const calls = [{ name: 'create_booking_request', result: { ok: false } }];
+    assert.strictEqual(requestWasMade(calls), false);
+  });
+});

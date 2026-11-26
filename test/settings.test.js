@@ -46,6 +46,9 @@ describe('defaults', () => {
       'alertNumbers',
       'botLanguage',
       'dashboardLanguage',
+      // On the form because it can send a customer away: if a word here ever
+      // deflects somebody who was in the right chat, it has to be findable.
+      'otherBusinessKeywords',
       'shopUrl',
       'studioAboutText',
       'studioAlertNumbers',

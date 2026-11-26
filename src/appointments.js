@@ -180,6 +180,7 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
 
     // The customer hears about it too - same as on the PartyDekoMiet side.
     // Confirming used to be silent towards the person actually waiting.
+    let customerTold = false;
     if (notify?.toNumber && appt.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
       const { m } = require('./notify/messages');
       const texts = m();
@@ -187,7 +188,14 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
         ? texts.appointmentConfirmedCustomer(appt)
         : texts.appointmentCancelledCustomer(appt);
       const res = await notify.toNumber(String(appt.jid).split('@')[0], text, { plain: true });
-      if (!res?.ok) log.warn(`Appointment ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+      customerTold = Boolean(res?.ok);
+      if (!customerTold) log.warn(`Appointment ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+    }
+
+    // The team as well, for the same reason as on the PartyDekoMiet side.
+    if (notify?.owner && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+      const { m } = require('./notify/messages');
+      await notify.owner(m().appointmentStatusChanged(appt, status, customerTold), { kind: 'appointment_status' });
     }
 
     return { ok: true, appointment: appt, previous, calendarWarning };

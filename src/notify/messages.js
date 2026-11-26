@@ -69,6 +69,18 @@ const T = {
 
     // Sent to the CUSTOMER when the owner presses Bestaetigen. Written as a
     // person would write it - no bell, no status codes, no internal wording.
+    // To the team, after somebody pressed Confirm or Cancel in the dashboard.
+    // Says whether the customer was told, because that is the next question.
+    bookingStatusChanged: (b, status, customerTold) =>
+      `${status === 'CONFIRMED' ? 'BESTAETIGT' : 'ABGESAGT'}: ${b.productTitle}\n\n` +
+      `Kunde:     ${b.customerName || '-'}\nWhatsApp:  ${b.phone || '-'}\n` +
+      `Abholung:  ${b.pickupDate}\nRueckgabe: ${b.returnDate}\n\n` +
+      (customerTold ? 'Der Kunde wurde automatisch informiert.' : 'Der Kunde konnte NICHT informiert werden - bitte selbst melden.'),
+    appointmentStatusChanged: (a, status, customerTold) =>
+      `${status === 'CONFIRMED' ? 'BESTAETIGT' : 'ABGESAGT'}: ${a.serviceName}\n\n` +
+      `Kunde:  ${a.customerName || '-'}\nWhatsApp: ${a.phone || '-'}\n` +
+      `${a.date} um ${a.startTime}${a.professionalName ? `\nBei: ${a.professionalName}` : ''}\n\n` +
+      (customerTold ? 'Der Kunde wurde automatisch informiert.' : 'Der Kunde konnte NICHT informiert werden - bitte selbst melden.'),
     bookingConfirmedCustomer: (b) =>
       `Deine Buchung ist bestaetigt. \n\n${b.productTitle}\n` +
       `Abholung: ${b.pickupDate}\nRueckgabe: ${b.returnDate}\n\n` +
@@ -179,6 +191,16 @@ const T = {
           : 'Got it - you are marked busy. Say "free" when you can take someone again.',
     proNowFree: 'Got it - you are marked free again.',
 
+    bookingStatusChanged: (b, status, customerTold) =>
+      `${status === 'CONFIRMED' ? 'CONFIRMED' : 'CANCELLED'}: ${b.productTitle}\n\n` +
+      `Customer: ${b.customerName || '-'}\nWhatsApp: ${b.phone || '-'}\n` +
+      `Pickup:   ${b.pickupDate}\nReturn:   ${b.returnDate}\n\n` +
+      (customerTold ? 'The customer has been told automatically.' : 'The customer could NOT be told - please get in touch yourself.'),
+    appointmentStatusChanged: (a, status, customerTold) =>
+      `${status === 'CONFIRMED' ? 'CONFIRMED' : 'CANCELLED'}: ${a.serviceName}\n\n` +
+      `Customer: ${a.customerName || '-'}\nWhatsApp: ${a.phone || '-'}\n` +
+      `${a.date} at ${a.startTime}${a.professionalName ? `\nWith: ${a.professionalName}` : ''}\n\n` +
+      (customerTold ? 'The customer has been told automatically.' : 'The customer could NOT be told - please get in touch yourself.'),
     bookingConfirmedCustomer: (b) =>
       `Your booking is confirmed.\n\n${b.productTitle}\n` +
       `Pickup: ${b.pickupDate}\nReturn: ${b.returnDate}\n\n` +

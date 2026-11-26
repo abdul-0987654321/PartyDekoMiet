@@ -96,6 +96,49 @@ function createBookings({ catalog, calendar, notify }) {
     // technical problem and the request reached nobody.
     const customer = customers.get('party', jid);
 
+    // The same customer changing their mind about dates for the same set.
+    //
+    // Three open requests sat in the dashboard for one conversation: the set on
+    // the 27th, the same set on the 1st, and the first one still open after the
+    // bot itself had said the 27th was taken. Each one had sent its own alert.
+    // Changing a date is not a second booking, so the earlier request is
+    // withdrawn before the new one is made - which also frees the days it was
+    // holding, so the availability check below is asked about a calendar that
+    // no longer contains the customer's own abandoned attempt.
+    const superseded = [];
+    for (const old of db.all('bookings')) {
+      if (old.status !== 'PENDING') continue;
+      if (old.jid !== jid || !jid) continue;
+      if (old.productId !== product.id) continue;
+      const res = await setStatus(old.id, 'CANCELLED', { silent: true });
+      if (res.ok) superseded.push(old.id);
+    }
+    if (superseded.length) {
+      log.info(`Superseded earlier open request(s) for the same set: ${superseded.join(', ')}`);
+    }
+
+    // Is it actually free? This was never asked here, so a set the bot had just
+    // said was taken could still be written into the book - and the owner found
+    // out by reading two contradictory alerts.
+    if (calendar) {
+      try {
+        const free = await calendar.checkAvailability({ productId: product.id, productHandle: product.handle, start: args.start_date });
+        if (free.ok && free.available === false) {
+          return {
+            ok: false,
+            error: 'Das Set ist an diesen Daten nicht frei. Biete dem Kunden eines der freien Daten an und frage, welches passt.',
+            available: false,
+            reason: free.reason,
+            next_free_pickup_dates: free.next_free_pickup_dates || [],
+          };
+        }
+      } catch (err) {
+        // A calendar that cannot be read must not stop a request reaching the
+        // team: a person checks it anyway before confirming.
+        log.warn(`Availability could not be checked before booking: ${err.message}`);
+      }
+    }
+
     const booking = {
       id: newId(),
       business: 'party',
@@ -174,7 +217,14 @@ function createBookings({ catalog, calendar, notify }) {
    * @param {string} id
    * @param {'PENDING'|'CONFIRMED'|'CANCELLED'} status
    */
-  async function setStatus(id, status) {
+  /**
+   * @param {object} [opts]
+   * @param {boolean} [opts.silent] do not write to the customer. Used when an
+   *   earlier request is withdrawn because the same customer is making a new
+   *   one: they did not cancel anything, and telling them their booking was
+   *   cancelled mid-conversation would be alarming and wrong.
+   */
+  async function setStatus(id, status, { silent = false } = {}) {
     const allowed = ['PENDING', 'CONFIRMED', 'CANCELLED'];
     if (!allowed.includes(status)) {
       return { ok: false, error: `status must be one of ${allowed.join(', ')}` };
@@ -215,7 +265,7 @@ function createBookings({ catalog, calendar, notify }) {
     // waiting on WhatsApp heard nothing at all and had no way to know their
     // set was theirs.
     let customerTold = false;
-    if (notify?.toNumber && booking.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+    if (!silent && notify?.toNumber && booking.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
       const { m } = require('./notify/messages');
       const texts = m();
       const text = status === 'CONFIRMED'
@@ -224,6 +274,15 @@ function createBookings({ catalog, calendar, notify }) {
       const res = await notify.toNumber(String(booking.jid).split('@')[0], text, { plain: true });
       customerTold = Boolean(res?.ok);
       if (!customerTold) log.warn(`Booking ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+    }
+
+    // And the team. The owner and his partner are not both looking at the
+    // dashboard, so whoever pressed the button is otherwise the only person who
+    // knows - and the owner reported confirming a booking and hearing nothing
+    // at all, which from his side is indistinguishable from it not working.
+    if (!silent && notify?.owner && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+      const { m } = require('./notify/messages');
+      await notify.owner(m().bookingStatusChanged(booking, status, customerTold), { kind: 'booking_status' });
     }
 
     return { ok: true, booking, previous, calendarWarning, customerTold };

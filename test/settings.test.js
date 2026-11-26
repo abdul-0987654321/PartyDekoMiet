@@ -23,8 +23,8 @@ describe('defaults', () => {
 
   test('describe() reports where each value came from', () => {
     const rows = settings.describe();
-    const row = rows.find((r) => r.key === 'alertNumbers');
-    assert.ok(row, 'the alert numbers are on the form');
+    const row = rows.find((r) => r.key === 'shopUrl');
+    assert.ok(row, 'the shop link is on the form');
     assert.ok(['env', 'default'].includes(row.source));
     for (const r of rows) {
       assert.ok(r.label.de, `${r.key} is missing a German label`);
@@ -43,7 +43,6 @@ describe('defaults', () => {
     const shown = settings.describe().map((r) => r.key).sort();
     assert.deepStrictEqual(shown, [
       'aboutText',
-      'alertNumbers',
       'botLanguage',
       'dashboardLanguage',
       // On the form because it can send a customer away: if a word here ever
@@ -51,7 +50,6 @@ describe('defaults', () => {
       'otherBusinessKeywords',
       'shopUrl',
       'studioAboutText',
-      'studioAlertNumbers',
       'studioBufferMin',
       'studioCancellationRule',
       'studioMinNoticeHours',
@@ -145,21 +143,17 @@ describe('validation', () => {
 });
 
 describe('alert numbers', () => {
-  test('accept one or several international numbers', async () => {
-    assert.strictEqual((await settings.update({ alertNumbers: '41791234567' })).ok, true);
-    assert.strictEqual((await settings.update({ alertNumbers: '41791234567, 923001234567' })).ok, true);
-  });
-
-  test('clean pasted numbers and keep the list', async () => {
-    assert.strictEqual((await settings.update({ alertNumbers: '+41 79 123 45 67, +92 300 1234567' })).ok, true);
-    assert.strictEqual(settings.get('alertNumbers'), '41791234567, 923001234567');
-  });
-
-  test('reject an entry that cannot be a phone number', async () => {
-    assert.strictEqual((await settings.update({ alertNumbers: '41791234567, 079' })).ok, false);
-  });
-
-  test('empty is allowed - it falls back to the owner number', async () => {
-    assert.strictEqual((await settings.update({ alertNumbers: '' })).ok, true);
+  /**
+   * There is no alert-number setting any more, on either side. Alerts go to
+   * the phone the line is connected on. Both of these fields existed, both
+   * were typed in by hand, and a value left in either of them beat the one on
+   * Render without saying so.
+   */
+  test('there is nothing to type in', async () => {
+    for (const key of ['alertNumbers', 'studioAlertNumbers']) {
+      const res = await settings.update({ [key]: '41791234567' });
+      assert.strictEqual(res.ok, false, key);
+      assert.ok(!settings.describe().some((r) => r.key === key), `${key} is not on the form`);
+    }
   });
 });

@@ -44,22 +44,34 @@ function profName(id) {
 }
 
 function tileHtml(s) {
+  // Everything the client still has to send us, named on the tile rather than
+  // left for the bot to apologise about in a conversation.
+  const missing = [
+    s.priceChf ? null : t('s_m_price'),
+    s.durationMin ? null : t('s_m_duration'),
+    s.notes ? null : t('s_m_notes'),
+    s.photoFileId ? null : t('s_m_photo'),
+  ].filter(Boolean);
   return `
     <div class="tile ${s.active ? '' : 'off'}">
       <div class="head">
+        ${s.photoFileId
+          ? `<img class="shot" src="/api/studio/photo/${esc(s.photoFileId)}" alt="">`
+          : `<span class="shot">${esc(String(s.name || '?').trim().charAt(0).toUpperCase() || '?')}</span>`}
         <div class="title">
           <b>${esc(s.name)}</b>
           <span>${esc(s.professionalId ? profName(s.professionalId) : t('s_for_all'))}</span>
         </div>
         ${s.active ? '' : pill(t('inactive'), 'warn')}
       </div>
-      <div class="price">
-        ${s.priceChf ? 'CHF ' + esc(s.priceChf) : '<span class="muted">' + t('s_no_price') + '</span>'}
+      ${s.priceChf || s.durationMin ? `<div class="price">
+        ${s.priceChf ? 'CHF ' + esc(s.priceChf) : ''}
         ${s.durationMin ? `<small>· ${esc(s.durationMin)} min</small>` : ''}
-      </div>
-      ${s.notes
-        ? `<div class="note">${esc(s.notes)}</div>`
-        : `<div class="note"><span class="pill warn">${t('s_no_notes')}</span></div>`}
+      </div>` : ''}
+      ${s.notes ? `<div class="note">${esc(s.notes)}</div>` : ''}
+      ${missing.length
+        ? `<div class="note">${t('s_missing')} ${missing.map((x) => `<span class="pill warn">${esc(x)}</span>`).join(' ')}</div>`
+        : ''}
       <div class="acts">
         <button class="ghost" onclick="startEdit('${esc(s.id)}')">${t('edit')}</button>
         <button class="ghost" onclick="remove('${esc(s.id)}')">${t('delete')}</button>
@@ -113,6 +125,11 @@ function formHtml(s) {
       <p class="help">${t('s_notes_help')}</p>
       <textarea id="f_notes" rows="7">${esc(s?.notes || '')}</textarea>
     </div>
+    <div class="field"><label>${t('photo')}</label>
+      <p class="help">${t('s_photo_help')}</p>
+      <input type="file" id="f_photo" accept="image/*">
+      ${s?.photoFileId ? `<div style="margin-top:8px"><img src="/api/studio/photo/${esc(s.photoFileId)}" style="max-height:100px;border-radius:8px"></div>` : ''}
+    </div>
     <div class="field"><label class="check"><input type="checkbox" id="f_active" ${s?.active !== false ? 'checked' : ''}> ${t('active')}</label></div>
     <div class="actions inline">
       <button class="primary" id="f_save">${t('save')}</button>
@@ -149,6 +166,13 @@ async function save() {
     ? await api(`/api/studio/services/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
     : await api('/api/studio/services', { method: 'POST', body: patch });
   if (!res.ok) { $('f_msg').textContent = ''; $('alerts').innerHTML = `<p class="banner err">${esc(res.error || t('save_err'))}</p>`; return; }
+
+  const file = $('f_photo').files[0];
+  if (file && res.service) {
+    const base64 = await fileToBase64(file);
+    await api(`/api/studio/services/${encodeURIComponent(res.service.id)}/photo`,
+      { method: 'POST', body: { name: file.name, mimeType: file.type, base64 } });
+  }
   $('alerts').innerHTML = '';
   closeForm();
   refresh();

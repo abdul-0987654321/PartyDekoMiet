@@ -1,15 +1,15 @@
 'use strict';
 /**
- * Which number an alert goes to, and whether the dashboard can say why.
+ * Which number an alert goes to, and whether the dashboard can say so.
  *
- * The owner emptied every alert field he could find - on this page and in
- * Render - and the alerts kept arriving at a number he had not set. They were
- * coming from OWNER_WHATSAPP, which is a different variable with a different
- * name, is not shown on the settings page, and sits in the middle of a chain of
- * four fallbacks. From where he sat the system was ignoring him.
+ * The owner emptied every alert field he could find - on the settings page and
+ * in Render - and the alerts kept arriving at a number he had not set. They
+ * were coming from OWNER_WHATSAPP, a different variable with a different name,
+ * shown nowhere, sitting in the middle of a chain of four fallbacks. From
+ * where he sat the system was ignoring him.
  *
- * The chain itself is fine and deliberate. What was missing was any way to see
- * it, so these tests pin both the order and the explanation.
+ * The chain is gone. Alerts go to the phone the number is connected on, and
+ * these tests pin that no saved value can take it over again.
  */
 const { test, describe, beforeEach } = require('node:test');
 const assert = require('node:assert');
@@ -23,50 +23,35 @@ const LINKED = '41781112233';
 beforeEach(async () => {
   await db.init(createMemoryBackend());
   settings.load();
-  await settings.update({
-    ownerWhatsapp: '', alertNumbers: '', studioOwnerWhatsapp: '', studioAlertNumbers: '',
-  });
 });
 
-describe('the order the sources are tried in', () => {
-  test("a line's own numbers win", async () => {
-    await settings.update({ alertNumbers: '41790000002', ownerWhatsapp: '41790000003' });
-    const r = explainRecipients({ business: 'pro-sofia', ownNumbers: () => '41790000001', self: LINKED });
-    assert.deepStrictEqual(r.numbers, ['41790000001']);
-    assert.strictEqual(r.source, 'line');
-  });
-
-  test('then the field on the settings page', async () => {
-    await settings.update({ alertNumbers: '41790000002', ownerWhatsapp: '41790000003' });
-    const r = explainRecipients({ business: 'party', self: LINKED });
-    assert.deepStrictEqual(r.numbers, ['41790000002']);
-    assert.strictEqual(r.source, 'settings');
-  });
-
-  test('then OWNER_WHATSAPP - the one nothing on the page shows', async () => {
-    await settings.update({ ownerWhatsapp: '41790000003' });
-    const r = explainRecipients({ business: 'party', self: LINKED });
-    assert.deepStrictEqual(r.numbers, ['41790000003']);
-    assert.strictEqual(r.source, 'owner');
-    assert.strictEqual(r.key, 'ownerWhatsapp', 'the dashboard needs the key to offer to clear it');
-  });
-
-  test('and finally the linked phone', () => {
-    const r = explainRecipients({ business: 'party', self: LINKED });
+describe('where an alert goes', () => {
+  test('the connected phone, and the page says exactly that', () => {
+    const r = explainRecipients({ self: LINKED });
     assert.deepStrictEqual(r.numbers, [LINKED]);
     assert.strictEqual(r.source, 'linked');
+    assert.strictEqual(r.key, null, 'there is no setting to offer to clear');
   });
 
-  test('with nothing anywhere, nobody - and it says so', () => {
-    const r = explainRecipients({ business: 'party', self: '' });
+  test('not connected means nobody, and it says so', () => {
+    const r = explainRecipients({ self: '' });
     assert.deepStrictEqual(r.numbers, []);
-    assert.strictEqual(r.source, 'none');
+    assert.strictEqual(r.source, 'offline');
   });
 
-  test('the Studio reads its own fields, not Party\'s', async () => {
-    await settings.update({ alertNumbers: '41790000002', studioOwnerWhatsapp: '41790000009' });
-    const r = explainRecipients({ business: 'studio', self: LINKED });
-    assert.deepStrictEqual(r.numbers, ['41790000009']);
+  test('no saved number can take over, on either side', async () => {
+    await settings.update({
+      ownerWhatsapp: '41790000003',
+      studioOwnerWhatsapp: '41790000009',
+    });
+    assert.deepStrictEqual(explainRecipients({ self: LINKED }).numbers, [LINKED]);
+  });
+
+  test('the same number twice is written to once', () => {
+    assert.deepStrictEqual(
+      explainRecipients({ self: `${LINKED}, 41 78 111 22 33` }).numbers,
+      [LINKED]
+    );
   });
 });
 
@@ -77,7 +62,7 @@ describe('what actually gets sent', () => {
       sent,
       getStatus: () => ({ status: 'connected', me: { id: `${LINKED}:1@s.whatsapp.net` } }),
       isConnected: () => true,
-      sendText: async (jid, text) => { sent.push(jid.replace(/@.*/, '')); return {}; },
+      sendText: async (jid) => { sent.push(jid.replace(/@.*/, '')); return {}; },
     };
   }
 
@@ -85,25 +70,19 @@ describe('what actually gets sent', () => {
     await settings.update({ ownerWhatsapp: '41790000003' });
     const c = client();
     await createNotifier({ client: c, business: 'party' }).owner('test');
-
-    const explained = explainRecipients({ business: 'party', self: LINKED });
-    assert.deepStrictEqual(c.sent, explained.numbers, 'the page must not describe a different reality');
+    assert.deepStrictEqual(
+      c.sent,
+      explainRecipients({ self: LINKED }).numbers,
+      'the page must not describe a different reality'
+    );
   });
 
-  test('clearing the hidden number moves alerts to the visible field', async () => {
-    await settings.update({ ownerWhatsapp: '41790000003', alertNumbers: '41790000002' });
-    await settings.reset('ownerWhatsapp');
-
-    const c = client();
-    await createNotifier({ client: c, business: 'party' }).owner('test');
-    assert.deepStrictEqual(c.sent, ['41790000002']);
-  });
-
-  test('a number listed twice is written to once', async () => {
-    await settings.update({ alertNumbers: '41790000002, 41 79 000 00 02' });
-    const c = client();
-    await createNotifier({ client: c, business: 'party' }).owner('test');
-    assert.deepStrictEqual(c.sent, ['41790000002']);
+  test('both built-in numbers and a professional line behave alike', async () => {
+    for (const business of ['party', 'studio', 'pro-sofia']) {
+      const c = client();
+      await createNotifier({ client: c, business }).owner('test');
+      assert.deepStrictEqual(c.sent, [LINKED], business);
+    }
   });
 });
 
@@ -122,7 +101,6 @@ describe('the same alert twice in a minute', () => {
   // "somebody needs you" alerts. Two buzzes for one situation is how people
   // start ignoring the buzz.
   test('only goes out once', async () => {
-    await settings.update({ alertNumbers: '41790000002' });
     const c = client();
     const notify = createNotifier({ client: c, business: 'studio' });
 
@@ -133,7 +111,6 @@ describe('the same alert twice in a minute', () => {
   });
 
   test('a different customer still gets through', async () => {
-    await settings.update({ alertNumbers: '41790000002' });
     const c = client();
     const notify = createNotifier({ client: c, business: 'studio' });
 
@@ -144,7 +121,6 @@ describe('the same alert twice in a minute', () => {
   });
 
   test('a different kind of alert about the same chat still gets through', async () => {
-    await settings.update({ alertNumbers: '41790000002' });
     const c = client();
     const notify = createNotifier({ client: c, business: 'studio' });
 
@@ -155,7 +131,6 @@ describe('the same alert twice in a minute', () => {
   });
 
   test('an alert with no chat behind it is never suppressed', async () => {
-    await settings.update({ alertNumbers: '41790000002' });
     const c = client();
     const notify = createNotifier({ client: c, business: 'party' });
 

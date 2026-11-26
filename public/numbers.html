@@ -12,6 +12,7 @@
     <div class="grow">
       <h1 id="h1"></h1>
       <p class="muted" id="intro"></p>
+      <p class="muted count" id="count"></p>
     </div>
     <button class="primary" id="addbtn"></button>
   </div>
@@ -30,10 +31,12 @@ $('addbtn').textContent = '+ ' + t('add');
 let rows = [];
 let professionals = [];
 let editingId = null;
+let maxLines = 5;
 
 async function refresh() {
   const [l, p] = await Promise.all([api('/api/lines'), api('/api/studio/professionals')]);
   rows = l.lines || [];
+  maxLines = l.max || 5;
   professionals = p.professionals || [];
   render();
 }
@@ -54,8 +57,17 @@ function goConnect(id) {
 }
 
 function render() {
-  const extra = rows.filter((l) => !l.builtIn);
-  $('addbtn').hidden = extra.length >= (rows.max || 10);
+  // Counted the way the page shows them: PartyDekoMiet and the Studio are two
+  // of the five.
+  const max = maxLines;
+  const left = Math.max(0, max - rows.length);
+  // The button disappearing with no explanation reads like a broken page, so
+  // the count is on screen whether or not there is room for another number.
+  $('addbtn').hidden = left === 0;
+  $('count').textContent = (left ? t('n_left') : t('n_full'))
+    .replace('{used}', String(rows.length))
+    .replace('{max}', String(max))
+    .replace('{left}', String(left));
 
   $('wrap').innerHTML = `<div class="tiles">${rows.map((l) => `
     <div class="tile ${l.active === false ? 'off' : ''}">
@@ -67,15 +79,14 @@ function render() {
         ${l.connected ? pill(t('n_connected'), 'ok') : pill(t('n_offline'), 'warn')}
       </div>
       ${l.bootError ? `<div class="note"><span class="pill err">${esc(l.bootError)}</span></div>` : ''}
-      ${l.alertError && !l.builtIn ? `<div class="note"><span class="pill warn">${t('n_nobody')}</span></div>` : ''}
-      ${!l.builtIn && l.alertNumbers ? `<div class="note">${t('n_alerts')}: ${esc(l.alertNumbers)}</div>` : ''}
+      <div class="note">${l.connected ? t('n_alerts_here') : t('n_alerts_offline')}</div>
       <div class="acts">
         <button class="ghost" onclick="goConnect('${esc(l.id)}')">${l.connected ? t('n_open') : t('n_connect')}</button>
         ${l.builtIn ? '' : `<button class="ghost" onclick="startEdit('${esc(l.id)}')">${t('edit')}</button>`}
         ${l.builtIn ? '' : `<button class="ghost" onclick="remove('${esc(l.id)}')">${t('delete')}</button>`}
       </div>
     </div>`).join('')}</div>
-    ${extra.length ? '' : `<p class="muted" style="margin-top:14px">${t('n_none')}</p>`}`;
+    ${rows.some((l) => !l.builtIn) ? '' : `<p class="muted" style="margin-top:14px">${t('n_none')}</p>`}`;
 }
 
 function formHtml(l) {
@@ -89,11 +100,7 @@ function formHtml(l) {
       <select id="f_professionalId"><option value="">${t('n_for_none')}</option>${professionals.map((p) =>
         `<option value="${esc(p.id)}" ${p.id === l?.professionalId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
     </div>
-    ${l ? `<div class="field"><label>${t('n_alerts')}</label>
-      <p class="help">${t('n_alerts_help')}</p>
-      <input type="text" id="f_alertNumbers" value="${esc(l.alertNumbers || '')}" placeholder="41791234567">
-    </div>
-    <div class="field"><label class="check"><input type="checkbox" id="f_active" ${l.active !== false ? 'checked' : ''}> ${t('active')}</label></div>` : ''}
+    ${l ? `<div class="field"><label class="check"><input type="checkbox" id="f_active" ${l.active !== false ? 'checked' : ''}> ${t('active')}</label></div>` : ''}
     <div class="actions inline">
       <button class="primary" id="f_save">${t('save')}</button>
       <button class="ghost" id="f_cancel">${t('reset')}</button>
@@ -121,10 +128,7 @@ async function save() {
     name: $('f_name').value.trim(),
     professionalId: $('f_professionalId').value,
   };
-  if (editingId) {
-    patch.alertNumbers = $('f_alertNumbers').value;
-    patch.active = $('f_active').checked;
-  }
+  if (editingId) patch.active = $('f_active').checked;
   const res = editingId
     ? await api(`/api/lines/${encodeURIComponent(editingId)}`, { method: 'PATCH', body: patch })
     : await api('/api/lines', { method: 'POST', body: patch });

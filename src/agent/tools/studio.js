@@ -87,6 +87,7 @@ function serviceView(s) {
     // What the service includes. Empty means the owner has not written it yet -
     // say so, never invent one.
     details: String(s.notes || '').trim(),
+    hasPhoto: Boolean(s.photoFileId),
   };
 }
 
@@ -197,6 +198,20 @@ const DEFS = [
         ? all.filter((p) => p.id === service.professionalId)
         : all;
 
+      // The service's own picture goes with the answer whenever there is one.
+      // Asked about a service and shown a person's face instead, a customer
+      // reads it as the wrong answer to their question.
+      let servicePhotoSent = false;
+      if (photos && chatId && service.photoFileId) {
+        try {
+          const res = await photos.sendService(chatId, service, service.name, { once: true });
+          servicePhotoSent = Boolean(res.ok && !res.skipped);
+        } catch {
+          // A missing picture must never cost the customer their answer.
+          servicePhotoSent = false;
+        }
+      }
+
       // Only when the service points at one person: sending every
       // professional's photo because someone asked about a service they all
       // offer would be a pile of pictures nobody asked for.
@@ -206,6 +221,7 @@ const DEFS = [
       return {
         ok: true,
         photoSent,
+        servicePhotoSent,
         service: serviceView(service),
         offeredBy: offeredBy.map((p) => ({
           id: p.id,
@@ -220,6 +236,9 @@ const DEFS = [
             : 'Zu diesem Service ist keine Beschreibung hinterlegt. Sag ehrlich, dass dazu nichts weiter hinterlegt ist, nenne Dauer und Preis, und biete an, die Frage ans Team weiterzugeben. Erfinde keine Beschreibung.',
           // Asking for details and being told to ask again for a picture reads
           // like the bot has nothing. If there is a photo, it goes with the answer.
+          servicePhotoSent
+            ? 'Ein Bild zu diesem Service wurde soeben automatisch mitgeschickt. Erwaehne es kurz ("ich habe dir ein Bild dazu geschickt").'
+            : null,
           photoSent.length
             ? `Das Foto von ${photoSent.join(', ')} wurde soeben automatisch mitgeschickt. Erwaehne es kurz ("ich habe dir ein Foto geschickt") und rufe send_professional_photo NICHT noch einmal auf.`
             : offeredBy.length > 1 && offeredBy.some((p) => p.photoFileId)

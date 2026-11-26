@@ -139,10 +139,17 @@ describe('the numbers page', () => {
     assert.deepStrictEqual(booted.map((b) => b.id), ['pro-sofia-m']);
   });
 
-  test('a bad alert number is refused rather than silently dropped', async () => {
+  test('an alert number sent by an old page is accepted and ignored', async () => {
+    // There is no such field any more: alerts go to the phone her number is
+    // connected on. A stale tab posting one must not 500.
     const d = await patch('/api/lines/pro-sofia-m', { alertNumbers: '41791234567, 12' });
-    assert.strictEqual(d.ok, false);
-    assert.match(d.error, /12/);
+    assert.strictEqual(d.ok, true);
+    assert.ok(!('alertNumbers' in d.line));
+  });
+
+  test('the limit is on the list, so the page can say how many are left', async () => {
+    const d = await get('/api/lines');
+    assert.strictEqual(d.max, 5);
   });
 
   test('removing logs the device out first, then drops the row', async () => {

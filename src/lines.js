@@ -31,11 +31,18 @@ const PRO_PREFIX = 'pro-';
 const PRO_ID = /^pro-[a-z0-9][a-z0-9-]*$/;
 
 /**
- * More numbers in one process means more memory, and the whole thing runs in
- * one 512 MB box. This is not a licence check - it is a guard against someone
- * adding twenty numbers and wondering why everything restarts.
+ * Five numbers on the Numbers page, and not a sixth.
+ *
+ * Counted the way the page counts them, PartyDekoMiet and the Studio included:
+ * the owner looked at a page showing those two and said two are made and three
+ * more should fit, to five. So three professionals can have their own number.
+ * The page prints the count next to the button, so if he meant five on top of
+ * the built-in two he can see that at a glance and say so.
+ *
+ * More numbers in one process also means more memory, and the whole thing runs
+ * in one 512 MB box.
  */
-const MAX_PRO_LINES = 10;
+const MAX_LINES = 5;
 
 const BUILT_IN = Object.freeze([
   Object.freeze({ id: 'party', name: 'PartyDekoMiet', kind: 'party', builtIn: true, active: true, professionalId: '' }),
@@ -105,15 +112,16 @@ function nameOf(id) {
 async function create({ name, professionalId = '' } = {}) {
   const clean = String(name || '').trim();
   if (!clean) return { ok: false, error: 'name is required' };
-  if (stored().length >= MAX_PRO_LINES) {
-    return { ok: false, error: `at most ${MAX_PRO_LINES} extra numbers` };
+  if (all().length >= MAX_LINES) {
+    // Says the number as well as the limit, because "at most 5" with five
+    // already on screen reads like the app has lost count.
+    return { ok: false, error: `${MAX_LINES} numbers is the limit, and all ${MAX_LINES} are in use. Delete one to add another.` };
   }
   const taken = new Set(all().map((l) => l.id));
   const line = {
     id: idFor(clean, taken),
     name: clean,
     professionalId: String(professionalId || ''),
-    alertNumbers: '',
     active: true,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -135,17 +143,6 @@ async function update(id, patch = {}) {
     next.name = clean;
   }
   if (patch.professionalId !== undefined) next.professionalId = String(patch.professionalId || '');
-  if (patch.alertNumbers !== undefined) {
-    // Same cleaning the settings form applies, so one bad paste cannot make
-    // every alert for this number silently go nowhere.
-    const parts = String(patch.alertNumbers || '')
-      .split(',')
-      .map((n) => n.replace(/[^0-9]/g, ''))
-      .filter(Boolean);
-    const bad = parts.filter((n) => !/^[0-9]{8,15}$/.test(n));
-    if (bad.length) return { ok: false, error: `not a valid number: ${bad.join(', ')}` };
-    next.alertNumbers = parts.join(', ');
-  }
   if (patch.active !== undefined) next.active = Boolean(patch.active);
   next.updatedAt = nowIso();
 
@@ -171,5 +168,5 @@ async function remove(id) {
 module.exports = {
   all, active, get, create, update, remove,
   isBuiltIn, isKnown, looksLikePro, nameOf,
-  BUILT_IN_IDS, PRO_PREFIX, MAX_PRO_LINES,
+  BUILT_IN_IDS, PRO_PREFIX, MAX_LINES,
 };

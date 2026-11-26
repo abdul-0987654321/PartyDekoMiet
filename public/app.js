@@ -34,8 +34,10 @@ const T = {
     n_for: 'Gehört zu',
     n_for_none: 'Noch niemandem zugeordnet',
     n_for_help: 'Der Bot auf dieser Nummer spricht nur über sie und über die Services, die alle anbieten.',
-    n_alerts: 'Benachrichtigungen an',
-    n_alerts_help: 'Wer Terminanfragen von dieser Nummer bekommt. Leer = die Nummer, mit der diese Linie verbunden ist - also das Handy, das den QR gescannt hat.',
+    n_alerts_here: 'Benachrichtigungen gehen an das Handy, mit dem diese Nummer verbunden ist.',
+    n_alerts_offline: 'Benachrichtigungen gehen an das Handy, mit dem diese Nummer verbunden ist - sobald sie verbunden ist.',
+    n_left: '{used} von {max} Nummern vergeben. Noch {left} frei.',
+    n_full: 'Alle {max} Nummern sind vergeben. Zum Hinzufügen zuerst eine entfernen.',
     n_connect: 'Verbinden',
     n_open: 'QR-Code öffnen',
     n_connected: 'Verbunden',
@@ -43,7 +45,6 @@ const T = {
     n_builtin: 'Fest eingebaut',
     n_none: 'Noch keine eigene Nummer für eine Professional.',
     n_delete_confirm: 'Diese Nummer entfernen? Die Verbindung wird getrennt und die Anmeldung gelöscht. Chats bleiben erhalten.',
-    n_nobody: 'Niemand bekommt Benachrichtigungen von dieser Nummer.',
     tech_details: 'Technische Angaben',
     logout: 'Abmelden', save: 'Speichern', saving: 'Speichert…', saved: 'Gespeichert', reset: 'Zurücksetzen',
     refresh: 'Aktualisieren', loading: 'Lädt…', none: 'keine', yes: 'ja', no: 'nein',
@@ -68,15 +69,9 @@ const T = {
     cal_hint: 'Kalender teilen mit:', copy: 'Kopieren', copied: 'Kopiert ✓',
     g_calendar_access: 'Kalender-Zugang',
     alerts_where_title: 'Wohin gehen die Benachrichtigungen',
-    alerts_where_to: 'Gehen an', alerts_where_from: 'Kommt von',
-    alerts_where_none: 'Niemand bekommt Benachrichtigungen. Trage oben eine Nummer ein.',
-    alerts_src_line: 'den Alert-Nummern dieser Nummer (Seite Nummern)',
-    alerts_src_settings: 'dem Feld oben auf dieser Seite',
-    alerts_src_owner: 'OWNER_WHATSAPP - gesetzt in Render oder frueher hier gespeichert, nicht auf dieser Seite sichtbar',
-    alerts_src_linked: 'dem Handy, mit dem diese Nummer verbunden ist (weil nichts eingetragen ist)',
-    alerts_clear: 'Diese Nummer entfernen',
-    alerts_clear_help: 'Danach gilt wieder das Feld oben, sonst das verbundene Handy.',
-    alerts_clear_confirm: 'Diese gespeicherte Nummer entfernen? Benachrichtigungen gehen danach an das Feld oben - oder, wenn das leer ist, an das verbundene Handy.',
+    alerts_where_to: 'Gehen an',
+    alerts_where_help: 'Das ist das Handy, mit dem diese Nummer verbunden ist. Es gibt nichts einzutragen: wer den QR-Code scannt, bekommt die Benachrichtigungen. Sie erscheinen im eigenen WhatsApp-Chat ("Nachricht an mich").',
+    alerts_where_offline: 'Diese Nummer ist nicht verbunden, deshalb gehen gerade keine Benachrichtigungen raus. Verbinde sie auf der Seite Nummern.',
     cal_not_ready: 'Kalender-Zugang ist noch nicht eingerichtet (GOOGLE_SERVICE_ACCOUNT_JSON_B64 fehlt in Render). Bitte den Entwickler fragen.',
     cal_steps: '1) Neuen Google-Kalender erstellen (calendar.google.com). 2) Einstellungen und Freigabe → Für bestimmte Personen freigeben → diese Adresse einfügen → Berechtigung «Termine ändern» wählen → Senden. 3) Weiter unten unter «Kalender integrieren» die Kalender-ID kopieren und weitergeben - sie wird in Render eingetragen (GOOGLE_CALENDAR_ID fuer PartyDekoMiet, STUDIO_CALENDAR_ID fuer das Studio).',
     nav_chats: 'Chats', tab_qr: 'QR-Code', tab_pair: 'Mit Nummer',
@@ -146,7 +141,9 @@ const T = {
     chat_delete: 'Verlauf loeschen',
     chat_delete_q: 'Den gespeicherten Verlauf mit {who} loeschen? Das betrifft nur dieses Dashboard - auf WhatsApp bleibt die Unterhaltung bestehen.',
     l_no_address: 'Adresse fehlt',
-    s_no_price: 'Kein Preis', s_no_notes: 'Beschreibung fehlt',
+    s_missing: 'Fehlt noch:',
+    s_m_price: 'Preis', s_m_duration: 'Dauer', s_m_notes: 'Beschreibung', s_m_photo: 'Bild',
+    s_photo_help: 'Ein Bild zu diesem Service - der Raum, die Liege, ein Beispiel. Der Bot schickt es mit, wenn jemand nach diesem Service fragt. Kein Foto einer Person: das gehoert auf ihr eigenes Profil.',
     p_no_location: 'Kein Standort', p_no_photo: 'Kein Foto',
     s_notes_help: 'Was dieser Service beinhaltet. Genau das erzaehlt der Bot, wenn ein Kunde nach Details fragt - bleibt das Feld leer, sagt er, dass er dazu nichts weiss.',
     f_intro: 'Eigene Fragen und Antworten. Der Bot benutzt sie woertlich - er formuliert sie nicht um.',
@@ -207,8 +204,10 @@ const T = {
     n_for: 'Belongs to',
     n_for_none: 'Not assigned to anyone yet',
     n_for_help: 'The bot on this number talks about her only, plus the services everyone offers.',
-    n_alerts: 'Send alerts to',
-    n_alerts_help: 'Who gets appointment requests from this number. Empty = the number this line is linked to - the phone that scanned the QR.',
+    n_alerts_here: 'Alerts go to the phone this number is connected on.',
+    n_alerts_offline: 'Alerts go to the phone this number is connected on - once it is connected.',
+    n_left: '{used} of {max} numbers used. {left} left.',
+    n_full: 'All {max} numbers are in use. Remove one to add another.',
     n_connect: 'Connect',
     n_open: 'Open QR code',
     n_connected: 'Connected',
@@ -216,7 +215,6 @@ const T = {
     n_builtin: 'Built in',
     n_none: 'No separate number for a professional yet.',
     n_delete_confirm: 'Remove this number? It will be disconnected and its login deleted. Chats are kept.',
-    n_nobody: 'Nobody receives alerts from this number.',
     tech_details: 'Technical details',
     logout: 'Log out', save: 'Save', saving: 'Saving…', saved: 'Saved', reset: 'Reset',
     refresh: 'Refresh', loading: 'Loading…', none: 'none', yes: 'yes', no: 'no',
@@ -241,15 +239,9 @@ const T = {
     cal_hint: 'Share the calendar with:', copy: 'Copy', copied: 'Copied ✓',
     g_calendar_access: 'Calendar access',
     alerts_where_title: 'Where alerts go',
-    alerts_where_to: 'Sent to', alerts_where_from: 'Coming from',
-    alerts_where_none: 'Nobody receives alerts. Enter a number above.',
-    alerts_src_line: "this number's own alert numbers (Numbers page)",
-    alerts_src_settings: 'the field above on this page',
-    alerts_src_owner: 'OWNER_WHATSAPP - set in Render or saved here earlier, not shown on this page',
-    alerts_src_linked: 'the phone this number is linked to (because nothing is entered)',
-    alerts_clear: 'Remove this number',
-    alerts_clear_help: 'The field above applies again afterwards, otherwise the linked phone.',
-    alerts_clear_confirm: 'Remove this saved number? Alerts then go to the field above - or, if that is empty, to the linked phone.',
+    alerts_where_to: 'Sent to',
+    alerts_where_help: 'That is the phone this number is connected on. There is nothing to fill in: whoever scans the QR code gets the alerts. They arrive in that phone\'s own WhatsApp chat ("Message yourself").',
+    alerts_where_offline: 'This number is not connected, so no alerts are going out right now. Connect it on the Numbers page.',
     cal_not_ready: 'Calendar access is not set up yet (GOOGLE_SERVICE_ACCOUNT_JSON_B64 is missing in Render). Ask the developer.',
     cal_steps: '1) Create a new Google Calendar (calendar.google.com). 2) Settings and sharing → Share with specific people → paste this address → choose "Make changes to events" → Send. 3) Further down under "Integrate calendar", copy the Calendar ID and pass it on - it is entered in Render (GOOGLE_CALENDAR_ID for PartyDekoMiet, STUDIO_CALENDAR_ID for the Studio).',
     nav_chats: 'Chats', tab_qr: 'QR code', tab_pair: 'With number',
@@ -319,7 +311,9 @@ const T = {
     chat_delete: 'Delete history',
     chat_delete_q: 'Delete the stored history with {who}? This only affects this dashboard - the conversation stays on WhatsApp.',
     l_no_address: 'Address missing',
-    s_no_price: 'No price', s_no_notes: 'Description missing',
+    s_missing: 'Still missing:',
+    s_m_price: 'Price', s_m_duration: 'Duration', s_m_notes: 'Description', s_m_photo: 'Picture',
+    s_photo_help: 'A picture of this service - the room, the table, an example. The bot sends it along when somebody asks about this service. Not a photo of a person: that belongs on her own profile.',
     p_no_location: 'No location', p_no_photo: 'No photo',
     s_notes_help: 'What this service includes. This is exactly what the bot tells a customer who asks for details - leave it empty and it will say it does not know.',
     f_intro: 'Your own questions and answers. The bot uses them word for word - it does not rewrite them.',
@@ -431,6 +425,15 @@ const t = (k) => (T[LANG] && T[LANG][k]) || T.de[k] || k;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pill = (text, kind) => `<span class="pill ${kind}">${esc(text)}</span>`;
+/** A picked file as base64, which is how pictures travel to the server here. */
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString(LANG === 'en' ? 'en-GB' : 'de-CH') : t('never'));
 
 function setLang(lang) {
@@ -657,8 +660,18 @@ syncLangFromServer();
 // Every endpoint that answers differently per number. Forgetting one here does
 // not fail loudly - it quietly serves PartyDekoMiet's data on the Studio's
 // page, which is the one kind of mistake this dashboard must not make.
+/**
+ * Every endpoint whose answer depends on which number is selected.
+ *
+ * A missing entry does not fail, it lies: the Studio dashboard asked
+ * /api/alerts/where without saying "studio" and was shown PartyDekoMiet's
+ * alert number, which read as the Studio sending its alerts to the wrong
+ * place. There is a test (biz-aware-endpoints) that fails when the server
+ * learns to read `biz` on a route that is not on this list.
+ */
 const BIZ_AWARE_PREFIXES = [
   '/api/status', '/api/whatsapp', '/api/chats', '/api/bookings', '/api/calendar', '/api/test/chat',
+  '/api/alerts/where',
 ];
 function withBiz(path) {
   if (BIZ === 'party') return path; // party is the default on every endpoint - no param needed

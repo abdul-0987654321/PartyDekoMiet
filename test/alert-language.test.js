@@ -19,7 +19,10 @@ let sent, alerts;
 const client = {
   sendText: async (jid, text) => sent.push(text),
   forwardImage: async () => {},
-  getStatus: () => ({ status: 'connected' }),
+  // Alerts go to the phone the line is connected on, so the fake client has
+  // to be connected on one.
+  getStatus: () => ({ status: 'connected', me: { id: '41791111111:4@s.whatsapp.net' } }),
+  isConnected: () => true,
 };
 const notify = { owner: async (text, meta) => alerts.push({ text, meta }) };
 

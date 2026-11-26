@@ -22,57 +22,45 @@ const { m } = require('./messages');
  *   somebody even before her own number is filled in.
  */
 /**
- * Where an alert goes, and - just as important - why.
+ * Where an alert goes.
  *
- * There are four possible sources and they are tried in order, so "the field is
- * empty but alerts still arrive somewhere" is a perfectly ordinary state and
- * was impossible to understand from the dashboard. Two of these sources are not
- * visible anywhere: OWNER_WHATSAPP is set in the environment, and the linked
- * phone is not a setting at all. The owner deleted every number he could find
- * and the alerts kept coming, which from where he sat looked like the code
- * ignoring him.
+ * One answer, and it needs no setting up: the number this line is connected
+ * on. Whoever scanned the QR for PartyDekoMiet is the person who deals with
+ * PartyDekoMiet's requests; whoever scanned it for the Studio deals with the
+ * Studio's; a professional's own number is her. The alert lands in that
+ * phone's own "Message yourself" chat, which is a real chat with a real
+ * notification, and the owner can answer the customer by quoting it.
  *
- * So this returns the numbers together with the name of the step that produced
- * them, and the dashboard prints it.
+ * It used to be four sources tried in order - her own list, then an alert
+ * list, then an owner number, then the linked phone - with three of them
+ * typed in by hand and two of them invisible. Every single confusion about
+ * alerts in the last month came out of that ladder: a number saved months ago
+ * in the dashboard quietly beat the one set on Render, an emptied field
+ * changed nothing because the next rung took over, and nobody could see which
+ * rung was in play. Numbers are not worth typing when the right one is
+ * already known, so now none of them are typed.
  *
- * @returns {{numbers: string[], source: string, key: string|null}}
+ * When the line is not connected there is no number - and nothing could be
+ * sent anyway, since sending needs the same socket.
+ *
+ * @returns {{numbers: string[], source: 'linked'|'offline', key: null}}
  */
-function explainRecipients({ business = 'party', ownNumbers = null, self = '' } = {}) {
-  const studioSide = business !== 'party';
-  const alertKey = studioSide ? 'studioAlertNumbers' : 'alertNumbers';
-  const ownerKey = studioSide ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
-  const clean = (raw) =>
-    [...new Set(
-      String(raw || '')
-        .split(',')
-        .map((n) => n.replace(/[^0-9]/g, ''))
-        .filter((n) => n.length >= 8)
-    )];
-
-  const own = clean(ownNumbers ? ownNumbers() : '');
-  if (own.length) return { numbers: own, source: 'line', key: null };
-
-  const fromAlerts = clean(settings.get(alertKey));
-  if (fromAlerts.length) return { numbers: fromAlerts, source: 'settings', key: alertKey };
-
-  const fromOwner = clean(settings.get(ownerKey));
-  if (fromOwner.length) return { numbers: fromOwner, source: 'owner', key: ownerKey };
-
-  const linked = clean(self);
-  if (linked.length) return { numbers: linked, source: 'linked', key: null };
-
-  return { numbers: [], source: 'none', key: null };
+function explainRecipients({ self = '' } = {}) {
+  const numbers = [...new Set(
+    String(self || '')
+      .split(',')
+      .map((n) => n.replace(/[^0-9]/g, ''))
+      .filter((n) => n.length >= 8)
+  )];
+  return numbers.length
+    ? { numbers, source: 'linked', key: null }
+    : { numbers: [], source: 'offline', key: null };
 }
 
-function createNotifier({ client, business = 'party', ownNumbers = null }) {
+function createNotifier({ client, business = 'party' }) {
   /**
-   * The number this line is linked to - the phone that scanned the QR.
-   *
-   * Used only when nothing at all is configured. Somebody is holding that
-   * phone, and it is the one person certain to be connected to this number, so
-   * an alert reaching it is always better than an alert reaching nobody. For a
-   * professional's own line that is her, which is what you would expect
-   * without having to fill anything in.
+   * The number this line is linked to - the phone that scanned the QR. The
+   * only alert destination there is.
    */
   function selfNumber() {
     try {
@@ -83,13 +71,9 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
     }
   }
 
-  /**
-   * Who gets alerts. Her own list wins, then the dedicated alert list, then the
-   * owner number, so a fresh install still notifies someone. Everything that is
-   * not PartyDekoMiet reads the Studio's settings.
-   */
+  /** Who gets alerts: the phone this line is connected on. */
   function recipients() {
-    return explainRecipients({ business, ownNumbers, self: selfNumber() }).numbers;
+    return explainRecipients({ self: selfNumber() }).numbers;
   }
 
   /**
@@ -125,8 +109,8 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
     }
     const numbers = recipients();
     if (!numbers.length) {
-      log.warn(`No alert number configured - notification not sent: ${text.split('\n')[0]}`);
-      return { ok: false, error: 'no alert number' };
+      log.warn(`This number is not connected - alert not sent: ${text.split('\n')[0]}`);
+      return { ok: false, error: 'not connected' };
     }
     const body = `\u{1F514} ${text}`;
     const failed = [];

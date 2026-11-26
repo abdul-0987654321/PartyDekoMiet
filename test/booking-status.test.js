@@ -98,13 +98,17 @@ describe('changing a booking status', () => {
 
 describe('the owner price line follows the deposit setting', () => {
   let sent;
-  const client = { sendText: async (jid, text) => sent.push(text), forwardImage: async () => {} };
+  const client = {
+    getStatus: () => ({ status: 'connected', me: { id: '41791111111:2@s.whatsapp.net' } }),
+    isConnected: () => true,
+    sendText: async (jid, text) => sent.push(text),
+    forwardImage: async () => {},
+  };
   const { createNotifier } = require('../src/notify/owner');
 
   beforeEach(async () => {
     await db.init(createMemoryBackend());
     settings.load();
-    await settings.update({ ownerWhatsapp: '41791111111' });
     sent = [];
   });
 

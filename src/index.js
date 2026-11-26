@@ -178,17 +178,10 @@ async function boot() {
   }
 
   // 5. WhatsApp side.
+  // Alerts go to the phone this number is connected on, so there is nothing to
+  // check here and nothing that can be set wrongly. At boot the socket is not
+  // open yet, so asking who gets alerts now would always answer "nobody".
   runtime.notify = createNotifier({ client: whatsapp });
-  const partyAlerts = runtime.notify.recipients();
-  if (partyAlerts.length) {
-    log.info(`Booking alerts go to: ${partyAlerts.join(', ')}`);
-    state.alertError = null;
-  } else {
-    state.alertError =
-      'No alert number set - booking requests will reach nobody. ' +
-      'Dashboard: Settings, "Numbers for alerts" or "Owner number".';
-    log.warn(state.alertError);
-  }
   const messenger = createMessenger({ client: whatsapp });
   runtime.bookings = createBookings({ catalog, calendar: runtime.calendar, notify: runtime.notify });
 
@@ -307,22 +300,6 @@ async function bootStudio() {
       business: 'studio',
     });
 
-    // Say who alerts go to, at boot. An appointment request that reaches nobody
-    // looks exactly like a working bot from the customer's side - they are told
-    // the team will confirm, and the team never hears about it. There are two
-    // separate alert settings (Studio's own and PartyDekoMiet's) and filling in
-    // the wrong one is silent, so name the setting in the warning.
-    const studioAlerts = studioRuntime.notify.recipients();
-    if (studioAlerts.length) {
-      log.info(`[studio] Appointment alerts go to: ${studioAlerts.join(', ')}`);
-      studioState.alertError = null;
-    } else {
-      studioState.alertError =
-        'No Studio alert number set - appointment requests will reach nobody. ' +
-        'Dashboard: switch to Studio, Settings, "Numbers for alerts (Studio)" or "Owner number (Studio)".';
-      log.warn(`[studio] ${studioState.alertError}`);
-    }
-
     studioRuntime.photos = createPhotos({ client: studioWhatsapp, business: 'studio' });
 
     studioRuntime.services = {
@@ -376,7 +353,7 @@ async function bootLine(line) {
     {
       line,
       whatsapp: createWhatsAppClient(line.id),
-      state: { startedAt: new Date().toISOString(), ready: false, bootError: null, alertError: null },
+      state: { startedAt: new Date().toISOString(), ready: false, bootError: null },
       runtime: {},
     };
   entry.line = line;
@@ -408,13 +385,9 @@ async function bootLine(line) {
       openai, knowledge, guards, tools: studioTools, config: config.openai,
     });
 
-    entry.runtime.notify = createNotifier({
-      client: entry.whatsapp,
-      business: line.id,
-      // Read per alert, not captured: renaming or renumbering her in the
-      // dashboard reaches the next appointment request without a restart.
-      ownNumbers: () => lines.get(line.id)?.alertNumbers || '',
-    });
+    // Her alerts go to the phone her own number is connected on, which is
+    // hers. Nothing to fill in, and nothing that can be filled in wrongly.
+    entry.runtime.notify = createNotifier({ client: entry.whatsapp, business: line.id });
     entry.runtime.appointments = createAppointments({
       calendar: studioRuntime.calendar,
       notify: entry.runtime.notify,
@@ -440,13 +413,6 @@ async function bootLine(line) {
     });
     entry.runtime.router.init();
     entry.whatsapp.onMessage((msg) => entry.runtime.router.handle(msg));
-
-    const alerts = entry.runtime.notify.recipients();
-    entry.state.alertError = alerts.length
-      ? null
-      : 'No alert number for this professional and none for the Studio either - her appointment requests reach nobody.';
-    if (alerts.length) log.info(`${tag} Appointment alerts go to: ${alerts.join(', ')}`);
-    else log.warn(`${tag} ${entry.state.alertError}`);
 
     if (!line.professionalId) {
       log.warn(`${tag} No professional linked to this number yet - it answers for the whole Studio until one is chosen.`);

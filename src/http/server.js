@@ -174,7 +174,6 @@ function createServer({
             faq: faqStore.list({ business: 'studio', activeOnly: true }).length,
           }
         : null,
-      alertError: st.alertError || null,
       config: {
         model: config.openai?.model,
         hasOpenAiKey: Boolean(config.openai?.apiKey),
@@ -454,22 +453,16 @@ function createServer({
   /**
    * Where alerts for this business actually go right now.
    *
-   * Exists because "every field is empty and alerts still arrive" was a real
-   * afternoon: the number came from OWNER_WHATSAPP, which is set in the
-   * environment and shown nowhere. A dashboard that cannot answer "who gets
-   * these" is not telling the truth about the thing it controls.
+   * There is only one answer now - the connected number - but the dashboard
+   * still has to say it out loud. "Every field is empty and alerts still
+   * arrive somewhere" was a real afternoon, and the cure for it is a page that
+   * names the number rather than a form that implies it is up for discussion.
    */
   app.get('/api/alerts/where', (req, res) => {
-    const { biz, whatsapp: wa } = pick(req);
+    const { whatsapp: wa } = pick(req);
     const me = wa?.getStatus?.()?.me?.id || '';
     const self = String(me).split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
-    const line = biz === 'party' || biz === 'studio' ? null : lines?.registry?.get(biz);
-    const found = explainRecipients({
-      business: biz,
-      ownNumbers: line ? () => line.alertNumbers : null,
-      self,
-    });
-    res.json({ ok: true, ...found });
+    res.json({ ok: true, ...explainRecipients({ self }) });
   });
 
   // ---- Calendar ----
@@ -693,12 +686,11 @@ function createServer({
         connected: entry?.whatsapp ? entry.whatsapp.getStatus().status === 'connected' : false,
         status: entry?.whatsapp ? entry.whatsapp.getStatus().status : 'stopped',
         bootError: entry?.state?.bootError || null,
-        alertError: entry?.state?.alertError || null,
       };
     };
 
     app.get('/api/lines', (req, res) => {
-      res.json({ ok: true, lines: registry.all().map(withStatus), max: registry.MAX_PRO_LINES });
+      res.json({ ok: true, lines: registry.all().map(withStatus), max: registry.MAX_LINES });
     });
 
     app.post('/api/lines', safe(async (req, res) => {
@@ -841,6 +833,18 @@ function createServer({
       const id = await db.putFile(name || 'foto.jpg', mimeType || 'image/jpeg', Buffer.from(base64, 'base64'));
       const result = await dir.updateProfessional(professional.id, { photoFileId: id });
       res.json({ ok: true, photoFileId: id, professional: result.professional });
+    }));
+
+    // A service's own picture - the room, the table, an example of the work.
+    // Same storage as a professional's photo, read back from the same endpoint.
+    app.post('/api/studio/services/:id/photo', safe(async (req, res) => {
+      const service = dir.getService(String(req.params.id));
+      if (!service) return res.status(404).json({ ok: false, error: 'service not found' });
+      const { name, mimeType, base64 } = req.body || {};
+      if (!base64) return res.status(400).json({ ok: false, error: 'base64 required' });
+      const id = await db.putFile(name || 'foto.jpg', mimeType || 'image/jpeg', Buffer.from(base64, 'base64'));
+      const result = await dir.updateService(service.id, { photoFileId: id });
+      res.json({ ok: true, photoFileId: id, service: result.service });
     }));
 
     app.get('/api/studio/photo/:fileId', safe(async (req, res) => {

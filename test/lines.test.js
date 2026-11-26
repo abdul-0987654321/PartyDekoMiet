@@ -68,13 +68,27 @@ describe('the registry', () => {
     assert.deepStrictEqual(lines.all().map((l) => l.id), ['party', 'studio']);
   });
 
-  test('there is a ceiling, because every number costs memory', async () => {
-    for (let n = 0; n < lines.MAX_PRO_LINES; n += 1) {
-      assert.strictEqual((await lines.create({ name: `Nr ${n}` })).ok, true);
+  test('five numbers on the page, and not a sixth', async () => {
+    // Counted the way the Numbers page shows them, so PartyDekoMiet and the
+    // Studio are two of the five and three professionals can have their own.
+    assert.strictEqual(lines.MAX_LINES, 5, 'the owner set this number and checks it');
+    const room = 5 - lines.all().length;
+    assert.strictEqual(room, 3, 'two are built in');
+    for (let n = 0; n < room; n += 1) {
+      assert.strictEqual((await lines.create({ name: `Nr ${n}` })).ok, true, `number ${n + 1}`);
     }
     const over = await lines.create({ name: 'one too many' });
     assert.strictEqual(over.ok, false);
-    assert.match(over.error, /at most/);
+    assert.match(over.error, /5/, 'the message names the limit');
+    assert.strictEqual(lines.all().length, 5, 'and nothing was added');
+  });
+
+  test('deleting one makes room for another', async () => {
+    const made = [];
+    while (lines.all().length < 5) made.push((await lines.create({ name: `Nr ${made.length}` })).line);
+    assert.strictEqual((await lines.create({ name: 'one more' })).ok, false);
+    await lines.remove(made[0].id);
+    assert.strictEqual((await lines.create({ name: 'one more' })).ok, true);
   });
 
   test('switching a number off keeps it, and takes it out of the active list', async () => {
@@ -88,15 +102,15 @@ describe('the registry', () => {
     assert.deepStrictEqual(lines.active().map((l) => l.id), ['party', 'studio']);
   });
 
-  test('her own alert numbers are cleaned, and nonsense is refused', async () => {
+  test('there is no alert-number field to fill in or get wrong', async () => {
+    // Her alerts go to the phone her number is connected on, which is hers.
+    // The field used to be here, and a number typed into it beat everything
+    // else invisibly.
     const { line } = await lines.create({ name: 'Sofia' });
-    const ok = await lines.update(line.id, { alertNumbers: '+41 79 123 45 67, 0041760000000' });
-    assert.strictEqual(ok.ok, true);
-    assert.strictEqual(ok.line.alertNumbers, '41791234567, 0041760000000');
-
-    const bad = await lines.update(line.id, { alertNumbers: '123' });
-    assert.strictEqual(bad.ok, false);
-    assert.strictEqual(lines.get(line.id).alertNumbers, '41791234567, 0041760000000', 'the stored value is untouched');
+    assert.ok(!('alertNumbers' in line), 'a new line carries no such field');
+    const after = await lines.update(line.id, { alertNumbers: '41791234567' });
+    assert.strictEqual(after.ok, true, 'an old client sending it is not an error');
+    assert.ok(!('alertNumbers' in lines.get(line.id)), 'and it is not stored either');
   });
 
   test('removing one really removes it', async () => {

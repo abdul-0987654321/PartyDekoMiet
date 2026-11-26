@@ -142,37 +142,25 @@ async function save() {
   if (dash && !localStorage.getItem('dashLang')) setLang(dash.value);
 }
 
-/** Prints the live answer, and offers to clear a number that no field shows. */
+/**
+ * Names the number alerts go to. There is nothing to choose and nothing to
+ * clear - it is the number this line is connected on - but it still has to be
+ * written down somewhere the owner can look, because the one thing he could
+ * never find out from this page was who was actually being buzzed.
+ */
 async function renderWhere() {
   const box = $('whereto');
   if (!box) return;
   const d = await api('/api/alerts/where');
   const numbers = d.numbers || [];
   if (!numbers.length) {
-    box.innerHTML = `<p class="banner warn" style="margin:0">${esc(t('alerts_where_none'))}</p>`;
+    box.innerHTML = `<p class="banner warn" style="margin:0">${esc(t('alerts_where_offline'))}</p>`;
     return;
   }
-  const source = t('alerts_src_' + d.source);
   box.innerHTML = `
     <div class="row"><span>${esc(t('alerts_where_to'))}</span>
       <span><b>${numbers.map(esc).join(', ')}</b></span></div>
-    <div class="row"><span>${esc(t('alerts_where_from'))}</span>
-      <span>${esc(source)}</span></div>
-    ${d.key ? `<div class="actions inline" style="margin-top:10px">
-      <button class="ghost" id="clearalerts">${esc(t('alerts_clear'))}</button>
-      <span class="muted">${esc(t('alerts_clear_help'))}</span></div>` : ''}`;
-  if (d.key) $('clearalerts').onclick = () => clearAlertSource(d.key);
-}
-
-/**
- * Drops whatever is holding that number. reset removes a value saved here; if
- * the environment still sets one, the next line will say so rather than
- * pretending it worked.
- */
-async function clearAlertSource(key) {
-  if (!(await ask(t('alerts_clear_confirm')))) return;
-  await api('/api/settings/reset', { method: 'POST', body: { key } });
-  await load();
+    <p class="help" style="margin:8px 0 0">${esc(t('alerts_where_help'))}</p>`;
 }
 
 async function load() {

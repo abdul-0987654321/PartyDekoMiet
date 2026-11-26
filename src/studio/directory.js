@@ -143,6 +143,7 @@ async function createService(args) {
     durationMin: args.durationMin || '',
     priceChf: args.priceChf || '',
     notes: args.notes || '',
+    photoFileId: args.photoFileId || '',
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };

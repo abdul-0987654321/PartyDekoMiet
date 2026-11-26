@@ -123,21 +123,7 @@ describe('an appointment request taken on her own number', () => {
   });
 });
 
-describe('alert numbers are validated on both sides', () => {
-  for (const key of ['alertNumbers', 'studioAlertNumbers']) {
-    test(`${key} refuses a number that is too short`, async () => {
-      const res = await settings.update({ [key]: '41791234567, 123' });
-      assert.strictEqual(res.ok, false);
-      assert.match(res.errors.join(' '), /123/);
-    });
-
-    test(`${key} cleans a pasted number`, async () => {
-      const res = await settings.update({ [key]: '+41 79 123 45 67' });
-      assert.strictEqual(res.ok, true);
-      assert.strictEqual(settings.get(key), '41791234567');
-    });
-  }
-
+describe('the owner number is validated on both sides', () => {
   for (const key of ['ownerWhatsapp', 'studioOwnerWhatsapp']) {
     test(`${key} refuses nonsense`, async () => {
       const res = await settings.update({ [key]: 'nummer folgt' });

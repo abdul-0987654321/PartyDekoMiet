@@ -530,6 +530,9 @@ code.mail { background: var(--bg); padding: 3px 7px; border-radius: 6px; font-si
 @media (max-width: 860px) {
   .pagehead { margin-bottom: 14px; }
   .pagehead p { display: none; }  /* the intro is in the manual, not in the way */
+  /* A count is not an intro: "2 of 5 used" is the reason the Add button is
+     there or gone, and the phone is where that button is looked for. */
+  .pagehead p.count { display: block; margin-top: 4px; }
 }
 
 /* The Add button sits beside the title, so it stays reachable on a long list

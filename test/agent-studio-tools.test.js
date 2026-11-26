@@ -429,6 +429,64 @@ describe('the photo is sent by the lookup, not left to the model', () => {
     assert.match(res.note, /Mehrere Personen/);
   });
 
+  test("a service's own picture goes with its details", async () => {
+    // "Show me the massage" used to be answered with a photo of a person,
+    // because a service could not carry a picture of its own.
+    await directory.updateService(svc.id, { photoFileId: 'S9' });
+    const pics = [];
+    const res = await runTool('get_service', { service_id: 'Sofia' }, {
+      directory,
+      chatId: 'c1',
+      photos: {
+        sendService: async (chatId, service) => { pics.push(service.name); return { ok: true }; },
+        sendForAnswer: async () => [],
+      },
+    });
+    assert.deepStrictEqual(pics, ['Sofia']);
+    assert.strictEqual(res.servicePhotoSent, true);
+    assert.strictEqual(res.service.hasPhoto, true);
+    assert.match(res.note, /Bild zu diesem Service/);
+  });
+
+  test('a service with no picture of its own sends nothing and says nothing', async () => {
+    const res = await runTool('get_service', { service_id: 'Sofia' }, {
+      directory,
+      chatId: 'c1',
+      photos: { sendService: async () => { throw new Error('should not be called'); }, sendForAnswer: async () => [] },
+    });
+    assert.strictEqual(res.servicePhotoSent, false);
+    assert.strictEqual(res.service.hasPhoto, false);
+    assert.ok(!/Bild zu diesem Service/.test(res.note || ''));
+  });
+
+  test("the service picture failing does not cost the customer the answer", async () => {
+    await directory.updateService(svc.id, { photoFileId: 'S9' });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, {
+      directory,
+      chatId: 'c1',
+      photos: {
+        sendService: async () => { throw new Error('WhatsApp down'); },
+        sendForAnswer: async () => [],
+      },
+    });
+    assert.strictEqual(res.ok, true);
+    assert.strictEqual(res.servicePhotoSent, false);
+    assert.strictEqual(res.service.price, 'CHF 1000.-', 'the details still arrive');
+  });
+
+  test('the same picture is not sent twice in one conversation', async () => {
+    await directory.updateService(svc.id, { photoFileId: 'S9' });
+    const res = await runTool('get_service', { service_id: 'Sofia' }, {
+      directory,
+      chatId: 'c1',
+      photos: {
+        sendService: async () => ({ ok: true, skipped: 'already sent in this chat' }),
+        sendForAnswer: async () => [],
+      },
+    });
+    assert.strictEqual(res.servicePhotoSent, false, 'nothing to mention, because nothing was sent');
+  });
+
   test('the answer still comes back when sending the photo fails', async () => {
     const broken = { sendForAnswer: async () => { throw new Error('WhatsApp down'); } };
     await assert.rejects(() => broken.sendForAnswer(), /WhatsApp down/); // the stub really does throw

@@ -110,15 +110,6 @@ const SCHEMA = [
     },
   },
   {
-    key: 'alertNumbers', group: 'contacts', type: 'string', default: '', env: 'ALERT_NUMBERS',
-    placeholder: '41791234567, 923001234567',
-    label: { de: 'Nummern für Benachrichtigungen', en: 'Numbers for alerts' },
-    help: {
-      de: 'Wer Buchungsanfragen, Referenzbilder und Uebergaben per WhatsApp bekommt. Mehrere Nummern mit Komma trennen. Leer = die Inhaber-Nummer oben.',
-      en: 'Who receives booking requests, reference photos and handovers on WhatsApp. Several numbers separated by commas. Empty = the owner number above.',
-    },
-  },
-  {
     key: 'handoffPhone', group: 'contacts', type: 'string', default: '', env: 'HANDOFF_PHONE', hidden: true,
     label: { de: 'Telefon für Übergaben', en: 'Phone for handovers' },
     help: {
@@ -303,15 +294,6 @@ const SCHEMA = [
     },
   },
   {
-    key: 'studioAlertNumbers', group: 'studio', type: 'string', default: '', env: 'STUDIO_ALERT_NUMBERS',
-    placeholder: '41791234567, 923001234567',
-    label: { de: 'Nummern für Benachrichtigungen (Studio)', en: 'Numbers for alerts (Studio)' },
-    help: {
-      de: 'Wer Terminanfragen und Uebergaben fuer das Studio bekommt. Mehrere Nummern mit Komma trennen. Leer = die Inhaber-Nummer oben.',
-      en: 'Who receives appointment requests and handovers for the Studio. Several numbers separated by commas. Empty = the owner number above.',
-    },
-  },
-  {
     key: 'studioPriceGuard', group: 'studio', type: 'enum', default: 'warn', env: 'STUDIO_PRICE_GUARD', hidden: true,
     options: ['warn', 'block'],
     optionLabels: {
@@ -421,12 +403,15 @@ function coerce(def, raw) {
 }
 
 /**
- * Settings that hold WhatsApp numbers. Both businesses are listed on purpose:
- * every one of these is a field where a typo means an alert reaches nobody,
- * and silence is exactly what nobody notices.
+ * Settings that hold a WhatsApp number. Both businesses are listed on purpose:
+ * a typo in either means the owner is not recognised when he writes to his own
+ * bot, and nothing says so.
+ *
+ * These two no longer decide where alerts go - that is the connected number -
+ * so they are off the form and kept only to recognise the owner's messages
+ * when he writes from a different phone.
  */
 const SINGLE_NUMBER_KEYS = new Set(['ownerWhatsapp', 'studioOwnerWhatsapp']);
-const NUMBER_LIST_KEYS = new Set(['alertNumbers', 'studioAlertNumbers']);
 
 /** @returns {{ok:true,value:any}|{ok:false,error:string}} */
 function validate(def, raw) {
@@ -449,14 +434,6 @@ function validate(def, raw) {
       return { ok: false, error: `${def.key}: not a valid international number (8-15 digits)` };
     }
     return { ok: true, value: digits };
-  }
-  if (NUMBER_LIST_KEYS.has(def.key) && value) {
-    const parts = String(value).split(',').map((n) => n.replace(/[^0-9]/g, '')).filter(Boolean);
-    const bad = parts.filter((n) => !/^[0-9]{8,15}$/.test(n));
-    if (bad.length) {
-      return { ok: false, error: `${def.key}: not a valid international number: ${bad.join(', ')}` };
-    }
-    return { ok: true, value: parts.join(', ') };
   }
   return { ok: true, value };
 }

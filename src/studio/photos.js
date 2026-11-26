@@ -71,17 +71,33 @@ function createPhotos({ client, business = 'studio' }) {
    * @param {boolean} [opts.once] skip if this photo already went to this chat
    * @returns {Promise<{ok:boolean, skipped?:string}>}
    */
-  async function sendProfessional(chatId, professional, note, { once = false } = {}) {
-    if (!professional?.photoFileId) throw new Error('no photo on file');
-    if (once && alreadySent(chatId, professional.photoFileId, business)) {
+  async function sendProfessional(chatId, professional, note, opts) {
+    return sendPicture(chatId, professional, note, opts);
+  }
+
+  /**
+   * A service's own picture - the room, the table, an example of the work.
+   *
+   * Identical machinery, separate entry point: "show me the massage" and
+   * "show me Sofia" are different questions, and before a service could carry
+   * a picture of its own, both were answered with her face.
+   */
+  async function sendService(chatId, service, note, opts) {
+    return sendPicture(chatId, service, note, opts);
+  }
+
+  /** Any directory record with a photoFileId and a name. */
+  async function sendPicture(chatId, record_, note, { once = false } = {}) {
+    if (!record_?.photoFileId) throw new Error('no photo on file');
+    if (once && alreadySent(chatId, record_.photoFileId, business)) {
       return { ok: true, skipped: 'already sent in this chat' };
     }
-    const file = await db.getFile(professional.photoFileId);
+    const file = await db.getFile(record_.photoFileId);
     if (!file?.buffer?.length) throw new Error('the stored photo is empty');
-    const caption = String(note || professional.name || '').trim();
+    const caption = String(note || record_.name || '').trim();
     await client.forwardImage(chatId, file.buffer, caption, file.mimeType);
-    record(chatId, caption, professional.photoFileId, business);
-    log.info(`[${business}] Photo sent for ${professional.name} to ${chatId}`);
+    record(chatId, caption, record_.photoFileId, business);
+    log.info(`[${business}] Photo sent for ${record_.name} to ${chatId}`);
     return { ok: true };
   }
 
@@ -115,7 +131,7 @@ function createPhotos({ client, business = 'studio' }) {
     return sent;
   }
 
-  return { sendProfessional, sendForAnswer };
+  return { sendProfessional, sendService, sendForAnswer };
 }
 
 module.exports = { createPhotos };

@@ -136,6 +136,11 @@ const TABLES = {
       durationMin: s.durationMin || '',
       priceChf: s.priceChf || '',
       notes: s.notes || '', // e.g. what a package includes; never invented by the bot
+      // A picture of the service itself - the room, the table, an example of
+      // the work. Separate from a professional's photo: "show me the massage"
+      // and "show me Sofia" are different questions and used to get the same
+      // answer, which was her face.
+      photoFileId: s.photoFileId || '',
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
     }),
@@ -203,7 +208,8 @@ const TABLES = {
       active: l.active !== false,
       name: l.name,
       professionalId: l.professionalId || '',
-      alertNumbers: l.alertNumbers || '', // empty = the Studio's alert numbers
+      // No alert column: her alerts go to the phone this number is connected
+      // on. An old sheet keeps the column and it is simply blanked from now on.
       createdAt: l.createdAt,
       updatedAt: l.updatedAt,
     }),

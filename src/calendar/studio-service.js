@@ -22,6 +22,13 @@ const { isBusy } = require('../studio/availability-status');
  *   built-in calendar and a Google one are interchangeable: both offer the same
  *   six methods, and everything below this line is written against those.
  */
+/** The calendar day after a YYYY-MM-DD, without going near a timezone. */
+function nextDay(day) {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe/Zurich', client: injected = null }) {
   const client = injected || createCalendarClient({
     serviceAccountJsonB64,
@@ -126,7 +133,21 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
       const title = `[${PENDING}] ${appt.serviceName} – ${appt.customerName}`;
       const [h, min] = appt.startTime.split(':').map(Number);
       const endTotal = h * 60 + min + Number(appt.durationMin || 0);
-      const endTime = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
+
+      /**
+       * An hour booked at 23:30 ends at 00:30 the next day, not at "24:30".
+       *
+       * The arithmetic used to divide straight through, so a late booking was
+       * written as 24:04 - not a clock time at all. The calendar entry carried
+       * an unparseable end, and extending it compared "24:04" against the
+       * 23:59 cap and moved the end backwards. A studio that works past
+       * midnight hit this on every late booking.
+       */
+      const DAY = 24 * 60;
+      const endsNextDay = endTotal >= DAY;
+      const endMinutes = endTotal % DAY;
+      const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+      const endDate = endsNextDay ? nextDay(appt.date) : appt.date;
 
       const description = [
         `Kunde: ${appt.customerName}`,
@@ -147,7 +168,7 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
         summary: title,
         description,
         start: { dateTime: `${appt.date}T${appt.startTime}:00`, timeZone },
-        end: { dateTime: `${appt.date}T${endTime}:00`, timeZone },
+        end: { dateTime: `${endDate}T${endTime}:00`, timeZone },
         transparency: 'opaque',
         extendedProperties: {
           private: {
@@ -160,7 +181,7 @@ function createStudioCalendarService({ serviceAccountJsonB64, timeZone = 'Europe
       });
 
       log.info(`Calendar event created for appointment ${appt.id}: ${event.id}`);
-      return { id: event.id, htmlLink: event.htmlLink, endTime };
+      return { id: event.id, htmlLink: event.htmlLink, endTime, endsNextDay };
     },
 
     patchEvent: (id, patch) => client.patchEvent(id, patch),

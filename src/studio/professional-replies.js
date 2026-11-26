@@ -115,7 +115,7 @@ async function applyReply({ professional, text, appointments, m }) {
  *
  * @returns {Promise<{reply: string, kind: string, changed: object|null}>}
  */
-async function handleProfessionalMessage({ professional, text, appointments, m, timeZone = 'Europe/Zurich' }) {
+async function handleProfessionalMessage({ professional, text, appointments, m, timeZone = 'Europe/Zurich', now = new Date() }) {
   const status = parseStatus(text);
 
   if (status.ambiguous) {
@@ -123,14 +123,23 @@ async function handleProfessionalMessage({ professional, text, appointments, m, 
   }
 
   if (status.command === 'longer') {
-    const appt = appointments.currentFor(professional.id, { timeZone });
+    const appt = appointments.currentFor(professional.id, { timeZone, now });
     if (!appt) {
       return { reply: m.proNoRunningAppointment, kind: 'no_appointment', changed: null };
     }
     // No length said: half an hour is the one people mean when they do not say.
     const minutes = status.minutes || 30;
     const res = await appointments.extend(appt.id, minutes);
-    if (!res.ok) return { reply: m.proStatusHelp, kind: 'error', changed: null };
+    if (!res.ok) {
+      // She is still with a client either way - the appointment simply cannot
+      // run past midnight. Telling her the reason beats the generic help text,
+      // which reads like she phrased it wrong.
+      if (res.atEndOfDay) {
+        setAvailability(professional, 'busy', { note: String(text).slice(0, 200) });
+        return { reply: res.error, kind: 'at_end_of_day', changed: null };
+      }
+      return { reply: m.proStatusHelp, kind: 'error', changed: null };
+    }
 
     // Still with a client, by definition.
     setAvailability(professional, 'busy', { note: String(text).slice(0, 200) });

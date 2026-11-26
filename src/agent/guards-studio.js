@@ -38,7 +38,7 @@
  * the rest structurally rather than by vocabulary.
  */
 
-const { sentences, normalise, fold } = require('./guards');
+const { sentences, normalise, fold, MACHINE_TALK } = require('./guards');
 
 const CONDITIONAL = /\b(sobald|wenn|erst|nachdem|falls|sofern|bevor|once|as soon as|after|if|until)\b/i;
 const NEGATION = /\b(kein|keine|keinen|keinem|keiner|nicht|nein|ohne das|leider|no|not|don't|do not|doesn't|cannot|can't)\b/i;
@@ -270,20 +270,62 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [], serviceTexts 
    */
   const warnOnly = (v) => v.code === 'INVENTED_PRICE' && readPriceMode() !== 'block';
 
+  /**
+   * Takes out the sentences that are not ours to say, keeps the rest.
+   *
+   * The Studio had no strip pass at all - only the all-or-nothing block - so
+   * a reply whose first sentence apologised for a failed lookup went out
+   * whole. The answer the customer wanted was usually the second sentence.
+   */
+  function strip(text) {
+    const allowed = allowedSentences();
+    const stripped = [];
+    const kept = [];
+    for (const sentence of sentences(text)) {
+      if (allowed.has(normalise(sentence))) { kept.push(sentence); continue; }
+      if (MACHINE_TALK.patterns.some((p) => p.test(fold(sentence)))) {
+        stripped.push({ code: MACHINE_TALK.code, hint: MACHINE_TALK.hint, sentence });
+      } else {
+        kept.push(sentence);
+      }
+    }
+    return { text: kept.join(' ').replace(/\s{2,}/g, ' ').trim(), stripped };
+  }
+
+  /**
+   * When the apology was the whole message.
+   *
+   * A short question, not "I have passed this to the team": the lookup failing
+   * is no reason to fetch a person, and a false handoff is exactly what this
+   * whole change is about.
+   */
+  const AFTER_STRIP = {
+    de: 'Kurze Rueckfrage, damit ich das richtig nachschaue: was genau suchst du?',
+    en: 'One quick question so I look up the right thing: what exactly are you after?',
+  };
+
   function enforce(text, { lang = 'de' } = {}) {
     const original = String(text ?? '');
-    const fixed = autofix(original);
+    let fixed = autofix(original);
+
+    // Strip first, then judge what is left: a message whose only problem was
+    // an apology for a failed lookup is a good message once it is gone.
+    const { text: withoutMachineTalk, stripped } = strip(fixed);
+    if (stripped.length) {
+      fixed = withoutMachineTalk.length >= 15 ? withoutMachineTalk : (AFTER_STRIP[lang] || AFTER_STRIP.de);
+    }
+
     const violations = check(fixed);
     const blocking = violations.filter((v) => !warnOnly(v));
     if (blocking.length) {
-      return { text: FALLBACK[lang] || FALLBACK.de, violations, blocked: true, warned: [], sharpSFixed: fixed !== original };
+      return { text: FALLBACK[lang] || FALLBACK.de, violations, blocked: true, warned: [], stripped, sharpSFixed: fixed !== original };
     }
     // Everything that was found is warn-only: the reply goes out, and the log
     // still records what tripped, so a genuinely invented price is visible.
-    return { text: fixed, violations: [], warned: violations, blocked: false, sharpSFixed: fixed !== original };
+    return { text: fixed, violations: [], warned: violations, blocked: false, stripped, sharpSFixed: fixed !== original };
   }
 
-  return { check, enforce, autofix };
+  return { check, enforce, autofix, strip };
 }
 
 module.exports = { createStudioGuards };

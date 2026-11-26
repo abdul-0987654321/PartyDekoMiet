@@ -39,7 +39,7 @@ const UNAVAILABLE = (what) => ({
  *
  * @returns {{record: object}|{error: string}}
  */
-function resolve(list, wanted, what) {
+function resolve(list, wanted, what, { alsoKnownAs = null } = {}) {
   const key = String(wanted ?? '').trim();
   if (!key) return { error: `Kein ${what} angegeben.` };
 
@@ -57,9 +57,49 @@ function resolve(list, wanted, what) {
     const names = (exact.length > 1 ? exact : partial).map((r) => r.name).join(', ');
     return { error: `"${key}" passt auf mehrere: ${names}. Frag den Kunden, welche gemeint ist.` };
   }
+
+  // The customer's words, not the owner's.
+  //
+  // He named a service "Sofia" and wrote "Wellness Massage mit Happy End" in
+  // its description. A customer who writes "I need massage" is asking for that
+  // service by the only name he could possibly know it by - the one in the
+  // text - and a lookup that only reads the title answers "there is no such
+  // service", about the one service there is.
+  const words = lower.split(/[^a-z0-9äöüß]+/i).filter((w) => w.length >= 4);
+  if (words.length) {
+    const inText = list.filter((r) => {
+      const hay = `${r.name || ''} ${r.notes || ''} ${r.languages || ''}`.toLowerCase();
+      return words.some((w) => hay.includes(w));
+    });
+    if (inText.length === 1) return { record: inText[0] };
+    if (inText.length > 1) {
+      return {
+        error: `"${key}" passt auf mehrere: ${inText.map((r) => r.name).join(', ')}. `
+          + 'Frag den Kunden, welche gemeint ist. Sag ihm NICHT, dass die Suche fehlgeschlagen ist.',
+      };
+    }
+  }
+
+  // The thing exists, under the other heading. He named a service after a
+  // person, so "Sofia" is a service and "tst" is the professional, and the
+  // model spent a whole conversation apologising to a customer for its own
+  // confusion between the two.
+  const crossed = (alsoKnownAs || []).find((r) => String(r.name || '').toLowerCase() === lower);
+  if (crossed) {
+    return {
+      error: `"${key}" ist kein ${what}, sondern der Name von etwas anderem im Verzeichnis. `
+        + `${what} vorhanden: ${list.map((r) => r.name).join(', ') || 'keine'}. `
+        + 'Ruf das Werkzeug gleich noch einmal mit einem davon auf. '
+        + 'Das ist ein interner Fehlgriff - erwaehne ihn dem Kunden gegenueber mit keinem Wort.',
+    };
+  }
+
   return {
     error: list.length
-      ? `${what} "${key}" gibt es nicht. Vorhanden: ${list.map((r) => r.name).join(', ')}.`
+      ? `${what} "${key}" gibt es nicht. Vorhanden: ${list.map((r) => r.name).join(', ')}. `
+        + 'Ruf das Werkzeug gleich noch einmal mit einem davon auf, oder frag den Kunden kurz, '
+        + 'welches er meint. Das ist ein interner Fehlgriff - erwaehne ihn dem Kunden gegenueber '
+        + 'mit keinem Wort, entschuldige dich nicht und sprich nicht von einem Fehler oder einer Verwechslung.'
       : `Es ist noch kein ${what} hinterlegt.`,
   };
 }
@@ -150,7 +190,9 @@ const DEFS = [
     },
     handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional', {
+        alsoKnownAs: directory.listServices({ activeOnly: true }),
+      });
       if (hit.error) return { ok: false, error: hit.error };
       const profile = directory.profileFor(hit.record.id);
       if (!profile) return { ok: false, error: `Professional ${hit.record.name} nicht gefunden.` };
@@ -189,7 +231,9 @@ const DEFS = [
     },
     handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const hit = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service');
+      const hit = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service', {
+        alsoKnownAs: directory.listProfessionals({ activeOnly: true }),
+      });
       if (hit.error) return { ok: false, error: hit.error };
       const service = hit.record;
 
@@ -266,7 +310,9 @@ const DEFS = [
     handler: async (args, { directory, photos, chatId }) => {
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
       if (!photos) return UNAVAILABLE('Der Bildversand');
-      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      const hit = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional', {
+        alsoKnownAs: directory.listServices({ activeOnly: true }),
+      });
       if (hit.error) return { ok: false, error: hit.error };
       const professional = hit.record;
       if (!professional.photoFileId) {
@@ -300,9 +346,13 @@ const DEFS = [
     handler: async (args, { directory, calendar }) => {
       if (!calendar) return UNAVAILABLE('Der Kalender');
       if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
-      const who = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional');
+      const who = resolve(directory.listProfessionals({ activeOnly: true }), args.professional_id, 'Professional', {
+        alsoKnownAs: directory.listServices({ activeOnly: true }),
+      });
       if (who.error) return { ok: false, error: who.error };
-      const what = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service');
+      const what = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service', {
+        alsoKnownAs: directory.listProfessionals({ activeOnly: true }),
+      });
       if (what.error) return { ok: false, error: what.error };
       const professional = who.record;
       const service = what.record;

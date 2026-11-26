@@ -76,7 +76,42 @@ const NEGATION = /\b(kein|keine|keinen|keinem|keiner|nicht|nein|ohne|leider|no|n
 // against one sentence at a time, and a price like "CHF 60.-" contains a full
 // stop, so a gap that forbids one silently fails to match the exact sentences
 // this exists to catch.
+/**
+ * The bot telling a customer about its own insides.
+ *
+ * Live, on the Studio number: "It seems I made an error while checking the
+ * service", "It seems there was a mix-up with the service name", "I apologize
+ * for the confusion" - eight messages of it, while the customer repeated his
+ * name four times and never got an appointment. Every one of those sentences
+ * was the model narrating a failed lookup.
+ *
+ * A failed lookup is ours to fix, not the customer's to hear about. The
+ * sentence goes, the rest of the message stays, and what is left is usually
+ * the actual answer, which in that conversation was sitting right underneath
+ * the apology the whole time.
+ *
+ * Only self-reported machinery is caught. "Sorry, we don't do that" and "I'm
+ * sorry to hear that" carry no error word and go out untouched.
+ */
+const MACHINE_TALK = {
+  code: 'MACHINE_TALK',
+  hint:
+    'Never tell the customer about a failed lookup, a mix-up or your own confusion. '
+    + 'Look it up again, or ask them a short question. Do not apologise for the machinery.',
+  patterns: [
+    /\b(it seems|it looks like|it appears|seems like)\b.{0,45}\b(error|mix.?up|misunderstanding|confusion|mistake|problem|issue|wrong)\b/i,
+    /\b(i apologi[sz]e|i'm sorry|i am sorry|sorry|apologies)\b.{0,45}\b(confusion|mix.?up|error|mistake|misunderstanding)\b/i,
+    /\b(there (was|is|seems to be)|i made|we had)\b.{0,25}\b(an error|a mistake|a mix.?up|a misunderstanding|some confusion)\b/i,
+    /\b(unable|not able|could ?n[o']t|cannot|can ?n[o']t|failed)\b.{0,20}\b(to )?(retrieve|fetch|access|look ?up|find)\b.{0,30}\b(details|service|information|data|it)\b/i,
+    /\b(let me (try|check) (that )?again|i('| a)?ll (try|check) (that )?again)\b/i,
+    /\b(es scheint|es sieht so aus|anscheinend|offenbar)\b.{0,45}\b(fehler|verwechslung|missverstaendnis|verwirrung|problem)\b/i,
+    /\b(entschuldig\w*|tut mir leid|verzeihung|sorry)\b.{0,45}\b(verwirrung|verwechslung|fehler|missverstaendnis)\b/i,
+    /\b(da (war|ist|gab)|es gab|ich habe)\b.{0,25}\b(einen fehler|eine verwechslung|ein missverstaendnis)\b/i,
+  ],
+};
+
 const STRIP_RULES = [
+  MACHINE_TALK,
   {
     code: 'PAYMENT_REQUESTED',
     hint: 'The bot never asks for payment and never sends a payment link. The team invoices after checking the request.',
@@ -361,4 +396,4 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damag
   return { check, enforce, autofix, strip };
 }
 
-module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES, claimsRequestSent, requestWasMade };
+module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES, MACHINE_TALK, claimsRequestSent, requestWasMade };

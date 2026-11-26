@@ -26,6 +26,13 @@ const PLACEHOLDER_NAMES = new Set([
 ]);
 
 /** @returns {string|null} an error for the model, or null when the data is usable */
+/** The calendar day after a YYYY-MM-DD, without going near a timezone. */
+function nextDay(day) {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function validateAppointmentArgs(args) {
   const name = String(args.customer_name || '').trim();
   if (name.length < 2 || PLACEHOLDER_NAMES.has(name.toLowerCase())) {
@@ -263,9 +270,21 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
       .filter((a) => a.professionalId === professionalId && a.date === today && a.status !== 'CANCELLED')
       .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
 
+    /**
+     * An appointment whose end is not after its start ends after midnight.
+     *
+     * A 23:30 booking of an hour is stored as 23:30-00:30 on the 23:30 day,
+     * and "00:30 > 23:50" is false, so between its start and midnight it
+     * looked finished. She said the client was staying longer, was told there
+     * was no appointment running, and the room stayed free in the calendar for
+     * the next person. A studio that works past midnight hits this every night
+     * it is busy.
+     */
+    const pastMidnight = (a) => Boolean(a.endTime) && a.endTime <= a.startTime;
+
     // Running now, or the next one about to start.
     return (
-      todays.find((a) => a.startTime <= clock && (!a.endTime || a.endTime > clock))
+      todays.find((a) => a.startTime <= clock && (!a.endTime || a.endTime > clock || pastMidnight(a)))
       || todays.find((a) => a.startTime > clock && a.startTime <= inAnHour)
       || null
     );
@@ -292,18 +311,47 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     if (!Number.isFinite(h) || !Number.isFinite(min)) {
       return { ok: false, error: 'appointment has no usable time' };
     }
-    const total = h * 60 + min + extra;
-    // Past midnight the appointment would need a second day, which no treatment
-    // here ever does - so it stops at the end of the day rather than wrapping
-    // round to the morning.
-    const capped = Math.min(total, 23 * 60 + 59);
-    const endTime = `${String(Math.floor(capped / 60)).padStart(2, '0')}:${String(capped % 60).padStart(2, '0')}`;
+
+    /**
+     * Where the appointment currently ends, as minutes from its own start day.
+     *
+     * An appointment that already runs past midnight has an end earlier on the
+     * clock than its start - 23:30 to 00:30 - and adding to it has to keep
+     * counting forward into that next day, not wrap back to the morning of the
+     * first one.
+     */
+    const DAY = 24 * 60;
+    const startsAt = (() => {
+      const [sh, sm] = String(appt.startTime || '').split(':').map(Number);
+      return Number.isFinite(sh) && Number.isFinite(sm) ? sh * 60 + sm : 0;
+    })();
+    const alreadyPastMidnight = Boolean(appt.endTime) && appt.endTime <= appt.startTime;
+    const total = h * 60 + min + (alreadyPastMidnight ? DAY : 0) + extra;
+
+    // Two days is the ceiling: nothing here runs longer, and it stops a typo
+    // in the spoken minutes from pushing an entry a week out.
+    const LIMIT = startsAt + DAY;
+    const capped = Math.min(total, LIMIT);
+    const endsNextDay = capped >= DAY;
+    const endMinutes = capped % DAY;
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+
+    // The cap swallowed the whole extension: reporting success here would tell
+    // her the room is held while the calendar still frees it at the old time.
+    if (endTime === appt.endTime) {
+      return {
+        ok: false,
+        atEndOfDay: true,
+        error: `Der Termin endet schon um ${appt.endTime} - weiter geht es nicht.`,
+      };
+    }
 
     let calendarWarning = null;
     if (calendar && appt.calendarEventId) {
       try {
+        const endDate = endsNextDay ? nextDay(appt.date) : appt.date;
         await calendar.patchEvent(appt.calendarEventId, {
-          end: { dateTime: `${appt.date}T${endTime}:00`, timeZone: calendar.timeZone || 'Europe/Zurich' },
+          end: { dateTime: `${endDate}T${endTime}:00`, timeZone: calendar.timeZone || 'Europe/Zurich' },
         });
       } catch (err) {
         calendarWarning = err.message;

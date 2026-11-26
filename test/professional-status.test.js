@@ -30,6 +30,21 @@ const HER = '41791112233';
 const HER_JID = `${HER}@s.whatsapp.net`;
 
 const todayIn = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+/** The studio zone's UTC offset on a given day, so a wall time can be pinned. */
+const offsetAt = (day) => {
+  const probe = new Date(`${day}T12:00:00Z`);
+  const shown = probe.toLocaleString('en-US', { timeZone: TZ, hour12: false, hour: '2-digit' });
+  const hours = 12 - Number(shown);
+  const sign = hours <= 0 ? '+' : '-';
+  return `${sign}${String(Math.abs(hours)).padStart(2, '0')}:00`;
+};
+
+const nextDay = (day) => {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 const clockIn = (offsetMin = 0) =>
   new Date(Date.now() + offsetMin * 60000)
     .toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
@@ -63,7 +78,9 @@ beforeEach(async () => {
   };
 });
 
-const say = (text) => handleProfessionalMessage({ professional: db.get('professionals', sofia.id), text, appointments, m: m(), timeZone: TZ });
+const say = (text, now) => handleProfessionalMessage({
+  professional: db.get('professionals', sofia.id), text, appointments, m: m(), timeZone: TZ, ...(now ? { now } : {}),
+});
 
 describe('understanding what she said', () => {
   for (const said of ['besetzt', 'ich bin besetzt', 'bin grad beschäftigt', 'busy', 'kunde ist da', 'ich arbeite gerade']) {
@@ -215,10 +232,22 @@ describe('the bot stops offering her while she is busy', () => {
 });
 
 describe('the client is staying longer', () => {
-  async function runningAppointment() {
+  /**
+   * A fixed early-afternoon appointment, with the clock told to match.
+   *
+   * It used to start "twenty minutes ago", whenever that was. Run late enough
+   * in the evening in Zurich, the appointment already ended at 23:59 - where
+   * extending caps - so the end could not move and the test failed for a
+   * reason that had nothing to do with extending. It only broke between about
+   * 22:40 and midnight, which is exactly when nobody wants to be reading a
+   * red test.
+   */
+  const AT = (clock) => new Date(`${todayIn()}T${clock}:00${offsetAt(todayIn())}`);
+
+  async function runningAppointment({ start = '14:00' } = {}) {
     const created = await appointments.create({
       professional_id: sofia.id, service_id: service.id,
-      date: todayIn(), start_time: clockIn(-20), customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
+      date: todayIn(), start_time: start, customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
     });
     return db.get('appointments', created.appointment_id);
   }
@@ -226,7 +255,7 @@ describe('the client is staying longer', () => {
   test('the appointment end moves', async () => {
     const appt = await runningAppointment();
     const before = appt.endTime;
-    const res = await say('der kunde bleibt noch eine halbe stunde');
+    const res = await say('der kunde bleibt noch eine halbe stunde', AT('14:20'));
 
     assert.strictEqual(res.kind, 'extended');
     const after = db.get('appointments', appt.id).endTime;
@@ -234,9 +263,45 @@ describe('the client is staying longer', () => {
     assert.strictEqual(after > before, true, 'it must move later, not earlier');
   });
 
+  /**
+   * A studio that works past midnight, which this one does.
+   *
+   * An hour booked at 23:30 used to be written down as ending at "24:04" -
+   * not a clock time at all. It made the appointment look finished the moment
+   * it started, so she was told there was no appointment running when she
+   * said the client was staying, and the calendar freed the room for the next
+   * person while it was still occupied.
+   */
+  describe('an appointment that runs past midnight', () => {
+    test('is written down as ending the next morning, not at "24:30"', async () => {
+      const appt = await runningAppointment({ start: '23:30' });
+      assert.strictEqual(appt.endTime, '00:30');
+
+      const row = db.all('calendarEvents').find((e) => e.id === appt.calendarEventId);
+      assert.strictEqual(row.endDateTime.slice(0, 10), nextDay(appt.date), 'the entry ends on the next day');
+      assert.strictEqual(row.endDateTime.slice(11, 16), '00:30');
+    });
+
+    test('is still the appointment running right now', async () => {
+      await runningAppointment({ start: '23:30' });
+      const running = appointments.currentFor(sofia.id, { timeZone: TZ, now: AT('23:50') });
+      assert.ok(running, 'she must be able to find the client who is in the room');
+    });
+
+    test('and it can still be extended', async () => {
+      const appt = await runningAppointment({ start: '23:30' });
+      const res = await say('der kunde bleibt noch eine halbe stunde', AT('23:50'));
+
+      assert.strictEqual(res.kind, 'extended');
+      assert.strictEqual(db.get('appointments', appt.id).endTime, '01:00', 'forward into the new day, not back to the morning');
+      const row = db.all('calendarEvents').find((e) => e.id === appt.calendarEventId);
+      assert.strictEqual(row.endDateTime.slice(0, 10), nextDay(appt.date));
+    });
+  });
+
   test('the calendar entry moves with it', async () => {
     const appt = await runningAppointment();
-    await say('noch eine stunde');
+    await say('noch eine stunde', AT('14:20'));
 
     const row = db.all('calendarEvents').find((e) => e.id === appt.calendarEventId);
     assert.strictEqual(row.endDateTime.slice(11, 16), db.get('appointments', appt.id).endTime);
@@ -244,18 +309,18 @@ describe('the client is staying longer', () => {
 
   test('she is left marked busy', async () => {
     await runningAppointment();
-    await say('der kunde bleibt länger');
+    await say('der kunde bleibt länger', AT('14:20'));
     assert.strictEqual(isBusy(db.get('professionals', sofia.id), { timeZone: TZ }), true);
   });
 
   test('without a length, half an hour is assumed', async () => {
-    const appt = await runningAppointment();
-    const res = await say('der kunde bleibt noch länger');
+    await runningAppointment();
+    const res = await say('der kunde bleibt noch länger', AT('14:20'));
     assert.strictEqual(res.minutes, 30);
   });
 
   test('with no appointment running she is told so, and nothing changes', async () => {
-    const res = await say('der kunde bleibt noch eine stunde');
+    const res = await say('der kunde bleibt noch eine stunde', AT('14:20'));
     assert.strictEqual(res.kind, 'no_appointment');
     assert.strictEqual(res.changed, null);
   });

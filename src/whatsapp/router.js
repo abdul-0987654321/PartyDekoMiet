@@ -522,12 +522,24 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
 
     if (!text && !photoNote) return;
 
+    // What the customer tapped reply on.
+    //
+    // After the bot sends five sets, one per message, the natural thing on
+    // WhatsApp is to long-press the one you want and answer "das hier" - which
+    // names nothing at all. The quote was being read for the owner's dictated
+    // replies and thrown away for customers, so the model saw two words with no
+    // subject and asked again which theme they meant.
+    const quotedCustomer = quotedTextOf(msg);
+    const quoteNote = quotedCustomer
+      ? `\n\n[Der Kunde antwortet auf diese Nachricht von dir: "${quotedCustomer.slice(0, 400)}"]`
+      : '';
+
     const history = recentHistory(jid);
     let out;
     try {
       out = await agent.reply({
         history,
-        message: voiceMark + (text || '[Bild ohne Text]') + photoNote,
+        message: voiceMark + (text || '[Bild ohne Text]') + quoteNote + photoNote,
         services,
         chatId: jid,
         customerName: customers.get(business, jid)?.name,

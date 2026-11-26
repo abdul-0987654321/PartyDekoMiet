@@ -104,6 +104,10 @@ function render() {
     // headed "Kalender-Zugang" sitting there afterwards reads as something
     // still to be done.
     + (usingGoogle ? `<h2>${esc(t('g_calendar_access'))}</h2>${calendarHint()}` : '')
+    // Who actually receives the alerts, whatever the fields above say. There
+    // are sources that no field on this page shows, so without this line an
+    // empty form and a ringing phone look like a contradiction.
+    + `<h2>${esc(t('alerts_where_title'))}</h2><div class="card" id="whereto"></div>`
     + `<div class="actions inline">
       <button class="primary" type="button" id="save">${t('save')}</button>
       <button class="ghost" type="button" id="reload">${t('refresh')}</button>
@@ -138,12 +142,46 @@ async function save() {
   if (dash && !localStorage.getItem('dashLang')) setLang(dash.value);
 }
 
+/** Prints the live answer, and offers to clear a number that no field shows. */
+async function renderWhere() {
+  const box = $('whereto');
+  if (!box) return;
+  const d = await api('/api/alerts/where');
+  const numbers = d.numbers || [];
+  if (!numbers.length) {
+    box.innerHTML = `<p class="banner warn" style="margin:0">${esc(t('alerts_where_none'))}</p>`;
+    return;
+  }
+  const source = t('alerts_src_' + d.source);
+  box.innerHTML = `
+    <div class="row"><span>${esc(t('alerts_where_to'))}</span>
+      <span><b>${numbers.map(esc).join(', ')}</b></span></div>
+    <div class="row"><span>${esc(t('alerts_where_from'))}</span>
+      <span>${esc(source)}</span></div>
+    ${d.key ? `<div class="actions inline" style="margin-top:10px">
+      <button class="ghost" id="clearalerts">${esc(t('alerts_clear'))}</button>
+      <span class="muted">${esc(t('alerts_clear_help'))}</span></div>` : ''}`;
+  if (d.key) $('clearalerts').onclick = () => clearAlertSource(d.key);
+}
+
+/**
+ * Drops whatever is holding that number. reset removes a value saved here; if
+ * the environment still sets one, the next line will say so rather than
+ * pretending it worked.
+ */
+async function clearAlertSource(key) {
+  if (!(await ask(t('alerts_clear_confirm')))) return;
+  await api('/api/settings/reset', { method: 'POST', body: { key } });
+  await load();
+}
+
 async function load() {
   const [s, st] = await Promise.all([api('/api/settings'), api('/api/status')]);
   schema = s.settings || [];
   serviceAccountEmail = st.config?.serviceAccountEmail || null;
   usingGoogle = st.config?.calendarSource === 'google';
   render();
+  renderWhere();
 }
 load();
 </script>

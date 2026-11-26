@@ -30,6 +30,7 @@ const faqStore = require('../faq-store');
 const { clearSession } = require('../whatsapp/auth-state');
 const { createLocalCalendarClient, overlapsWindow } = require('../calendar/local-client');
 const { roster, setAvailability } = require('../studio/availability-status');
+const { explainRecipients } = require('../notify/owner');
 
 /** All-day ranges end on the morning after, the way a calendar writes them. */
 function addOneDay(date) {
@@ -449,6 +450,27 @@ function createServer({
     await db.flush();
     res.json({ ok: true, professional: updated });
   }));
+
+  /**
+   * Where alerts for this business actually go right now.
+   *
+   * Exists because "every field is empty and alerts still arrive" was a real
+   * afternoon: the number came from OWNER_WHATSAPP, which is set in the
+   * environment and shown nowhere. A dashboard that cannot answer "who gets
+   * these" is not telling the truth about the thing it controls.
+   */
+  app.get('/api/alerts/where', (req, res) => {
+    const { biz, whatsapp: wa } = pick(req);
+    const me = wa?.getStatus?.()?.me?.id || '';
+    const self = String(me).split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
+    const line = biz === 'party' || biz === 'studio' ? null : lines?.registry?.get(biz);
+    const found = explainRecipients({
+      business: biz,
+      ownNumbers: line ? () => line.alertNumbers : null,
+      self,
+    });
+    res.json({ ok: true, ...found });
+  });
 
   // ---- Calendar ----
   // One month at a time, flattened into what a day cell needs. The entries are

@@ -21,6 +21,49 @@ const { m } = require('./messages');
  *   Empty falls back to the Studio's settings, so her requests always reach
  *   somebody even before her own number is filled in.
  */
+/**
+ * Where an alert goes, and - just as important - why.
+ *
+ * There are four possible sources and they are tried in order, so "the field is
+ * empty but alerts still arrive somewhere" is a perfectly ordinary state and
+ * was impossible to understand from the dashboard. Two of these sources are not
+ * visible anywhere: OWNER_WHATSAPP is set in the environment, and the linked
+ * phone is not a setting at all. The owner deleted every number he could find
+ * and the alerts kept coming, which from where he sat looked like the code
+ * ignoring him.
+ *
+ * So this returns the numbers together with the name of the step that produced
+ * them, and the dashboard prints it.
+ *
+ * @returns {{numbers: string[], source: string, key: string|null}}
+ */
+function explainRecipients({ business = 'party', ownNumbers = null, self = '' } = {}) {
+  const studioSide = business !== 'party';
+  const alertKey = studioSide ? 'studioAlertNumbers' : 'alertNumbers';
+  const ownerKey = studioSide ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
+  const clean = (raw) =>
+    [...new Set(
+      String(raw || '')
+        .split(',')
+        .map((n) => n.replace(/[^0-9]/g, ''))
+        .filter((n) => n.length >= 8)
+    )];
+
+  const own = clean(ownNumbers ? ownNumbers() : '');
+  if (own.length) return { numbers: own, source: 'line', key: null };
+
+  const fromAlerts = clean(settings.get(alertKey));
+  if (fromAlerts.length) return { numbers: fromAlerts, source: 'settings', key: alertKey };
+
+  const fromOwner = clean(settings.get(ownerKey));
+  if (fromOwner.length) return { numbers: fromOwner, source: 'owner', key: ownerKey };
+
+  const linked = clean(self);
+  if (linked.length) return { numbers: linked, source: 'linked', key: null };
+
+  return { numbers: [], source: 'none', key: null };
+}
+
 function createNotifier({ client, business = 'party', ownNumbers = null }) {
   /**
    * The number this line is linked to - the phone that scanned the QR.
@@ -46,21 +89,7 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
    * not PartyDekoMiet reads the Studio's settings.
    */
   function recipients() {
-    const studioSide = business !== 'party';
-    const alertKey = studioSide ? 'studioAlertNumbers' : 'alertNumbers';
-    const ownerKey = studioSide ? 'studioOwnerWhatsapp' : 'ownerWhatsapp';
-    const own = ownNumbers ? String(ownNumbers() || '').trim() : '';
-    const raw = own || String(settings.get(alertKey) || '').trim();
-    const list = (raw || String(settings.get(ownerKey) || ''))
-      .split(',')
-      .map((n) => n.replace(/[^0-9]/g, ''))
-      .filter((n) => n.length >= 8);
-    const unique = [...new Set(list)]; // the same number listed twice would send twice
-    if (unique.length) return unique;
-
-    // Nothing filled in anywhere: the linked phone rather than nobody.
-    const self = selfNumber();
-    return self.length >= 8 ? [self] : [];
+    return explainRecipients({ business, ownNumbers, self: selfNumber() }).numbers;
   }
 
   async function owner(text, meta = {}, imageBuffer = null) {
@@ -205,4 +234,4 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
   return { owner, toNumber, bookingRequest, appointmentRequest, recipients };
 }
 
-module.exports = { createNotifier };
+module.exports = { createNotifier, explainRecipients };

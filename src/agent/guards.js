@@ -269,8 +269,49 @@ const claimsRequestSent = (text) => {
   return CLAIMS_REQUEST_SENT.some((p) => p.test(probe));
 };
 
-/** Tool calls that actually put a request in front of a human. */
-const REQUEST_TOOLS = new Set(['create_booking_request', 'create_appointment', 'handoff_to_human']);
+/**
+ * "I'll pass your request to the team now" - and then the conversation ends.
+ *
+ * The future tense was treated as harmless on the grounds that the next
+ * message is where it gets checked. There often is no next message. The
+ * customer said what he wanted, was told it was being passed on, said "ok",
+ * and that was that: no request, no alert, nothing in the dashboard, and a
+ * person who believes he has an appointment.
+ *
+ * To the customer there is no difference between "I will pass this on" and "I
+ * have passed this on". Both are the end of his part. So a promise with
+ * nothing behind it is checked exactly like a claim - the model is asked to
+ * actually do it, in the same turn, while it still has everything in hand.
+ */
+const PROMISES_TO_SEND = [
+  // The object has to be the customer's own request. "I'll pass this to a
+  // colleague" and "ich gebe das weiter" are a handoff, which is a different
+  // thing and a legitimate one - and the guard's own fallback text says
+  // exactly that, so a looser pattern made every blocked reply look like an
+  // unkept promise.
+  /\b(i(?:'ll| will)|we(?:'ll| will))\b.{0,30}\b(pass|send|forward|submit|create|put|place)\b.{0,30}\b(request|booking|appointment|reservation)\b/i,
+  /\b(ich (?:werde|gebe|leite)|wir (?:werden|geben|leiten))\b.{0,30}\b(anfrage|buchungsanfrage|terminanfrage|reservierung)\b/i,
+];
+
+const promisesToSend = (text) => {
+  const probe = fold(String(text || ''));
+  return PROMISES_TO_SEND.some((p) => p.test(probe));
+};
+
+/**
+ * Tool calls that actually put a request in front of a human.
+ *
+ * `create_appointment` was never the name of anything. The Studio's tool is
+ * create_appointment_request, so on that side this set matched nothing: a
+ * real, successful appointment request looked exactly like no request at all,
+ * and the check that exists to catch an empty promise could not tell the two
+ * apart.
+ */
+const REQUEST_TOOLS = new Set([
+  'create_booking_request',
+  'create_appointment_request',
+  'handoff_to_human',
+]);
 const requestWasMade = (toolCalls = []) =>
   toolCalls.some((c) => REQUEST_TOOLS.has(c.name) && c.result?.ok !== false);
 
@@ -396,4 +437,4 @@ function createGuards({ faqAnswers = [], depositChf = 50, lateFeeChf = 50, damag
   return { check, enforce, autofix, strip };
 }
 
-module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES, MACHINE_TALK, claimsRequestSent, requestWasMade };
+module.exports = { createGuards, sentences, normalise, fold, STRIP_RULES, MACHINE_TALK, claimsRequestSent, promisesToSend, requestWasMade, REQUEST_TOOLS };

@@ -13,7 +13,7 @@ const { buildSystemPrompt } = require('./prompt');
 const partyTools = require('./tools');
 const { resolveLanguage, scoreText } = require('./language');
 const settings = require('../settings');
-const { claimsRequestSent, requestWasMade, sentences } = require('./guards');
+const { claimsRequestSent, promisesToSend, requestWasMade, sentences } = require('./guards');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -217,7 +217,18 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
       // would never hear of it. Rather than send that, ask for the thing that
       // is almost always missing - the name - or, if we have it, put a human
       // on it, which is what the customer was promised in substance.
-      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls) && !retried) {
+      // A promise counts the same as a claim. "I'll pass your request to the
+      // team now" was treated as harmless because the next message is where it
+      // gets checked - but there often is no next message. The customer says
+      // "ok" and leaves believing he has an appointment, and nothing reached
+      // anybody.
+      // Not for a blocked reply: that text is the guard's, not the model's,
+      // and it is already on its way to a person.
+      const owesARequest = !guarded.blocked
+        && (claimsRequestSent(guarded.text) || promisesToSend(guarded.text))
+        && !requestWasMade(toolCalls);
+
+      if (owesARequest && !retried) {
         // Send it back to the model instead of patching the sentence.
         //
         // The first version replaced the message - with a request for the name,
@@ -235,19 +246,23 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
         messages.push({
           role: 'system',
           content:
-            'You just told the customer their request had been passed on, but you did not call '
-            + 'create_booking_request (or create_appointment). Nothing reached the team. '
-            + 'Either call the tool now with everything you have, or - if something required is '
-            + 'still missing, usually the name or the date - ask the customer for exactly that, '
-            + 'in one short sentence, without claiming anything has been sent.',
+            'You told the customer their request is with the team, or that you are about to pass '
+            + 'it on - but you did not call create_booking_request or create_appointment_request, '
+            + 'so nothing reached anybody. Saying you will do it is not doing it, and there may be '
+            + 'no next message. Call the tool NOW, in this same reply, with everything you already '
+            + 'have. If something required is genuinely still missing - usually the name or the '
+            + 'date - ask the customer for exactly that in one short sentence, and do not say '
+            + 'anything about passing it on.',
         });
         continue;
       }
 
       // It said it again after being told. Rather than send a claim that is not
       // true, take the claim out and keep whatever else it said.
-      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls)) {
-        const kept = sentences(guarded.text).filter((line) => !claimsRequestSent(line)).join(' ').trim();
+      if (owesARequest) {
+        const kept = sentences(guarded.text)
+          .filter((line) => !claimsRequestSent(line) && !promisesToSend(line))
+          .join(' ').trim();
         log.error(
           `Reply still claimed a request had been passed on after being corrected. `
             + `Removed the claim. Tools: ${toolCalls.map((c) => c.name).join(', ') || 'none'}`

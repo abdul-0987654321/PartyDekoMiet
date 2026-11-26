@@ -195,3 +195,48 @@ describe('confirming', () => {
     assert.match(told.at(-1), /NICHT informiert|NOT be told/);
   });
 });
+
+describe('the same request arriving twice at once', () => {
+  /**
+   * Straight from a live log. The model called create_booking_request twice for
+   * the same set within twenty seconds and the two runs walked through each
+   * other: the second withdrew the first's record, the first wrote its row back
+   * as open, and both ended up in the dashboard with an alert each. The fix for
+   * duplicates had produced a duplicate.
+   */
+  test('two calls at the same moment leave one request', async () => {
+    const [a, b] = await Promise.all([request(), request()]);
+
+    assert.strictEqual(a.ok, true, a.error);
+    assert.strictEqual(b.ok, true, b.error);
+    assert.strictEqual(a.booking_id, b.booking_id, 'the second call joins the first request');
+
+    const open = db.all('bookings').filter((x) => x.status === 'PENDING');
+    assert.strictEqual(open.length, 1);
+  });
+
+  test('and one alert, not two', async () => {
+    alerts.length = 0;
+    await Promise.all([request(), request()]);
+    assert.strictEqual(alerts.length, 1);
+  });
+
+  test('three at once are still one', async () => {
+    const results = await Promise.all([request(), request(), request()]);
+    const ids = new Set(results.map((r) => r.booking_id));
+    assert.strictEqual(ids.size, 1);
+    assert.strictEqual(db.all('bookings').filter((x) => x.status === 'PENDING').length, 1);
+  });
+
+  test('a genuinely different date still makes its own request', async () => {
+    const first = await request();
+    const second = await request({ start_date: openDay(24) });
+    assert.notStrictEqual(first.booking_id, second.booking_id);
+  });
+
+  test('no calendar entry is left behind by the one that did not happen', async () => {
+    await Promise.all([request(), request()]);
+    const entries = db.all('calendarEvents');
+    assert.strictEqual(entries.length, 1, 'a stray entry would block those days for everybody');
+  });
+});

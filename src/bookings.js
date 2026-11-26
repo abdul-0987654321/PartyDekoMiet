@@ -71,10 +71,37 @@ function validateBookingArgs(args) {
 
 function createBookings({ catalog, calendar, notify }) {
   /**
+   * One booking at a time per conversation.
+   *
+   * The model called create_booking_request twice for the same set within
+   * twenty seconds, and the two runs walked through each other: the second
+   * withdrew the first's record, the first then wrote its own row back as open,
+   * and both ended up in the dashboard with an alert each - the exact duplicate
+   * this was meant to prevent, now produced by the fix for it. Withdrawing an
+   * earlier request only works if nothing else is half-written at the time.
+   */
+  const chatLocks = new Map();
+  function runAlone(jid, work) {
+    const previous = chatLocks.get(jid) || Promise.resolve();
+    const next = previous.catch(() => {}).then(work);
+    // Keep the chain, drop it once it is the last link, so the map does not
+    // grow for the lifetime of the process.
+    chatLocks.set(jid, next);
+    next.catch(() => {}).finally(() => {
+      if (chatLocks.get(jid) === next) chatLocks.delete(jid);
+    });
+    return next;
+  }
+
+  /**
    * @returns {object} tool result; the wording is read by the model, so it must
    *                   never sound like a confirmation.
    */
   async function create(args) {
+    return runAlone(args.chatId || 'no-chat', () => createOne(args));
+  }
+
+  async function createOne(args) {
     const problem = validateBookingArgs(args);
     if (problem) return { ok: false, error: problem };
 
@@ -105,6 +132,28 @@ function createBookings({ catalog, calendar, notify }) {
     // withdrawn before the new one is made - which also frees the days it was
     // holding, so the availability check below is asked about a calendar that
     // no longer contains the customer's own abandoned attempt.
+    // The same request twice over: same chat, same set, same pickup day, made
+    // moments ago. That is one booking, however many times it was asked for.
+    const alreadyThere = db.all('bookings').find(
+      (b) => b.status === 'PENDING'
+        && b.jid === jid && jid
+        && b.productId === product.id
+        && b.pickupDate === win.pickup
+    );
+    if (alreadyThere) {
+      log.info(`Booking request for the same set and day already open (${alreadyThere.id}) - not making a second.`);
+      return {
+        ok: true,
+        booking_id: alreadyThere.id,
+        status: alreadyThere.status,
+        pickup_date: alreadyThere.pickupDate,
+        return_date: alreadyThere.returnDate,
+        product_url: alreadyThere.productUrl,
+        payment_hint: paymentHint(),
+        note: 'Diese Anfrage liegt bereits beim Team. Sag dem Kunden nichts von einer zweiten Anfrage.',
+      };
+    }
+
     const superseded = [];
     for (const old of db.all('bookings')) {
       if (old.status !== 'PENDING') continue;
@@ -273,7 +322,11 @@ function createBookings({ catalog, calendar, notify }) {
         : texts.bookingCancelledCustomer(booking);
       const res = await notify.toNumber(String(booking.jid).split('@')[0], text, { plain: true });
       customerTold = Boolean(res?.ok);
-      if (!customerTold) log.warn(`Booking ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+      // Logged either way: "did the customer actually hear about this" is the
+      // first question asked when something looks wrong, and a line that only
+      // appears on failure cannot answer it.
+      if (customerTold) log.info(`Booking ${id}: the customer was told it is ${status.toLowerCase()}.`);
+      else log.warn(`Booking ${id}: the customer could not be told (${res?.error || 'unknown'})`);
     }
 
     // And the team. The owner and his partner are not both looking at the

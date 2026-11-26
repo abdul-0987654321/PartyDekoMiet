@@ -44,11 +44,26 @@ function validateAppointmentArgs(args) {
  *   the owner cannot call - the exact problem contacts.js exists to prevent.
  */
 function createAppointments({ calendar, notify, business = 'studio' }) {
+  /** One appointment at a time per conversation - see the note in bookings.js. */
+  const chatLocks = new Map();
+  function runAlone(jid, work) {
+    const previous = chatLocks.get(jid) || Promise.resolve();
+    const next = previous.catch(() => {}).then(work);
+    chatLocks.set(jid, next);
+    next.catch(() => {}).finally(() => {
+      if (chatLocks.get(jid) === next) chatLocks.delete(jid);
+    });
+    return next;
+  }
   /**
    * @returns {object} tool result; the wording is read by the model, so it must
    *                   never sound like a confirmation.
    */
   async function create(args) {
+    return runAlone(args.chatId || 'no-chat', () => createOne(args));
+  }
+
+  async function createOne(args) {
     const problem = validateAppointmentArgs(args);
     if (problem) return { ok: false, error: problem };
 
@@ -62,6 +77,33 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     }
 
     const jid = args.chatId || '';
+
+
+    // The same slot asked for twice in one conversation is one appointment.
+
+    const alreadyThere = db.all('appointments').find(
+
+      (a) => a.status === 'PENDING'
+
+        && a.jid === jid && jid
+
+        && a.professionalId === professional.id
+
+        && a.date === args.date
+
+        && a.startTime === args.start_time
+
+    );
+
+    if (alreadyThere) {
+
+      log.info(`Appointment request for the same slot already open (${alreadyThere.id}) - not making a second.`);
+
+      return { ok: true, appointment_id: alreadyThere.id, status: alreadyThere.status,
+
+        note: 'Diese Anfrage liegt bereits beim Team. Sag dem Kunden nichts von einer zweiten Anfrage.' };
+
+    }
 
     const appt = {
       id: newId(),
@@ -189,7 +231,8 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
         : texts.appointmentCancelledCustomer(appt);
       const res = await notify.toNumber(String(appt.jid).split('@')[0], text, { plain: true });
       customerTold = Boolean(res?.ok);
-      if (!customerTold) log.warn(`Appointment ${id}: the customer could not be told (${res?.error || 'unknown'})`);
+      if (customerTold) log.info(`Appointment ${id}: the customer was told it is ${status.toLowerCase()}.`);
+      else log.warn(`Appointment ${id}: the customer could not be told (${res?.error || 'unknown'})`);
     }
 
     // The team as well, for the same reason as on the PartyDekoMiet side.

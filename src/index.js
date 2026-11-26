@@ -233,6 +233,15 @@ async function bootStudio() {
           .listServices({ activeOnly: true })
           .map((s) => Number(s.priceChf))
           .filter((n) => Number.isFinite(n) && n > 0);
+      // The price list the "nothing beyond the list" rule is measured against:
+      // every active service's name and description, exactly as the owner
+      // typed them. A function for the same reason the prices are - he edits
+      // services while the bot is running.
+      const activeServiceTexts = () =>
+        directory
+          .listServices({ activeOnly: true })
+          .flatMap((s) => [s.name, s.notes])
+          .filter(Boolean);
       const liveKnowledge = {
         ...knowledge,
         get faq() {
@@ -247,6 +256,7 @@ async function bootStudio() {
       const guards = createStudioGuards({
         faqAnswers: () => liveKnowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
         allowedPrices: activePrices,
+        serviceTexts: activeServiceTexts,
         priceMode: () => settings.get('studioPriceGuard'),
       });
       // Kept, so each professional's own number can build its agent from the
@@ -371,11 +381,19 @@ async function bootLine(line) {
         .listServices({ activeOnly: true })
         .map((s) => Number(s.priceChf))
         .filter((n) => Number.isFinite(n) && n > 0);
+    // Scoped the same way: her number may describe what she offers, which is
+    // her own services plus the studio's shared ones, and nothing else.
+    const activeServiceTexts = () =>
+      scoped
+        .listServices({ activeOnly: true })
+        .flatMap((s) => [s.name, s.notes])
+        .filter(Boolean);
 
     const knowledge = studioRuntime.liveKnowledge;
     const guards = createStudioGuards({
       faqAnswers: () => knowledge.faq.flatMap((e) => [e.a_de, e.a_en]),
       allowedPrices: activePrices,
+      serviceTexts: activeServiceTexts,
       priceMode: () => settings.get('studioPriceGuard'),
     });
 

@@ -17,6 +17,8 @@
  *   notify        { owner(text, meta) }
  */
 
+const { isVague, ASK_INSTEAD, DESCRIPTION_TAIL } = require('../handoff');
+
 const UNAVAILABLE = (what) => ({
   ok: false,
   error: `${what} ist noch nicht angebunden. Sag dem Kunden, dass du das gerade nicht pruefen kannst, und gib den Fall weiter.`,
@@ -342,13 +344,16 @@ const DEFS = [
   {
     name: 'handoff_to_human',
     description:
-      'Hand the conversation to a human. Use for complaints, changes to an existing appointment, cancellations, exceptions, or anything you are unsure about, including anything about a service beyond what the price list covers. Tell the customer briefly that a colleague will get back to them, without promising a time.',
+      'Hand the conversation to a human. Use ONLY for: a complaint, a cancellation, a change to an '
+      + 'appointment that already exists, a dispute about a price, or somebody asking for something '
+      + 'the studio does not offer. '
+      + DESCRIPTION_TAIL,
     parameters: {
       type: 'object',
       properties: {
         reason: {
           type: 'string',
-          description: 'Short category: cancellation | change | exception | complaint | unclear',
+          description: 'Short category: cancellation | change | complaint | price_dispute | not_offered',
         },
         summary: { type: 'string', description: 'One or two sentences for the owner, in German' },
       },
@@ -356,6 +361,8 @@ const DEFS = [
       additionalProperties: false,
     },
     handler: async (args, { notify, chatId, onHandoff }) => {
+      // Not understanding a message is a reason to ask, not to fetch somebody.
+      if (isVague(args.reason)) return { ok: false, error: ASK_INSTEAD };
       if (onHandoff) onHandoff(args);
       if (notify) {
         const { m } = require('../../notify/messages');

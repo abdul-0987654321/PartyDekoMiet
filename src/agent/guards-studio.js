@@ -11,8 +11,22 @@
  *
  *   - never speak in the first person as if it were the professional
  *   - never offer, negotiate or confirm anything sexual beyond the price list
+ *   - never put unprotected sex in writing, whatever the price list says
  *   - never quote a price that isn't an active service's own price
  *   - never present an appointment as confirmed before the owner has it
+ *
+ * "Beyond the price list" is the whole of the second rule, and it is read
+ * literally: the list is whatever the owner has typed into Services in the
+ * dashboard. If he has written "Wellness Massage mit Happy End" into a
+ * service, the bot saying so is reading his list out, not improvising, and
+ * blocking it means the bot cannot describe the studio's own offer. If the
+ * words are not in any active service, the bot naming them is inventing an
+ * offer, and that is what gets stopped.
+ *
+ * This matters because the guard did block it, live: the owner filled in his
+ * services, a customer asked what was on offer, and every answer came back as
+ * "Let me check that with the team". The list said one thing and the bot was
+ * forbidden from saying it.
  *
  * Design notes
  * ------------
@@ -46,13 +60,31 @@ const RULES = [
     code: 'SEXUAL_EXTRA_OFFERED',
     hint: 'Only the official service list may be named. Anything beyond it - intimate extras, special wishes - is discussed by the professional in person, never by the bot.',
     escape: NEGATION,
+    // Checked against the owner's own service list, not by vocabulary alone:
+    // see subjectIn() and the note on INVENTED_EXTRA below.
+    subjects: [
+      [/\bhappy\s*end(ing|e)?\b/i, 'happy end'],
+      [/\bintime?r?e? optionen\b|\bintimate options\b/i, 'intime optionen'],
+      [/\bsonderwuensche\b|\bspecial requests?\b/i, 'sonderwuensche'],
+      [/\bextras?\b/i, 'extras'],
+      [/\bgfe\b|\bgirlfriend experience\b/i, 'gfe'],
+    ],
+    // An offer, a possibility or an inclusion - not a mention in passing.
+    context: /\b(bieten wir|bieten|anbieten|moeglich|verfuegbar|kannst du|koennen wir|beinhaltet|inklusive|enthalten|mit)\b|\b(we offer|offer|available|possible|we can|includes|including|with)\b/i,
+  },
+  {
+    // The one line that holds whatever the service list says.
+    //
+    // Everything else in this file is about the bot staying inside the
+    // owner's list. This is not: a bot putting "without a condom" in writing
+    // is a health question and a question of what the women are then expected
+    // to agree to, and neither belongs in an automated message. A customer who
+    // asks goes to a person, which is what a person is for.
+    code: 'UNPROTECTED_OFFERED',
+    hint: 'Never put this in writing, whatever the service list says. Do not confirm it, do not deny it, do not discuss it - pass the conversation to a person with handoff_to_human.',
+    escape: NEGATION,
     patterns: [
-      /\b(intime? optionen|intimere optionen|sonderwuensche|extras?)\b[^.!?]{0,30}\b(bieten wir|anbieten|moeglich|verfuegbar|kannst du|koennen wir)\b/i,
-      /\b(bieten wir|anbieten|moeglich)\b[^.!?]{0,30}\b(intime? optionen|intimere optionen|sonderwuensche|extras?)\b/i,
-      /\b(intimate options|special requests?|extras?)\b[^.!?]{0,30}\b(we offer|available|possible|we can)\b/i,
-      /\b(we offer|available|we can)\b[^.!?]{0,30}\b(intimate options|special requests?|extras?)\b/i,
-      /\b(ohne gummi|without a condom|bareback)\b/i,
-      /\b(happy ending)\b/i,
+      /\b(ohne gummi|ohne kondom|without a condom|no condom|bareback|\bbb\b|\bao\b)\b/i,
     ],
   },
   {
@@ -87,13 +119,17 @@ function invalidPriceRule(sentence, ctx) {
  * @param {object} opts
  * @param {string[]} [opts.faqAnswers]     verbatim client answers - always allowed
  * @param {number[]} [opts.allowedPrices]  every active service's priceChf, across all professionals
+ * @param {function|string[]} [opts.serviceTexts]  every active service's name and
+ *   description, as the owner typed them. This is the price list the second
+ *   rule is measured against. A function, read per reply, because he edits
+ *   services while the bot is running.
  */
 /**
  * @param {object} opts
  * @param {function|string} [opts.priceMode] 'warn' (default) or 'block'; a
  *   function is read per reply, so the dashboard switch takes effect at once.
  */
-function createStudioGuards({ faqAnswers = [], allowedPrices = [], priceMode = 'warn' } = {}) {
+function createStudioGuards({ faqAnswers = [], allowedPrices = [], serviceTexts = [], priceMode = 'warn' } = {}) {
   const readPriceMode = typeof priceMode === 'function' ? priceMode : () => priceMode;
   // Both the whitelist and the price list are read per check, never captured
   // here: the owner edits FAQ answers and services in the dashboard while the
@@ -121,6 +157,44 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [], priceMode = '
   // list_services - gets blocked. That happened live: the agent quoted CHF 100
   // from the directory and the guard, still holding boot's empty list, killed it.
   const readPrices = typeof allowedPrices === 'function' ? allowedPrices : () => allowedPrices;
+
+  /**
+   * Everything the owner has written into his active services, folded the same
+   * way the reply is, so "Happy End", "happy ending" and "HAPPY-END" are one
+   * thing. Read per reply for the same reason the prices are.
+   */
+  const readServiceTexts = typeof serviceTexts === 'function' ? serviceTexts : () => serviceTexts;
+  function serviceCorpus() {
+    try {
+      // normalise, not fold: it lowercases and flattens punctuation too, so
+      // "Happy End", "happy-end" and "HAPPY END" are one thing.
+      return normalise((readServiceTexts() || []).join(' . '));
+    } catch {
+      // Unreadable means unknown, and unknown means nothing is on the list -
+      // the same way an unreadable price list allows no prices.
+      return '';
+    }
+  }
+
+  /**
+   * Is this phrase the owner's own offer, or the bot's invention?
+   *
+   * @returns {{subject: string}|null} the subject that was named, when one was
+   *   named and it is NOT in the owner's list
+   */
+  function offersSomethingNotOnTheList(sentence, rule) {
+    if (!rule.subjects) return null;
+    if (rule.context && !rule.context.test(sentence)) return null;
+    const corpus = serviceCorpus();
+    for (const [pattern, subject] of rule.subjects) {
+      if (!pattern.test(sentence)) continue;
+      // The subject flattened the same way the corpus is.
+      const needle = normalise(subject);
+      if (corpus.includes(needle)) continue; // he wrote it himself
+      return { subject };
+    }
+    return null;
+  }
 
   function autofix(text) {
     let out = String(text).replace(/ß/g, 'ss');
@@ -158,9 +232,23 @@ function createStudioGuards({ faqAnswers = [], allowedPrices = [], priceMode = '
         });
       }
       for (const rule of RULES) {
-        const hit = rule.patterns.some((p) => p.test(probe));
-        if (!hit) continue;
         if (rule.escape && rule.escape.test(sentence)) continue;
+
+        if (rule.subjects) {
+          const invented = offersSomethingNotOnTheList(probe, rule);
+          if (invented) {
+            found.push({
+              code: rule.code,
+              // Names what tripped, so a blocked reply can be told apart from
+              // a service the owner has simply not written down yet.
+              hint: `${rule.hint} "${invented.subject}" is in no active service.`,
+              sentence,
+            });
+          }
+          continue;
+        }
+
+        if (!rule.patterns.some((p) => p.test(probe))) continue;
         found.push({ code: rule.code, hint: rule.hint, sentence });
       }
     }

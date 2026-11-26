@@ -133,8 +133,21 @@ describe('busy and free', () => {
   test('busy has no timer: an hour later she is still busy', async () => {
     await say('besetzt');
     const her = db.get('professionals', sofia.id);
-    const inAnHour = new Date(Date.now() + 60 * 60000);
-    assert.strictEqual(isBusy(her, { timeZone: TZ, now: inAnHour }), true, 'a timer would lie exactly when a client overruns');
+
+    // Pinned to a fixed afternoon rather than "now + 1h". Run near midnight in
+    // the studio's zone, the old version stepped over into the next day and
+    // tripped the overnight clear instead - the test failed for a reason that
+    // had nothing to do with what it is about, and only between 23:00 and
+    // midnight in Zurich.
+    her.busySince = '2026-07-15T14:00:00.000Z';
+    db.put('professionals', her);
+    const anHourLater = new Date('2026-07-15T15:00:00.000Z');
+
+    assert.strictEqual(
+      isBusy(db.get('professionals', sofia.id), { timeZone: TZ, now: anHourLater }),
+      true,
+      'a timer would lie exactly when a client overruns'
+    );
   });
 
   test("yesterday's forgotten busy does not block today", () => {

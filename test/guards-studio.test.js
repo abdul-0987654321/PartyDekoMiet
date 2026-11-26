@@ -34,12 +34,100 @@ describe('the bot must never offer or negotiate sexual extras', () => {
     assert.ok(codes('Yes, we offer special requests too.').includes('SEXUAL_EXTRA_OFFERED'));
   });
 
-  test('blocks explicit terms outright', () => {
+  test('blocks a term that is in no service the owner has written', () => {
     assert.ok(codes('Ein Happy Ending ist moeglich.').includes('SEXUAL_EXTRA_OFFERED'));
   });
 
   test('allows a clear decline', () => {
     assert.deepStrictEqual(codes('Sonderwuensche bieten wir nicht an, nur die Services aus der Liste.'), []);
+  });
+});
+
+/**
+ * "Beyond the price list" is measured against the list, and the list is
+ * whatever the owner typed into Services.
+ *
+ * This blocked him live. He filled his services in - "1 Stunde Service:
+ * Wellness Massage mit Happy End." - a customer asked what was on offer, and
+ * every answer came back as "Let me check that with the team". The list said
+ * one thing and the bot was forbidden from saying it, which is not a safety
+ * net, it is a bot that cannot describe the business it answers for.
+ */
+describe('the owner\'s own service list is the list', () => {
+  const HIS_LIST = [
+    'Sofia',
+    '1 Stunde Service:\nWellness Massage mit Happy End.\nWelness Massage, Bj, 69 eventuell Sex',
+  ];
+  const withList = (texts) => createStudioGuards({ allowedPrices: [200], serviceTexts: () => texts });
+  const codesWith = (texts, text) => withList(texts).check(text).map((v) => v.code);
+
+  test('what he wrote into a service may be said back', () => {
+    for (const reply of [
+      'Our one hour service includes a wellness massage with happy ending.',
+      'Wir bieten eine Wellness Massage mit Happy End an, 1 Stunde, CHF 200.',
+      'Sofia offers a 60 minute massage for CHF 200 with happy ending.',
+    ]) {
+      assert.deepStrictEqual(codesWith(HIS_LIST, reply), [], reply);
+    }
+  });
+
+  test('the same sentence is blocked when no service says it', () => {
+    assert.ok(
+      codesWith([], 'Our one hour service includes a wellness massage with happy ending.')
+        .includes('SEXUAL_EXTRA_OFFERED'),
+      'with nothing on the list, the bot is inventing the offer'
+    );
+  });
+
+  test('something he did not write is still blocked, list or no list', () => {
+    // He wrote nothing about intimate options or unnamed extras, so offering
+    // them is the bot going past his list - which is the whole rule.
+    assert.ok(codesWith(HIS_LIST, 'We also offer intimate options.').includes('SEXUAL_EXTRA_OFFERED'));
+    assert.ok(codesWith(HIS_LIST, 'Extras are possible, just ask her.').includes('SEXUAL_EXTRA_OFFERED'));
+  });
+
+  test('taking the service down takes the permission with it', () => {
+    const texts = [...HIS_LIST];
+    const g = createStudioGuards({ allowedPrices: [200], serviceTexts: () => texts });
+    const line = 'Our one hour service includes a happy ending.';
+    assert.deepStrictEqual(g.check(line).map((v) => v.code), []);
+    texts.length = 0; // he deactivates the service mid-shift
+    assert.ok(g.check(line).map((v) => v.code).includes('SEXUAL_EXTRA_OFFERED'), 'read per reply, not at boot');
+  });
+
+  test('naming it in passing without offering it is not an offer', () => {
+    assert.deepStrictEqual(codesWith([], 'Happy end.'), []);
+  });
+});
+
+describe('unprotected sex is never put in writing', () => {
+  // The one line the service list does not move. A bot writing this is a
+  // health question and a question of what the women are then expected to
+  // agree to, and neither belongs in an automated message. The owner is
+  // alerted instead, because that is what a person is for.
+  const HIS_LIST = ['Alles ohne Gummi moeglich'];
+  const codesWith = (texts, text) =>
+    createStudioGuards({ allowedPrices: [], serviceTexts: () => texts }).check(text).map((v) => v.code);
+
+  for (const reply of [
+    'Yes, that is possible without a condom.',
+    'Ohne Gummi ist das moeglich.',
+    'Bareback is available.',
+  ]) {
+    test(`blocked: ${reply}`, () => {
+      assert.ok(codesWith([], reply).includes('UNPROTECTED_OFFERED'));
+    });
+  }
+
+  test('writing it into a service does not unlock it', () => {
+    assert.ok(
+      codesWith(HIS_LIST, 'Ohne Gummi ist das moeglich.').includes('UNPROTECTED_OFFERED'),
+      'this is the one thing the list cannot permit'
+    );
+  });
+
+  test('a clear no is still allowed', () => {
+    assert.deepStrictEqual(codesWith([], 'Ohne Gummi geht das nicht.'), []);
   });
 });
 

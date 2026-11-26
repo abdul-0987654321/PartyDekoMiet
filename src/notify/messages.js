@@ -52,6 +52,22 @@ const T = {
     // dashboard she does not open.
     appointmentFooterOwnLine: 'Noch nicht bestaetigt. Antworte hier J zum Bestaetigen oder N zum Absagen - oder im Dashboard unter Termine.',
 
+    // The Studio's own number hears about every request, including the ones
+    // that came in on a professional's own line. Before this, a booking on her
+    // number was invisible to the studio: she knew, the owner did not, and
+    // nobody running the place could see what the evening looked like.
+    // Deliberately not an alert that asks for anything - she confirms it.
+    appointmentOnHerLine: (a, lineName) =>
+      `TERMINANFRAGE AUF ${String(lineName || a.professionalName).toUpperCase()}\n\n` +
+      `Kunde:       ${a.customerName}\n` +
+      `WhatsApp:    ${a.phone}\n` +
+      `Professional:${a.professionalName}\n` +
+      `Leistung:    ${a.serviceName}\n` +
+      `Datum:       ${a.date}\n` +
+      `Zeit:        ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
+      `${a.professionalName} hat die Anfrage auf ihrem Telefon und bestaetigt sie selbst. ` +
+      'Zur Info - im Dashboard unter Termine sichtbar.',
+
     // What the professional herself gets, on her own number. Deliberately
     // short: she is reading it between clients, and the only thing she has to
     // do is answer J or N.
@@ -185,6 +201,17 @@ const T = {
     },
     appointmentFooter: 'Not confirmed yet. Tap "Confirm" under Appointments in the dashboard - the calendar follows automatically.',
     appointmentFooterOwnLine: 'Not confirmed yet. Reply Y here to confirm or N to decline - or use Appointments in the dashboard.',
+
+    appointmentOnHerLine: (a, lineName) =>
+      `APPOINTMENT REQUEST ON ${String(lineName || a.professionalName).toUpperCase()}\n\n` +
+      `Customer:     ${a.customerName}\n` +
+      `WhatsApp:     ${a.phone}\n` +
+      `Professional: ${a.professionalName}\n` +
+      `Service:      ${a.serviceName}\n` +
+      `Date:         ${a.date}\n` +
+      `Time:         ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
+      `${a.professionalName} has this on her phone and confirms it herself. ` +
+      'For your information - visible under Appointments in the dashboard.',
 
     proRequest: (a, forName) =>
       `NEW REQUEST FOR ${String(forName || a.professionalName || '').toUpperCase() || 'YOU'}\n\n` +

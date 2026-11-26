@@ -14,6 +14,7 @@ const db = require('./store/db');
 const customers = require('./customers');
 const settings = require('./settings');
 const directory = require('./studio/directory');
+const { readWindow, withinHours, describe } = require('./studio/hours');
 
 function newId() {
   const d = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -50,8 +51,10 @@ function validateAppointmentArgs(args) {
  *   record lives under that number, so looking the phone up as 'studio' on a
  *   professional's line found nothing and the alert showed a raw WhatsApp id
  *   the owner cannot call - the exact problem contacts.js exists to prevent.
+ * @param {object} [deps.studioNotify] the Studio's own notifier, passed on a
+ *   professional's line so the studio also hears about a request taken there.
  */
-function createAppointments({ calendar, notify, business = 'studio' }) {
+function createAppointments({ calendar, notify, business = 'studio', studioNotify = null }) {
   /** One appointment at a time per conversation - see the note in bookings.js. */
   const chatLocks = new Map();
   function runAlone(jid, work) {
@@ -82,6 +85,25 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     const service = directory.getService(args.service_id);
     if (!service) {
       return { ok: false, error: `Service ${args.service_id} nicht gefunden.` };
+    }
+
+    // The last gate, and the one that actually holds. The slot check refuses
+    // times outside the opening hours, but the model is free not to call it -
+    // and once, after being told a time was taken, it offered midnight and
+    // wrote the appointment straight down. An appointment outside the hours is
+    // never created, whatever the conversation said.
+    const win = readWindow(settings);
+    if (!withinHours(args.start_time, service.durationMin, win)) {
+      log.warn(
+        `Refused an appointment outside the opening hours (${describe(win)}): ` +
+        `${args.date} ${args.start_time}, ${service.durationMin} min.`
+      );
+      return {
+        ok: false,
+        error:
+          `${args.start_time} liegt ausserhalb der Oeffnungszeiten (${describe(win)}). ` +
+          'Lege die Anfrage NICHT an. Frag den Kunden nach einer Zeit innerhalb der Oeffnungszeiten.',
+      };
     }
 
     const jid = args.chatId || '';
@@ -185,6 +207,28 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
       if (ownNumber && !alreadyHasIt && notify.toNumber) {
         const { m } = require('./notify/messages');
         await notify.toNumber(ownNumber, m().proRequest(appt, professional.name));
+      }
+
+      /**
+       * And the Studio itself.
+       *
+       * A request taken on a professional's own number used to be invisible to
+       * the studio: she had it on her phone, and the person running the place
+       * had no idea a booking existed until he opened the dashboard and looked.
+       * He cannot run an evening like that. This is information only - she is
+       * still the one who confirms it, so it asks for nothing.
+       */
+      if (studioNotify && business !== 'studio') {
+        const { m } = require('./notify/messages');
+        const lineName = lines.get(business)?.name || professional.name;
+        try {
+          await studioNotify.owner(m().appointmentOnHerLine(appt, lineName), {
+            kind: 'appointment_on_line', appointmentId: appt.id, line: business,
+          });
+        } catch (err) {
+          // Her request is already safe; the studio's copy is not worth failing for.
+          log.warn(`Could not tell the Studio about ${appt.id}: ${err.message}`);
+        }
       }
       if (!appt.calendarEventId) {
         const { m } = require('./notify/messages');

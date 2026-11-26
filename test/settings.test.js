@@ -52,7 +52,13 @@ describe('defaults', () => {
       'studioAboutText',
       'studioBufferMin',
       'studioCancellationRule',
+      // On the form because an appointment was once created for 00:00-01:00 at
+      // a studio working 10:00-13:00: nothing knew when it was open. These are
+      // the hours the code enforces, so the client has to be able to see and
+      // change them himself.
+      'studioCloseTime',
       'studioMinNoticeHours',
+      'studioOpenTime',
       'studioPaymentMode',
     ]);
   });

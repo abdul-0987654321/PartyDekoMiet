@@ -410,6 +410,9 @@ async function bootLine(line) {
       calendar: studioRuntime.calendar,
       notify: entry.runtime.notify,
       business: line.id,
+      // So the Studio hears about a request taken on her number. Without it
+      // the person running the studio only found out by opening the dashboard.
+      studioNotify: studioRuntime.notify,
     });
     entry.runtime.photos = createPhotos({ client: entry.whatsapp, business: line.id });
 

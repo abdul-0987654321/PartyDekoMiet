@@ -322,6 +322,27 @@ const SCHEMA = [
     },
   },
   {
+    // Without these, an appointment was once booked for 00:00-01:00 at a studio
+    // that works 10:00-13:00: the calendar was asked whether midnight was free,
+    // and midnight is always free. This is the window the code enforces.
+    key: 'studioOpenTime', group: 'studio', type: 'string', default: '10:00', env: 'STUDIO_OPEN_TIME',
+    placeholder: '10:00',
+    label: { de: 'Studio geöffnet ab', en: 'Studio opens at' },
+    help: {
+      de: 'Format 10:00. Vor dieser Zeit wird kein Termin angeboten und keiner angelegt. Wer abends arbeitet, traegt z.B. 20:00 und als Schliesszeit 02:00 ein - die Nacht wird korrekt erkannt.',
+      en: 'Format 10:00. No appointment is offered or created before this time. For evening work enter e.g. 20:00 with a closing time of 02:00 - a window across midnight is understood.',
+    },
+  },
+  {
+    key: 'studioCloseTime', group: 'studio', type: 'string', default: '22:00', env: 'STUDIO_CLOSE_TIME',
+    placeholder: '22:00',
+    label: { de: 'Studio geschlossen ab', en: 'Studio closes at' },
+    help: {
+      de: 'Format 22:00. Ein Termin muss VOR dieser Zeit zu Ende sein, nicht nur anfangen.',
+      en: 'Format 22:00. An appointment must finish before this time, not merely start before it.',
+    },
+  },
+  {
     key: 'studioMinNoticeHours', group: 'studio', type: 'number', default: 1, min: 0, max: 168, env: 'STUDIO_MIN_NOTICE_HOURS',
     label: { de: 'Mindestvorlauf für Termine (Std.)', en: 'Minimum notice for appointments (hours)' },
     help: {

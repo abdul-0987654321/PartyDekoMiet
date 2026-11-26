@@ -47,6 +47,10 @@ const T = {
       price: 'Preis', date: 'Datum', time: 'Zeit', source: 'Quelle', calendar: 'Kalender', open: 'Dashboard',
     },
     appointmentFooter: 'Noch nicht bestaetigt. Im Dashboard unter Termine auf "Bestaetigen" tippen - der Kalender wird automatisch nachgefuehrt.',
+    // On a professional's own number the same alert is already in her hand, so
+    // it ends with what she can do from there instead of sending her to a
+    // dashboard she does not open.
+    appointmentFooterOwnLine: 'Noch nicht bestaetigt. Antworte hier J zum Bestaetigen oder N zum Absagen - oder im Dashboard unter Termine.',
 
     // What the professional herself gets, on her own number. Deliberately
     // short: she is reading it between clients, and the only thing she has to
@@ -180,6 +184,7 @@ const T = {
       price: 'Price', date: 'Date', time: 'Time', source: 'Source', calendar: 'Calendar', open: 'Dashboard',
     },
     appointmentFooter: 'Not confirmed yet. Tap "Confirm" under Appointments in the dashboard - the calendar follows automatically.',
+    appointmentFooterOwnLine: 'Not confirmed yet. Reply Y here to confirm or N to decline - or use Appointments in the dashboard.',
 
     proRequest: (a, forName) =>
       `NEW REQUEST FOR ${String(forName || a.professionalName || '').toUpperCase() || 'YOU'}\n\n` +

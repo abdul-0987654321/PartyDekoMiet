@@ -270,7 +270,14 @@ function createNotifier({ client, business = 'party' }) {
     return `${base}${path}${biz}`;
   }
 
-  /** The message the owner gets for a new Studio appointment request. */
+  /**
+   * The message the owner gets for a new Studio appointment request.
+   *
+   * @param {object} [extra]
+   * @param {boolean} [extra.ownLine] this number belongs to the professional
+   *   the appointment is for, so the alert is already in her hand and ends
+   *   with what she can do from there.
+   */
   async function appointmentRequest(appt, extra = {}) {
     const t = m();
     const f = t.appointmentFields;
@@ -290,7 +297,7 @@ function createNotifier({ client, business = 'party' }) {
       dashboardLink('/bookings') ? `${f.open}: ${dashboardLink('/bookings')}` : null,
       extra.calendarLink ? `${f.calendar}: ${extra.calendarLink}` : null,
       '',
-      t.appointmentFooter,
+      extra.ownLine ? t.appointmentFooterOwnLine : t.appointmentFooter,
     ].filter((l) => l !== null);
 
     return owner(lines.join('\n'), { kind: 'appointment_request', appointmentId: appt.id });

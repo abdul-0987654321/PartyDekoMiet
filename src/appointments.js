@@ -9,6 +9,7 @@
  */
 
 const log = require('./log');
+const lines = require('./lines');
 const db = require('./store/db');
 const customers = require('./customers');
 const settings = require('./settings');
@@ -154,21 +155,34 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     customers.save(business, jid, { phone: appt.phone, name: appt.customerName });
     await db.flush();
 
-    if (notify) {
-      await notify.appointmentRequest(appt, { calendarLink });
+    const herOwnLine = lines.get(business)?.professionalId === professional.id;
 
-      // And the woman the appointment is actually for. Without this she only
-      // learns of it if somebody passes it on, which on the Studio's main
-      // number means she often did not learn of it at all.
-      //
-      // Unless her number IS this number. The owner put his own number in her
-      // profile while setting her up, so one appointment produced two separate
-      // WhatsApp messages in the same chat - the team alert and "a new request
-      // for you, reply J" - with nothing to say which was which or why there
-      // were two. One chat, one message.
+    if (notify) {
+      await notify.appointmentRequest(appt, { calendarLink, ownLine: herOwnLine });
+
+      /**
+       * And the woman the appointment is actually for.
+       *
+       * Only when she has not already been told. The alert above goes to the
+       * phone this number is connected on, so there are two cases:
+       *
+       *   - booked on her own line: that phone is hers, she has the request
+       *     in her hand, and a second WhatsApp message about the same
+       *     appointment is noise. She answers J or N in that same chat.
+       *   - booked on the Studio's main number: that phone is the owner's.
+       *     She knows nothing until somebody tells her, which on a busy
+       *     evening meant she often was not told at all.
+       *
+       * The same holds when her profile carries the number this line runs on,
+       * which is what happens while somebody is setting her up with his own
+       * number: one appointment, two messages, one chat, nothing saying which
+       * was which.
+       */
       const ownNumber = String(professional.whatsapp || '').replace(/[^0-9]/g, '');
       const thisNumber = (notify.recipients?.() || [])[0] || '';
-      if (ownNumber && ownNumber !== thisNumber && notify.toNumber) {
+      const alreadyHasIt = herOwnLine || (ownNumber && ownNumber === thisNumber);
+
+      if (ownNumber && !alreadyHasIt && notify.toNumber) {
         const { m } = require('./notify/messages');
         await notify.toNumber(ownNumber, m().proRequest(appt, professional.name));
       }
@@ -272,22 +286,40 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     const inAnHour = new Date(now.getTime() + 60 * 60000)
       .toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
 
-    const todays = db
-      .all('appointments')
-      .filter((a) => a.professionalId === professionalId && a.date === today && a.status !== 'CANCELLED')
-      .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
-
     /**
      * An appointment whose end is not after its start ends after midnight.
      *
-     * A 23:30 booking of an hour is stored as 23:30-00:30 on the 23:30 day,
-     * and "00:30 > 23:50" is false, so between its start and midnight it
-     * looked finished. She said the client was staying longer, was told there
-     * was no appointment running, and the room stayed free in the calendar for
-     * the next person. A studio that works past midnight hits this every night
-     * it is busy.
+     * A 23:30 booking of an hour is stored as 23:30-00:30 under the 23:30
+     * day. Before this was handled, two things went wrong on the same night:
+     * between 23:30 and midnight "00:30 > 23:50" is false, so it looked
+     * finished; and after midnight it belongs to yesterday's date, so it was
+     * not even looked at. Either way she said the client was staying longer,
+     * was told there was no appointment running, and the calendar freed the
+     * room for the next person while it was still occupied. A studio that
+     * works past midnight hits this every night it is busy.
      */
     const pastMidnight = (a) => Boolean(a.endTime) && a.endTime <= a.startTime;
+
+    const yesterday = (() => {
+      const d = new Date(`${today}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 1);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    const mine = db
+      .all('appointments')
+      .filter((a) => a.professionalId === professionalId && a.status !== 'CANCELLED');
+
+    const todays = mine
+      .filter((a) => a.date === today)
+      .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+    // Still running from last night: started yesterday, ends after midnight,
+    // and that end has not come round yet.
+    const stillRunning = mine.find(
+      (a) => a.date === yesterday && pastMidnight(a) && clock < a.endTime
+    );
+    if (stillRunning) return stillRunning;
 
     // Running now, or the next one about to start.
     return (

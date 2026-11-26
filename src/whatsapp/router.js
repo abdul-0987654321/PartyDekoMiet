@@ -20,7 +20,9 @@ const settings = require('../settings');
 const { m } = require('../notify/messages');
 const contacts = require('../contacts');
 const customers = require('../customers');
-const { handleProfessionalMessage } = require('../studio/professional-replies');
+const { handleProfessionalMessage, parseReply } = require('../studio/professional-replies');
+const { parseStatus } = require('../studio/professional-status');
+const lines = require('../lines');
 
 /**
  * Both bots share the `state` table/sheet, so each needs its own pause-state key
@@ -378,6 +380,34 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
    * her number - otherwise an empty field would match every customer whose jid
    * happens to start with nothing.
    */
+  /**
+   * The professional this whole number belongs to, if it is hers.
+   *
+   * Her own line is her own phone, so every message she sends to the bot is
+   * an outgoing message in its own chat - the same shape as the owner typing
+   * a command. professionalFor() below matches on the SENDER's number, which
+   * she can never be on her own line, so none of her commands reached
+   * anything: not J or N, not "besetzt", not "der kunde bleibt laenger". The
+   * number she was given so she could answer for herself was the one number
+   * she could not answer from.
+   */
+  function professionalOfThisLine() {
+    if (!studioSide || !services?.appointments) return null;
+    const id = lines.get(business)?.professionalId;
+    if (!id) return null;
+    const her = db.get('professionals', id);
+    return her && her.active !== false ? her : null;
+  }
+
+  /** Is this something she is saying to the bot, rather than to a customer? */
+  function isProfessionalCommand(text) {
+    const said = String(text || '').trim();
+    if (!said) return false;
+    const status = parseStatus(said);
+    if (status.ambiguous || status.command) return true;
+    return Boolean(parseReply(said).action);
+  }
+
   function professionalFor(jid) {
     const appointments = services?.appointments;
     if (!studioSide || !appointments) return null;
@@ -452,8 +482,31 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
     let text = textOf(msg);
     contacts.remember(business, msg); // real phone number + WhatsApp name, for alerts and the dashboard
 
-    // 0. The owner talking to the bot in its own chat (same number as the bot).
-    if (msg.key.fromMe && isSelfChat(jid)) return handleOwnerInput(msg, jid, text);
+    // 0. Somebody talking to the bot in its own chat, on the same phone.
+    //
+    //    On a professional's own number that somebody is her, and what she
+    //    says there is her side of the job: J or N for a request, "besetzt",
+    //    "der Kunde bleibt laenger". Anything that is not one of those falls
+    //    through to the owner commands, which is what this chat was for
+    //    before and still is on PartyDekoMiet and the Studio's own number.
+    if (msg.key.fromMe && isSelfChat(jid)) {
+      const mine = professionalOfThisLine();
+      if (mine) {
+        let said = text;
+        let spoken = false;
+        if (hasAudio(msg)) {
+          // Between clients, speaking is the only practical way for her to
+          // say anything - typing means putting the phone down in front of
+          // somebody lying on the table.
+          const heard = await transcribe(msg, jid);
+          if (heard === null) return;
+          said = heard;
+          spoken = true;
+        }
+        if (isProfessionalCommand(said)) return handleProfessionalReply(mine, jid, said, spoken);
+      }
+      return handleOwnerInput(msg, jid, text);
+    }
 
     // 1. The owner answered a customer by hand from the phone -> step aside.
     if (msg.key.fromMe) {

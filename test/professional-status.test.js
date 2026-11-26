@@ -30,6 +30,17 @@ const HER = '41791112233';
 const HER_JID = `${HER}@s.whatsapp.net`;
 
 const todayIn = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+/**
+ * The calendar day a moment belongs to, in the studio's zone.
+ *
+ * Needed because "twenty minutes ago" and "today" are not always the same
+ * day: run at 00:01 in Zurich, an appointment that started twenty minutes
+ * earlier started yesterday. Pairing clockIn(-20) with todayIn() wrote down a
+ * record that cannot exist - one starting at 23:41 tonight, already running -
+ * and the test then failed for the one hour a day when that was true.
+ */
+const dayIn = (offsetMin = 0) =>
+  new Date(Date.now() + offsetMin * 60000).toLocaleDateString('en-CA', { timeZone: TZ });
 /** The studio zone's UTC offset on a given day, so a wall time can be pinned. */
 const offsetAt = (day) => {
   const probe = new Date(`${day}T12:00:00Z`);
@@ -289,6 +300,17 @@ describe('the client is staying longer', () => {
       assert.ok(running, 'she must be able to find the client who is in the room');
     });
 
+    test('is still found after midnight, when it is yesterday\'s date', async () => {
+      // 00:20, she is still with the client who came in at 23:30. The
+      // appointment belongs to yesterday now, and looking only at today's
+      // date meant the answer was "you have no appointment running" at
+      // exactly the hour this studio is busiest.
+      await runningAppointment({ start: '23:30' });
+      const justAfterMidnight = new Date(AT('23:30').getTime() + 50 * 60000);
+      const running = appointments.currentFor(sofia.id, { timeZone: TZ, now: justAfterMidnight });
+      assert.ok(running, 'the client in the room is the client in the room');
+    });
+
     test('and it can still be extended', async () => {
       const appt = await runningAppointment({ start: '23:30' });
       const res = await say('der kunde bleibt noch eine halbe stunde', AT('23:50'));
@@ -413,7 +435,7 @@ describe('she speaks instead of typing', () => {
   test('a spoken extension moves the appointment', async () => {
     const created = await appointments.create({
       professional_id: sofia.id, service_id: service.id,
-      date: todayIn(), start_time: clockIn(-20), customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
+      date: dayIn(-20), start_time: clockIn(-20), customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
     });
     const before = db.get('appointments', created.appointment_id).endTime;
 
@@ -443,7 +465,7 @@ describe('the afternoon this was built for', () => {
     // Booked for an hour, started twenty minutes ago.
     await appointments.create({
       professional_id: sofia.id, service_id: service.id,
-      date: todayIn(), start_time: clockIn(-20), customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
+      date: dayIn(-20), start_time: clockIn(-20), customer_name: 'Marco', chatId: '4176@s.whatsapp.net',
     });
 
     // She speaks, between clients, holding the phone in one hand.

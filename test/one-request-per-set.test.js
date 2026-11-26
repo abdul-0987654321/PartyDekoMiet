@@ -62,6 +62,7 @@ beforeEach(async () => {
     notify: {
       bookingRequest: async (b) => { alerts.push(b.id); return { ok: true }; },
       owner: async () => ({ ok: true }),
+      toChat: async () => ({ ok: true }),
       toNumber: async () => ({ ok: true }),
     },
   });
@@ -97,6 +98,7 @@ describe('changing the date', () => {
       notify: {
         bookingRequest: async () => ({ ok: true }),
         owner: async () => ({ ok: true }),
+        toChat: async (j, text) => { told.push(text); return { ok: true }; },
         toNumber: async (n, text) => { told.push(text); return { ok: true }; },
       },
     });
@@ -168,6 +170,7 @@ describe('confirming', () => {
       notify: {
         bookingRequest: async () => ({ ok: true }),
         owner: async (text) => { told.push({ to: 'team', text }); return { ok: true }; },
+        toChat: async (j, text) => { told.push({ to: String(j).split('@')[0], text }); return { ok: true }; },
         toNumber: async (n, text) => { told.push({ to: n, text }); return { ok: true }; },
       },
     });
@@ -186,6 +189,7 @@ describe('confirming', () => {
       notify: {
         bookingRequest: async () => ({ ok: true }),
         owner: async (text) => { told.push(text); return { ok: true }; },
+        toChat: async () => ({ ok: false, error: 'not connected' }),
         toNumber: async () => ({ ok: false, error: 'not connected' }),
       },
     });

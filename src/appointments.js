@@ -160,10 +160,17 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
       // And the woman the appointment is actually for. Without this she only
       // learns of it if somebody passes it on, which on the Studio's main
       // number means she often did not learn of it at all.
+      //
+      // Unless her number IS this number. The owner put his own number in her
+      // profile while setting her up, so one appointment produced two separate
+      // WhatsApp messages in the same chat - the team alert and "a new request
+      // for you, reply J" - with nothing to say which was which or why there
+      // were two. One chat, one message.
       const ownNumber = String(professional.whatsapp || '').replace(/[^0-9]/g, '');
-      if (ownNumber && notify.toNumber) {
+      const thisNumber = (notify.recipients?.() || [])[0] || '';
+      if (ownNumber && ownNumber !== thisNumber && notify.toNumber) {
         const { m } = require('./notify/messages');
-        await notify.toNumber(ownNumber, m().proRequest(appt));
+        await notify.toNumber(ownNumber, m().proRequest(appt, professional.name));
       }
       if (!appt.calendarEventId) {
         const { m } = require('./notify/messages');
@@ -230,13 +237,13 @@ function createAppointments({ calendar, notify, business = 'studio' }) {
     // The customer hears about it too - same as on the PartyDekoMiet side.
     // Confirming used to be silent towards the person actually waiting.
     let customerTold = false;
-    if (notify?.toNumber && appt.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+    if (notify?.toChat && appt.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
       const { m } = require('./notify/messages');
       const texts = m();
       const text = status === 'CONFIRMED'
         ? texts.appointmentConfirmedCustomer(appt)
         : texts.appointmentCancelledCustomer(appt);
-      const res = await notify.toNumber(String(appt.jid).split('@')[0], text, { plain: true });
+      const res = await notify.toChat(appt.jid, text, { plain: true });
       customerTold = Boolean(res?.ok);
       if (customerTold) log.info(`Appointment ${id}: the customer was told it is ${status.toLowerCase()}.`);
       else log.warn(`Appointment ${id}: the customer could not be told (${res?.error || 'unknown'})`);

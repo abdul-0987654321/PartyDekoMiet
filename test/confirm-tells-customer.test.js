@@ -28,6 +28,11 @@ function notifier() {
     owner: async () => ({ ok: true }),
     bookingRequest: async () => ({ ok: true }),
     appointmentRequest: async () => ({ ok: true }),
+    // Two entry points now. A customer is reached through the chat we are
+    // already in (toChat), because WhatsApp addresses most people by a
+    // hidden id that cannot be turned back into a phone number. A
+    // professional is reached by her number.
+    toChat: async (jid, text, opts = {}) => { sent.push({ number: String(jid).split('@')[0], jid, text, ...opts }); return { ok: true }; },
     toNumber: async (number, text, opts = {}) => { sent.push({ number, text, ...opts }); return { ok: true }; },
   };
 }

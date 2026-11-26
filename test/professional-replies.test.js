@@ -47,6 +47,7 @@ beforeEach(async () => {
   notifier = {
     sent: [],
     owner: async (text) => { notifier.sent.push({ to: 'team', text }); return { ok: true }; },
+    toChat: async (jid, text) => { notifier.sent.push({ to: String(jid).split('@')[0], text }); return { ok: true }; },
     toNumber: async (number, text) => { notifier.sent.push({ to: number, text }); return { ok: true }; },
     appointmentRequest: async () => ({ ok: true }),
   };

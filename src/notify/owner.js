@@ -102,6 +102,23 @@ function createNotifier({ client, business = 'party' }) {
     return false;
   }
 
+  /**
+   * Which number this alert is about.
+   *
+   * Every alert now lands in one phone's own chat, and that phone may be the
+   * one PartyDekoMiet is on, the one the Studio is on, or a professional's.
+   * Three different things arriving in three different chats that all look the
+   * same is how "what is this message and what am I supposed to do with it"
+   * starts, and it did.
+   */
+  function lineLabel() {
+    try {
+      return require('../lines').nameOf(business);
+    } catch {
+      return '';
+    }
+  }
+
   async function owner(text, meta = {}, imageBuffer = null) {
     if (isRepeat(meta)) {
       log.info(`Alert suppressed (${meta.kind}) - the same one went out for this chat moments ago.`);
@@ -112,7 +129,8 @@ function createNotifier({ client, business = 'party' }) {
       log.warn(`This number is not connected - alert not sent: ${text.split('\n')[0]}`);
       return { ok: false, error: 'not connected' };
     }
-    const body = `\u{1F514} ${text}`;
+    const label = lineLabel();
+    const body = `\u{1F514} ${text}${label ? `\n\n[${label}]` : ''}`;
     const failed = [];
 
     for (const number of numbers) {
@@ -135,11 +153,42 @@ function createNotifier({ client, business = 'party' }) {
   }
 
   /**
+   * A message back into a chat we are already in.
+   *
+   * Not toNumber. WhatsApp now addresses most people by a hidden id - a LID,
+   * like 150375495651422@lid - rather than by their phone number. Taking that
+   * chat id apart and building "150375495651422@s.whatsapp.net" out of it
+   * produces an address belonging to nobody, and the message goes nowhere.
+   *
+   * That is exactly what happened to every booking and appointment
+   * confirmation: the owner pressed Confirm, the status changed, the calendar
+   * updated, his own alert arrived - and the customer, the one person actually
+   * waiting to hear, was sent a message to an address that does not exist.
+   *
+   * The chat id we already have is the right address. It is the chat the
+   * conversation happened in.
+   */
+  async function toChat(jid, text, { plain = false } = {}) {
+    const target = String(jid || '').trim();
+    if (!target.includes('@')) {
+      // Not a chat id but a bare number - the old call sites passed those.
+      return toNumber(target, text, { plain });
+    }
+    try {
+      await client.sendText(target, plain ? text : `\u{1F514} ${text}`);
+      return { ok: true };
+    } catch (err) {
+      log.error(`Could not write to ${target}: ${err.message}`);
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /**
    * One named number, rather than whoever the alert list points at.
    *
-   * Used to reach a professional about her own appointment. Kept apart from
-   * owner() on purpose: that one is "tell whoever runs this", this one is "tell
-   * exactly her", and the two must never quietly become the same thing.
+   * Used to reach a professional about her own appointment, who is known by
+   * her phone number and not by a chat. For somebody we are already talking
+   * to, use toChat.
    */
   async function toNumber(number, text, { plain = false } = {}) {
     const digits = String(number || '').replace(/[^0-9]/g, '');
@@ -247,7 +296,7 @@ function createNotifier({ client, business = 'party' }) {
     return owner(lines.join('\n'), { kind: 'appointment_request', appointmentId: appt.id });
   }
 
-  return { owner, toNumber, bookingRequest, appointmentRequest, recipients };
+  return { owner, toNumber, toChat, bookingRequest, appointmentRequest, recipients };
 }
 
 module.exports = { createNotifier, explainRecipients };

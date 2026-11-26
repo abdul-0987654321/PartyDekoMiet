@@ -314,13 +314,13 @@ function createBookings({ catalog, calendar, notify }) {
     // waiting on WhatsApp heard nothing at all and had no way to know their
     // set was theirs.
     let customerTold = false;
-    if (!silent && notify?.toNumber && booking.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
+    if (!silent && notify?.toChat && booking.jid && (status === 'CONFIRMED' || status === 'CANCELLED')) {
       const { m } = require('./notify/messages');
       const texts = m();
       const text = status === 'CONFIRMED'
         ? texts.bookingConfirmedCustomer(booking)
         : texts.bookingCancelledCustomer(booking);
-      const res = await notify.toNumber(String(booking.jid).split('@')[0], text, { plain: true });
+      const res = await notify.toChat(booking.jid, text, { plain: true });
       customerTold = Boolean(res?.ok);
       // Logged either way: "did the customer actually hear about this" is the
       // first question asked when something looks wrong, and a line that only

@@ -51,10 +51,14 @@ const T = {
     // What the professional herself gets, on her own number. Deliberately
     // short: she is reading it between clients, and the only thing she has to
     // do is answer J or N.
-    proRequest: (a) =>
-      `NEUE ANFRAGE FUER DICH\n\n${a.serviceName}\nKunde: ${a.customerName}\n` +
+    proRequest: (a, forName) =>
+      `NEUE ANFRAGE FUER ${String(forName || a.professionalName || '').toUpperCase() || 'DICH'}\n\n` +
+      `${a.serviceName}\nKunde: ${a.customerName}\n` +
       `${a.date} um ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
-      `Antworte J zum Bestaetigen oder N zum Absagen.\nCode: ${a.id}`,
+      'Antworte J zum Bestaetigen oder N zum Absagen.\n' +
+      `(Diese Nachricht geht an die WhatsApp-Nummer, die im Dashboard unter Professionals bei ${forName || a.professionalName} eingetragen ist. ` +
+      'Nummer dort leeren = keine solchen Nachrichten mehr.)\n' +
+      `Code: ${a.id}`,
     proConfirmed: (a) => `Bestaetigt: ${a.serviceName}, ${a.date} um ${a.startTime}. Danke!`,
     proCancelled: (a) => `Abgesagt: ${a.serviceName}, ${a.date} um ${a.startTime}. Das Team wird informiert.`,
     proNothingOpen: 'Du hast gerade keine offene Anfrage.',
@@ -177,10 +181,14 @@ const T = {
     },
     appointmentFooter: 'Not confirmed yet. Tap "Confirm" under Appointments in the dashboard - the calendar follows automatically.',
 
-    proRequest: (a) =>
-      `NEW REQUEST FOR YOU\n\n${a.serviceName}\nCustomer: ${a.customerName}\n` +
+    proRequest: (a, forName) =>
+      `NEW REQUEST FOR ${String(forName || a.professionalName || '').toUpperCase() || 'YOU'}\n\n` +
+      `${a.serviceName}\nCustomer: ${a.customerName}\n` +
       `${a.date} at ${a.startTime}${a.endTime ? `-${a.endTime}` : ''}\n\n` +
-      `Reply Y to confirm or N to decline.\nCode: ${a.id}`,
+      'Reply Y to confirm or N to decline.\n' +
+      `(This goes to the WhatsApp number saved for ${forName || a.professionalName} on the Professionals page. ` +
+      'Clear that number and these messages stop.)\n' +
+      `Code: ${a.id}`,
     proConfirmed: (a) => `Confirmed: ${a.serviceName}, ${a.date} at ${a.startTime}. Thank you!`,
     proCancelled: (a) => `Declined: ${a.serviceName}, ${a.date} at ${a.startTime}. The team has been told.`,
     proNothingOpen: 'You have no open request right now.',

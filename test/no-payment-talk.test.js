@@ -114,3 +114,22 @@ describe('what must still be allowed', () => {
     assert.strictEqual(send(text, 'de').text, text);
   });
 });
+
+describe('the wordings it kept finding', () => {
+  // Each of these went out in a live conversation, one per testing round, each
+  // one a rewording of the promise the round before. They are kept together as
+  // a list because the lesson is the list: this rule has to be about the idea,
+  // not about a phrase.
+  for (const said of [
+    'Your booking will be confirmed once the payment is processed.',
+    "Your request is with the team, and they'll confirm once the payment is processed.",
+    'Your booking will only be binding after the payment is processed.',
+    'The reservation is final once we receive your payment.',
+    'Please complete the payment to secure the set.',
+  ]) {
+    test(`"${said.slice(0, 48)}..." does not reach the customer`, () => {
+      const out = send(said, 'en').text;
+      assert.ok(!/payment|pay\b/i.test(out), out);
+    });
+  }
+});

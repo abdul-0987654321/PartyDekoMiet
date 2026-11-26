@@ -98,8 +98,8 @@ const STRIP_RULES = [
     // word order, straight through. Confirming and paying must simply never
     // appear in one sentence.
     patterns: [
-      /\b(confirm|confirms|confirmed|confirmation|secure|secured|guarantee\w*)\b.{0,60}\b(payment|paid|pay\b)/i,
-      /\b(payment|paid|pay\b).{0,60}\b(confirm|confirms|confirmed|confirmation|secure|secured|booked)\b/i,
+      /\b(confirm|confirms|confirmed|confirmation|secure|secured|guarantee\w*|binding|final|valid|reserved)\b.{0,60}\b(payment|paid|pay\b)/i,
+      /\b(payment|paid|pay\b).{0,60}\b(confirm|confirms|confirmed|confirmation|secure|secured|booked|binding|final|valid|reserved)\b/i,
       /\b(best(?:ae|a)tig\w*|verbindlich|fix|gebucht|reserviert)\b.{0,60}\b(zahlung|bezahl\w*)\b/i,
       /\b(zahlung|bezahl\w*)\b.{0,60}\b(best(?:ae|a)tig\w*|verbindlich|fix|gebucht|reserviert)\b/i,
     ],

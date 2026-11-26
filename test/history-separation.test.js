@@ -101,6 +101,38 @@ describe('conversation history per number', () => {
     assert.deepStrictEqual(agent.calls[1].history, ['erste Frage', 'ok']);
   });
 
+  // A customer who came back the next day, about something else.
+  //
+  // This is the test for the conversation that went wrong: the customer had
+  // named no date at all and was told his pickup was the 9th of December,
+  // because a conversation the day before had settled on the 9th. He then
+  // argued with the bot four times about a date he never gave.
+  test('a conversation from yesterday is marked as over', async () => {
+    db.put('chat', {
+      id: 'old-1', at: new Date(Date.now() - 26 * 3600000).toISOString(), jid: JID,
+      direction: 'in', business: 'party', text: 'Abholung am 9. Dezember passt',
+    });
+    const agent = recordingAgent();
+    await routerFor('party', agent).handle(incoming('Hallo, ich brauche Deko', 'a1'));
+
+    const roles = agent.calls[0].history;
+    assert.ok(
+      roles.some((h) => /Neues Gespraech/.test(h)),
+      'the model must see that the old date belongs to a finished conversation'
+    );
+  });
+
+  test('a pause of minutes is still the same conversation', async () => {
+    db.put('chat', {
+      id: 'recent-1', at: new Date(Date.now() - 20 * 60000).toISOString(), jid: JID,
+      direction: 'in', business: 'party', text: 'Moment, ich frage kurz nach',
+    });
+    const agent = recordingAgent();
+    await routerFor('party', agent).handle(incoming('So, der 10. Dezember', 'a1'));
+
+    assert.ok(!agent.calls[0].history.some((h) => /Neues Gespraech/.test(h)));
+  });
+
   test('untagged rows written before the business column still belong to Party', async () => {
     db.put('chat', { id: 'old-1', at: '2026-01-01T00:00:00.000Z', jid: JID, direction: 'in', text: 'alte Zeile' });
     const agent = recordingAgent();

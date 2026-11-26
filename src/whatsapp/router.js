@@ -656,6 +656,20 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
   // ---- Conversation history -------------------------------------------------
 
   const MAX_TURNS = 20;
+  /**
+   * A gap this long means the customer went away and came back about something
+   * else. Six hours: long enough that a pause for lunch or a night's sleep sits
+   * between two conversations, short enough that yesterday's agreed date is
+   * never mistaken for today's.
+   */
+  const CONVERSATION_GAP_MS = 6 * 60 * 60 * 1000;
+  /** What the model is shown where one conversation ended and another began. */
+  const BREAK = {
+    role: 'system',
+    content:
+      '[Neues Gespraech. Alles davor ist eine fruehere Unterhaltung: Daten, Sets und '
+      + 'Wuensche von davor gelten NICHT mehr. Frage alles fuer diese Anfrage neu.]',
+  };
 
   function remember(jid, direction, text) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -671,12 +685,36 @@ function createRouter({ client, agent, services, notify, knowledge, voice = null
    * which is exactly the separation the client asked for by name.
    */
   function recentHistory(jid) {
-    return db
+    const rows = db
       .all('chat')
       .filter((m) => m.jid === jid && (m.business || 'party') === business)
       .sort((a, b) => String(a.at).localeCompare(String(b.at)))
-      .slice(-MAX_TURNS)
-      .map((m) => ({ role: m.direction === 'in' ? 'user' : 'assistant', content: m.text }));
+      .slice(-MAX_TURNS);
+
+    // Where the conversation stopped and started again.
+    //
+    // History had no sense of time, so a set and a date agreed yesterday read
+    // as part of today's request: a customer who had said nothing about dates
+    // was told his pickup was the 9th, because that is what the previous
+    // conversation had settled. He had to argue with the bot about a date he
+    // never gave.
+    const out = [];
+    let previousAt = null;
+    for (const m of rows) {
+      const at = Date.parse(m.at);
+      if (previousAt && Number.isFinite(at) && at - previousAt > CONVERSATION_GAP_MS) {
+        out.push(BREAK);
+      }
+      if (Number.isFinite(at)) previousAt = at;
+      out.push({ role: m.direction === 'in' ? 'user' : 'assistant', content: m.text });
+    }
+
+    // The gap that matters most is the one between the last thing said and now:
+    // the customer writing again today, after everything above was settled
+    // yesterday. That is exactly the case this was built for, and comparing
+    // only stored messages to each other misses it entirely.
+    if (previousAt && Date.now() - previousAt > CONVERSATION_GAP_MS) out.push(BREAK);
+    return out;
   }
 
   return {

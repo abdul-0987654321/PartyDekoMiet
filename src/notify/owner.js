@@ -92,7 +92,37 @@ function createNotifier({ client, business = 'party', ownNumbers = null }) {
     return explainRecipients({ business, ownNumbers, self: selfNumber() }).numbers;
   }
 
+  /**
+   * The same alert, about the same chat, twice in a row.
+   *
+   * A customer writing two awkward messages in a row produced two identical
+   * "somebody needs you" alerts within a minute. The second one carries no
+   * information the first did not, and two buzzes for one situation is how
+   * people start ignoring the buzz.
+   *
+   * Keyed on kind and chat, not on the text, so a handoff about one customer
+   * never silences a handoff about another.
+   */
+  const recentAlerts = new Map();
+  const REPEAT_WINDOW_MS = 2 * 60 * 1000;
+
+  function isRepeat(meta) {
+    if (!meta.kind || !meta.jid) return false;
+    const key = `${meta.kind}:${meta.jid}`;
+    const last = recentAlerts.get(key) || 0;
+    const now = Date.now();
+    if (now - last < REPEAT_WINDOW_MS) return true;
+    recentAlerts.set(key, now);
+    // Nothing older than the window is worth remembering.
+    for (const [k, at] of recentAlerts) if (now - at > REPEAT_WINDOW_MS) recentAlerts.delete(k);
+    return false;
+  }
+
   async function owner(text, meta = {}, imageBuffer = null) {
+    if (isRepeat(meta)) {
+      log.info(`Alert suppressed (${meta.kind}) - the same one went out for this chat moments ago.`);
+      return { ok: true, suppressed: true };
+    }
     const numbers = recipients();
     if (!numbers.length) {
       log.warn(`No alert number configured - notification not sent: ${text.split('\n')[0]}`);

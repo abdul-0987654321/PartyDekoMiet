@@ -106,3 +106,62 @@ describe('what actually gets sent', () => {
     assert.deepStrictEqual(c.sent, ['41790000002']);
   });
 });
+
+describe('the same alert twice in a minute', () => {
+  function client() {
+    const sent = [];
+    return {
+      sent,
+      getStatus: () => ({ status: 'connected', me: { id: `${LINKED}:1@s.whatsapp.net` } }),
+      isConnected: () => true,
+      sendText: async (jid, text) => { sent.push(text); return {}; },
+    };
+  }
+
+  // A customer writing two awkward messages in a row produced two identical
+  // "somebody needs you" alerts. Two buzzes for one situation is how people
+  // start ignoring the buzz.
+  test('only goes out once', async () => {
+    await settings.update({ alertNumbers: '41790000002' });
+    const c = client();
+    const notify = createNotifier({ client: c, business: 'studio' });
+
+    await notify.owner('Ein Kunde braucht jemanden.', { kind: 'handoff', jid: '4179@s.whatsapp.net' });
+    await notify.owner('Ein Kunde braucht jemanden.', { kind: 'handoff', jid: '4179@s.whatsapp.net' });
+
+    assert.strictEqual(c.sent.length, 1);
+  });
+
+  test('a different customer still gets through', async () => {
+    await settings.update({ alertNumbers: '41790000002' });
+    const c = client();
+    const notify = createNotifier({ client: c, business: 'studio' });
+
+    await notify.owner('x', { kind: 'handoff', jid: '4179@s.whatsapp.net' });
+    await notify.owner('y', { kind: 'handoff', jid: '4176@s.whatsapp.net' });
+
+    assert.strictEqual(c.sent.length, 2, 'two people waiting is two things to know about');
+  });
+
+  test('a different kind of alert about the same chat still gets through', async () => {
+    await settings.update({ alertNumbers: '41790000002' });
+    const c = client();
+    const notify = createNotifier({ client: c, business: 'studio' });
+
+    await notify.owner('x', { kind: 'handoff', jid: '4179@s.whatsapp.net' });
+    await notify.owner('y', { kind: 'appointment_request', jid: '4179@s.whatsapp.net' });
+
+    assert.strictEqual(c.sent.length, 2);
+  });
+
+  test('an alert with no chat behind it is never suppressed', async () => {
+    await settings.update({ alertNumbers: '41790000002' });
+    const c = client();
+    const notify = createNotifier({ client: c, business: 'party' });
+
+    await notify.owner('Speicher voll', { kind: 'storage_error' });
+    await notify.owner('Speicher voll', { kind: 'storage_error' });
+
+    assert.strictEqual(c.sent.length, 2, 'a system fault is not a chat and must not be swallowed');
+  });
+});

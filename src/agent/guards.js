@@ -82,6 +82,14 @@ const STRIP_RULES = [
     hint: 'The bot never asks for payment and never sends a payment link. The team invoices after checking the request.',
     patterns: [
       /\b(complete|make|process|finish)\b.{0,20}\b(the )?payment\b/i,
+      // Ordering is the same act under another word. "Here's the link to
+      // complete your order" sends the customer to buy something the team has
+      // not yet agreed to - and the team is the one who invoices.
+      /\b(complete|place|finish|submit|confirm)\b.{0,25}\b(your |the )?(order|booking)\b.{0,25}\b(here|link|online|shop)\b/i,
+      /\b(link)\b.{0,30}\b(to )?(complete|place|finish|submit)\b.{0,20}\b(your |the )?(order|purchase|booking)\b/i,
+      /\b(order|buy|book) (it |this |the set )?(here|now|online|directly)\b/i,
+      /\b(bestell|bestelle|bestellen|bestellung)\b.{0,30}\b(hier|ueber diesen link|im shop|abschliessen)\b/i,
+      /\b(schliess\w*|schliesse)\b.{0,25}\b(bestellung|buchung)\b.{0,20}\b(ab|hier)\b/i,
       /\bpay\b.{0,25}\b(here|through this link|via this link|now|first)\b/i,
       /\bplease (pay|complete|proceed with)\b/i,
       /\b(zahlung|bezahlung)\b.{0,30}\b(ueber|via|hier|abschliessen|vornehmen|taetigen|durchfuehren)\b/i,

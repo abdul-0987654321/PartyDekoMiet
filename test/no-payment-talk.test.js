@@ -133,3 +133,29 @@ describe('the wordings it kept finding', () => {
     });
   }
 });
+
+describe('ordering is the same act under another word', () => {
+  for (const said of [
+    "Here's the link to complete your order: https://partydekomiet.ch/products/x",
+    'You can order it here: https://partydekomiet.ch/products/x',
+    'Please place your order through this link.',
+    'Bestelle bitte hier im Shop.',
+  ]) {
+    test(`"${said.slice(0, 46)}" is removed`, () => {
+      const out = send(said, 'en').text;
+      assert.ok(!/order|bestell/i.test(out), out);
+    });
+  }
+
+  // The link itself is how a customer sees what they are getting. It must
+  // survive; only the instruction to buy is taken out.
+  for (const said of [
+    'Hier siehst du alle Bilder und Details: https://partydekomiet.ch/products/x',
+    'Here is the set with all the pictures: https://partydekomiet.ch/products/x',
+    'Party deko set bombril Fr: https://partydekomiet.ch/products/deko-set-fr-fr-350',
+  ]) {
+    test(`"${said.slice(0, 46)}" is kept`, () => {
+      assert.strictEqual(send(said, 'de').text, said);
+    });
+  }
+});

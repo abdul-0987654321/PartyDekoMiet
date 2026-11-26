@@ -13,7 +13,7 @@ const { buildSystemPrompt } = require('./prompt');
 const partyTools = require('./tools');
 const { resolveLanguage, scoreText } = require('./language');
 const settings = require('../settings');
-const { claimsRequestSent, requestWasMade } = require('./guards');
+const { claimsRequestSent, requestWasMade, sentences } = require('./guards');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -167,6 +167,7 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
     ];
 
     let handoff = false;
+    let retried = false; // the claim-without-a-tool nudge, allowed once
     const toolCalls = [];
     const toolServices = {
       ...services,
@@ -216,22 +217,45 @@ function createAgent({ openai, knowledge, guards, tools = partyTools, config = {
       // would never hear of it. Rather than send that, ask for the thing that
       // is almost always missing - the name - or, if we have it, put a human
       // on it, which is what the customer was promised in substance.
-      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls)) {
-        log.error(
-          `Reply claimed a request had been passed on, but no request tool ran. ` +
-            `Tools: ${toolCalls.map((c) => c.name).join(', ') || 'none'} | "${guarded.text.slice(0, 160)}"`
+      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls) && !retried) {
+        // Send it back to the model instead of patching the sentence.
+        //
+        // The first version replaced the message - with a request for the name,
+        // or with a handoff - and both were wrong in the common case. The model
+        // had simply forgotten to call the tool; it had everything it needed.
+        // Telling it so, once, gets the booking actually made, which is what
+        // the customer was promised. Handing the chat to a person instead
+        // turned a finished conversation into work for somebody.
+        retried = true;
+        log.warn(
+          `Reply claimed a request had been passed on with no tool behind it - asking the model to finish it. ` +
+            `Tools so far: ${toolCalls.map((c) => c.name).join(', ') || 'none'}`
         );
-        // Without a name the tool could not have run anyway, so ask for it.
-        // With a name something else went wrong, and a person should look.
-        const replacement = customerName
-          ? (lang === 'en'
-            ? 'Let me check this with a colleague - I am passing your request to the team now.'
-            : 'Das schaue ich kurz mit dem Team an - ich gebe deine Anfrage jetzt weiter.')
-          : (lang === 'en'
-            ? 'Before I pass this to the team I still need your name - what should I put on the request?'
-            : 'Bevor ich das ans Team weitergebe, brauche ich noch deinen Namen - wie heisst du?');
-        if (customerName) handoff = true;
-        guarded = { ...guarded, text: replacement };
+        messages.push({ role: 'assistant', content: guarded.text });
+        messages.push({
+          role: 'system',
+          content:
+            'You just told the customer their request had been passed on, but you did not call '
+            + 'create_booking_request (or create_appointment). Nothing reached the team. '
+            + 'Either call the tool now with everything you have, or - if something required is '
+            + 'still missing, usually the name or the date - ask the customer for exactly that, '
+            + 'in one short sentence, without claiming anything has been sent.',
+        });
+        continue;
+      }
+
+      // It said it again after being told. Rather than send a claim that is not
+      // true, take the claim out and keep whatever else it said.
+      if (claimsRequestSent(guarded.text) && !requestWasMade(toolCalls)) {
+        const kept = sentences(guarded.text).filter((line) => !claimsRequestSent(line)).join(' ').trim();
+        log.error(
+          `Reply still claimed a request had been passed on after being corrected. `
+            + `Removed the claim. Tools: ${toolCalls.map((c) => c.name).join(', ') || 'none'}`
+        );
+        const fallback = lang === 'en'
+          ? 'One moment - what name should I put on the request?'
+          : 'Einen Moment - auf welchen Namen soll die Anfrage laufen?';
+        guarded = { ...guarded, text: kept.length >= 15 ? kept : fallback };
       }
       if (guarded.blocked) {
         log.error(

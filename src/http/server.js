@@ -215,6 +215,15 @@ function createServer({
       ready: st.ready,
       startedAt: st.startedAt,
       uptimeSeconds: Math.round(process.uptime()),
+      // Every connected number costs memory, and the box has 512 MB. There was
+      // no way to see how close we are to it except Render's own graph, so the
+      // question "can this take another number" could only be answered by
+      // adding one and waiting to see whether everything restarted.
+      memory: {
+        rssMb: Math.round(process.memoryUsage().rss / 1048576),
+        heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+        limitMb: Number(process.env.MEMORY_LIMIT_MB) || 512,
+      },
       storage: db.status(), // one shared Google Sheet for both businesses
       storageError: state.storageError, // the Sheet connection itself, from Party's boot
       storageWarning: state.storageWarning,

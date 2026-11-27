@@ -75,6 +75,7 @@
     <div class="row"><span id="l_pending"></span><span id="pending">…</span></div>
     <div class="row"><span id="l_flushed"></span><span id="flushed">…</span></div>
     <div class="row"><span id="l_started"></span><span id="started">…</span></div>
+    <div class="row"><span id="l_memory"></span><span id="memory">…</span></div>
   </div>
   </div></div>
   </details>
@@ -176,7 +177,7 @@ for (const [id, key] of [
   ['l_wa','whatsapp'],['l_storage','storage'],['l_catalog','catalog'],['l_calendar','calendar'],
   ['l_key','openai_key'],['l_owner','owner_number'],['l_paused','paused_chats'],
   ['l_model','model'],['l_knowledge','knowledge'],['l_pending','pending_writes'],
-  ['l_flushed','last_saved'],['l_started','started'],
+  ['l_flushed','last_saved'],['l_started','started'],['l_memory','memory'],
 ]) $(id).textContent = t(key);
 
 // The Studio and every professional's number book appointments, not rentals,
@@ -301,6 +302,13 @@ async function refresh() {
   $('pending').textContent = d.storage.pending ?? '–';
   $('flushed').textContent = fmtDate(d.storage.lastFlushAt);
   $('started').textContent = fmtDate(d.startedAt);
+  // Each connected number costs memory and the box has a fixed ceiling, so
+  // this says how close it is before another number is added, not after.
+  if (d.memory) {
+    const share = Math.round((d.memory.rssMb / d.memory.limitMb) * 100);
+    $('memory').textContent = `${d.memory.rssMb} / ${d.memory.limitMb} MB (${share}%)`;
+    $('memory').className = share >= 85 ? 'bad' : share >= 70 ? 'warn' : '';
+  }
 }
 // Both on the same beat: a status that is ten minutes stale is worse than
 // none, because it gets believed.

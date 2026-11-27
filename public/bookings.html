@@ -104,12 +104,34 @@ function subjectBlock(b) {
     ${b.priceChf ? `<div class="muted">CHF ${esc(b.priceChf)}</div>` : ''}</div>`;
 }
 
+/**
+ * Clearing out the cancelled ones.
+ *
+ * Only offered while looking at them, and only when there are some: a button
+ * that deletes things has no business sitting next to a list of live
+ * appointments.
+ */
+async function clearCancelled() {
+  const n = rows.filter((b) => b.status === 'CANCELLED').length;
+  if (!n) return;
+  if (!(await ask(t('b_clear_q').replace('{n}', n)))) return;
+  const res = await api('/api/bookings/cancelled', { method: 'DELETE' });
+  if (!res.ok) { await say(res.error || t('save_err')); return; }
+  refresh();
+}
+
 function render() {
   renderFilters();
   const list = sortRows(rows.filter((b) => matches(b, filter)));
+  const cancelled = rows.filter((b) => b.status === 'CANCELLED').length;
+  const clearBtn = filter === 'CANCELLED' && cancelled
+    ? `<div class="actions inline" style="margin-bottom:14px">
+         <button class="ghost" onclick="clearCancelled()">${t('b_clear').replace('{n}', cancelled)}</button>
+       </div>`
+    : '';
   const emptyMsg = isStudio ? t('no_appointments') : t('no_bookings');
   if (!list.length) { $('wrap').innerHTML = `<div class="card"><p class="muted" style="margin:0">${emptyMsg}</p></div>`; return; }
-  $('wrap').innerHTML = `<div class="bk-list">${list.map((b) => `
+  $('wrap').innerHTML = `${clearBtn}<div class="bk-list">${list.map((b) => `
     <div class="bk ${esc(b.status)}">
       <div class="top">
         ${pill(t(STATUS_TXT[b.status]) || b.status, b.status === 'CONFIRMED' ? 'ok' : b.status === 'CANCELLED' ? 'err' : 'warn')}

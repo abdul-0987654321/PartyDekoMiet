@@ -706,6 +706,35 @@ function createServer({
     res.json({ ok: true, bookings: rows });
   });
 
+  /**
+   * Throw away the cancelled ones.
+   *
+   * A cancelled request is kept so the owner can see what happened, but after
+   * a few weeks of testing the list is mostly dead rows and the real ones are
+   * hard to find. Only CANCELLED is ever removed - never a pending request
+   * somebody is still waiting on, and never a confirmed appointment, which is
+   * somebody's afternoon.
+   *
+   * The calendar is not touched: cancelling already removed the entry, and a
+   * row in a sheet has no business deleting a customer's calendar event weeks
+   * later.
+   */
+  app.delete('/api/bookings/cancelled', safe(async (req, res) => {
+    const { biz } = pick(req);
+    const table = biz === 'party' ? 'bookings' : 'appointments';
+
+    let rows = db.all(table).filter((r) => r.status === 'CANCELLED');
+    // On a professional's own number, only hers - the same rule the list uses.
+    const her = professionalFor(biz);
+    if (her) rows = rows.filter((a) => belongsTo(a, her));
+
+    for (const row of rows) db.remove(table, row.id);
+    await db.flush();
+
+    log.info(`Removed ${rows.length} cancelled ${table} for ${biz}.`);
+    res.json({ ok: true, removed: rows.length });
+  }));
+
   app.post('/api/bookings/:id/status', safe(async (req, res) => {
     const { biz, runtime: rt } = pick(req);
     const svc = biz === 'party' ? rt.bookings : rt.appointments;

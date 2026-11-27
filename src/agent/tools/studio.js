@@ -386,9 +386,46 @@ const DEFS = [
       additionalProperties: false,
     },
     handler: async (args, services) => {
-      const { appointments } = services;
+      const { appointments, directory } = services;
       if (!appointments) return UNAVAILABLE('Die Terminverwaltung');
-      return await appointments.create({ ...args, chatId: services.chatId });
+      if (!directory) return UNAVAILABLE('Das Team-Verzeichnis');
+
+      /**
+       * Resolve the names first, exactly as check_slot_availability does.
+       *
+       * It did not, and the conversation died: the model called this with
+       * professional_id "TST" - the name of the number it was answering on,
+       * not an id - and got "Professional TST nicht gefunden" back. It tried
+       * again, failed again, and after a few rounds gave up and handed the
+       * customer to a human who was asleep. The model could check a slot by
+       * name and then not book it, which is the worst possible place to be
+       * strict about ids.
+       *
+       * Resolving against the line's own directory also means a professional's
+       * number can only ever book her: on her line that list holds one person.
+       */
+      const people = directory.listProfessionals({ activeOnly: true });
+      const who = resolve(people, args.professional_id, 'Professional', {
+        alsoKnownAs: directory.listServices({ activeOnly: true }),
+      });
+
+      // On her own number there is exactly one person it could be. Refusing
+      // over the name of a woman who is not on this line, when only one woman
+      // is, would be strictness for its own sake.
+      const professional = who.record || (people.length === 1 ? people[0] : null);
+      if (!professional) return { ok: false, error: who.error };
+
+      const what = resolve(directory.listServices({ activeOnly: true }), args.service_id, 'Service', {
+        alsoKnownAs: people,
+      });
+      if (what.error) return { ok: false, error: what.error };
+
+      return await appointments.create({
+        ...args,
+        professional_id: professional.id,
+        service_id: what.record.id,
+        chatId: services.chatId,
+      });
     },
   },
   {

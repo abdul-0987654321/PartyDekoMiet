@@ -126,7 +126,10 @@ describe('studio tool registry', () => {
     const res = await runTool(
       'create_appointment_request',
       { professional_id: professional.id, service_id: service.id, date: '2026-06-05', start_time: '14:00', customer_name: 'Anna Keller' },
-      { appointments, chatId: '41790000000@s.whatsapp.net' }
+      // The directory is wired now: the tool resolves a name to a record the
+      // way check_slot_availability always has, and on a professional's line
+      // that list is what keeps the appointment hers. See booking-by-name.
+      { appointments, directory, chatId: '41790000000@s.whatsapp.net' }
     );
     assert.strictEqual(res.ok, true);
     assert.strictEqual(res.status, 'PENDING');
